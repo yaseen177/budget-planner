@@ -55,7 +55,9 @@ import {
   Music,
   Copy,
   PenLine,
-  Search
+  Search,
+  ArrowUpDown,
+  Globe
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION AREA ---
@@ -104,10 +106,15 @@ const DEFAULT_ALLOCATIONS = [
 ];
 
 // --- HELPER FUNCTIONS ---
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('en-GB', {
+const formatCurrency = (amount, currency = 'GBP') => {
+  const localeMap = {
+    'GBP': 'en-GB',
+    'USD': 'en-US',
+    'EUR': 'de-DE'
+  };
+  return new Intl.NumberFormat(localeMap[currency] || 'en-GB', {
     style: 'currency',
-    currency: 'GBP',
+    currency: currency,
     minimumFractionDigits: 2
   }).format(amount);
 };
@@ -247,12 +254,12 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
 
 // --- OTHER COMPONENTS ---
 
-const BudgetWheel = ({ salary, expenses, allocations }) => {
+const BudgetWheel = ({ salary, expenses, allocations, currency }) => {
   if (!salary || parseFloat(salary) <= 0) return null;
 
   const salaryNum = parseFloat(salary);
   const totalExpenses = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-  const remainder = Math.max(0, salaryNum - totalExpenses);
+  // const remainder = Math.max(0, salaryNum - totalExpenses); // unused here
 
   const expensesPercent = Math.min(100, (totalExpenses / salaryNum) * 100);
   const remainderPercentOfTotal = 100 - expensesPercent;
@@ -289,7 +296,7 @@ const BudgetWheel = ({ salary, expenses, allocations }) => {
         <div className="absolute inset-2 bg-white rounded-full flex flex-col items-center justify-center">
            <div className="absolute inset-0 bg-white rounded-full flex flex-col items-center justify-center z-10">
               <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">Net Salary</span>
-              <span className="text-xl font-bold text-slate-800">{formatCurrency(salaryNum)}</span>
+              <span className="text-xl font-bold text-slate-800">{formatCurrency(salaryNum, currency)}</span>
            </div>
         </div>
       </div>
@@ -339,7 +346,7 @@ const LoginScreen = ({ onLogin }) => (
   </div>
 );
 
-const StatCard = ({ label, amount, icon: Icon, colorClass, subText }) => (
+const StatCard = ({ label, amount, icon: Icon, colorClass, subText, currency }) => (
   <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-full print:border-slate-300 print:shadow-none">
     <div className="flex justify-between items-start mb-2">
       <div className={`p-2.5 rounded-xl ${colorClass} print:bg-white print:border print:border-slate-200`}>
@@ -348,13 +355,13 @@ const StatCard = ({ label, amount, icon: Icon, colorClass, subText }) => (
     </div>
     <div>
       <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 print:text-slate-600">{label}</p>
-      <h3 className="text-2xl font-bold text-slate-800 print:text-black tracking-tight">{formatCurrency(amount)}</h3>
+      <h3 className="text-2xl font-bold text-slate-800 print:text-black tracking-tight">{formatCurrency(amount, currency)}</h3>
       {subText && <p className="text-xs text-slate-400 mt-1 print:text-slate-500 font-medium">{subText}</p>}
     </div>
   </div>
 );
 
-const AllocationCard = ({ title, amount, percentage, color }) => {
+const AllocationCard = ({ title, amount, percentage, color, currency }) => {
   let barColor = 'bg-slate-500';
   if (color.includes('indigo')) barColor = 'bg-indigo-500';
   if (color.includes('emerald')) barColor = 'bg-emerald-500';
@@ -370,7 +377,7 @@ const AllocationCard = ({ title, amount, percentage, color }) => {
           </div>
           <h4 className="font-bold text-slate-700 print:text-black">{title}</h4>
         </div>
-        <p className="text-lg font-bold text-slate-800 print:text-black">{amount > 0 ? formatCurrency(amount) : '£0.00'}</p>
+        <p className="text-lg font-bold text-slate-800 print:text-black">{amount > 0 ? formatCurrency(amount, currency) : formatCurrency(0, currency)}</p>
       </div>
       
       <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
@@ -428,7 +435,7 @@ const ReportSelector = ({ onClose, onSelect }) => (
   </div>
 );
 
-const MonthReportView = ({ date, salary, expenses, allocations, onClose }) => {
+const MonthReportView = ({ date, salary, expenses, allocations, onClose, currency }) => {
   const totalExpenses = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
   const salaryNum = parseFloat(salary) || 0;
   const remainder = Math.max(0, salaryNum - totalExpenses);
@@ -458,7 +465,7 @@ const MonthReportView = ({ date, salary, expenses, allocations, onClose }) => {
           </div>
           <div className="text-right">
             <p className="text-xs font-bold text-slate-400 uppercase">Net Salary</p>
-            <p className="text-2xl font-bold text-emerald-600">{formatCurrency(salaryNum)}</p>
+            <p className="text-2xl font-bold text-emerald-600">{formatCurrency(salaryNum, currency)}</p>
           </div>
         </div>
 
@@ -470,12 +477,12 @@ const MonthReportView = ({ date, salary, expenses, allocations, onClose }) => {
                 {expenses.map(e => (
                   <tr key={e.id}>
                     <td className="py-2 text-slate-600">{e.name}</td>
-                    <td className="py-2 text-right font-medium">{formatCurrency(e.amount)}</td>
+                    <td className="py-2 text-right font-medium">{formatCurrency(e.amount, currency)}</td>
                   </tr>
                 ))}
                 <tr className="font-bold text-slate-900">
                   <td className="py-3 pt-4">Total Expenses</td>
-                  <td className="py-3 pt-4 text-right">{formatCurrency(totalExpenses)}</td>
+                  <td className="py-3 pt-4 text-right">{formatCurrency(totalExpenses, currency)}</td>
                 </tr>
               </tbody>
             </table>
@@ -487,12 +494,12 @@ const MonthReportView = ({ date, salary, expenses, allocations, onClose }) => {
               {allocations.map(plan => (
                 <div key={plan.id} className="flex justify-between items-center text-sm">
                   <span className="text-slate-600">{plan.name} <span className="text-xs text-slate-400">({plan.percentage}%)</span></span>
-                  <span className="font-medium">{formatCurrency(remainder * (plan.percentage / 100))}</span>
+                  <span className="font-medium">{formatCurrency(remainder * (plan.percentage / 100), currency)}</span>
                 </div>
               ))}
               <div className="border-t border-slate-200 pt-3 flex justify-between font-bold text-slate-900 mt-2">
                 <span>Total Allocated</span>
-                <span>{formatCurrency(remainder)}</span>
+                <span>{formatCurrency(remainder, currency)}</span>
               </div>
             </div>
           </div>
@@ -506,7 +513,7 @@ const MonthReportView = ({ date, salary, expenses, allocations, onClose }) => {
   );
 };
 
-const HistoryReportView = ({ data, allocations, onClose }) => {
+const HistoryReportView = ({ data, allocations, onClose, currency }) => {
   return (
     <div className="fixed inset-0 bg-white z-[70] overflow-y-auto">
       <div className="bg-slate-900 text-white p-4 sticky top-0 z-20 flex justify-between items-center shadow-lg print:hidden">
@@ -551,12 +558,12 @@ const HistoryReportView = ({ data, allocations, onClose }) => {
                 return (
                   <tr key={row.id} className="hover:bg-slate-50 break-inside-avoid">
                     <td className="py-3 px-2 font-medium text-slate-800">{row.id}</td>
-                    <td className="py-3 px-2 text-right font-mono font-bold text-emerald-600">{formatCurrency(salary)}</td>
-                    <td className="py-3 px-2 text-right font-mono text-rose-500">{formatCurrency(totalExpenses)}</td>
-                    <td className="py-3 px-2 text-right font-mono font-bold text-slate-900">{formatCurrency(remainder)}</td>
+                    <td className="py-3 px-2 text-right font-mono font-bold text-emerald-600">{formatCurrency(salary, currency)}</td>
+                    <td className="py-3 px-2 text-right font-mono text-rose-500">{formatCurrency(totalExpenses, currency)}</td>
+                    <td className="py-3 px-2 text-right font-mono font-bold text-slate-900">{formatCurrency(remainder, currency)}</td>
                     {allocations.map(plan => (
                       <td key={plan.id} className="py-3 px-2 text-right font-mono text-slate-600 text-sm">
-                        {formatCurrency(remainder * (plan.percentage / 100))}
+                        {formatCurrency(remainder * (plan.percentage / 100), currency)}
                       </td>
                     ))}
                   </tr>
@@ -574,6 +581,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   const [displayName, setDisplayName] = useState(currentSettings.displayName || user.displayName || '');
   const [allocations, setAllocations] = useState(currentSettings.allocationRules || DEFAULT_ALLOCATIONS);
   const [defaultExpenses, setDefaultExpenses] = useState(currentSettings.defaultFixedExpenses || DEFAULT_FIXED_EXPENSES);
+  const [currency, setCurrency] = useState(currentSettings.currency || 'GBP');
   
   // State for new items
   const [newPlanName, setNewPlanName] = useState('');
@@ -590,6 +598,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
     }
     onSaveSettings({
       displayName,
+      currency,
       allocationRules: allocations,
       defaultFixedExpenses: defaultExpenses
     });
@@ -641,16 +650,32 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
       <div className="max-w-xl mx-auto p-6 space-y-8 pb-20">
         {/* Profile Name */}
         <section className="space-y-3">
-          <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Profile</h3>
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <label className="block text-xs font-semibold text-slate-500 mb-1">Display Name</label>
-            <input 
-              type="text" 
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full p-2 rounded-lg border border-slate-300 focus:border-emerald-500 outline-none transition"
-              placeholder="Your Name"
-            />
+          <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Profile & Currency</h3>
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Display Name</label>
+              <input 
+                type="text" 
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="w-full p-2 rounded-lg border border-slate-300 focus:border-emerald-500 outline-none transition"
+                placeholder="Your Name"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Currency</label>
+              <div className="flex gap-2">
+                 {['GBP', 'USD', 'EUR'].map(c => (
+                   <button
+                     key={c}
+                     onClick={() => setCurrency(c)}
+                     className={`px-4 py-2 rounded-lg font-bold text-sm transition ${currency === c ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}
+                   >
+                     {c}
+                   </button>
+                 ))}
+              </div>
+            </div>
           </div>
         </section>
 
@@ -718,7 +743,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                 <span className="font-medium text-slate-700">{exp.name}</span>
                 <div className="flex items-center gap-3">
                   <span className={`font-medium text-sm ${exp.amount === 0 ? 'text-orange-500 bg-orange-50 px-2 py-0.5 rounded text-xs' : 'text-slate-600'}`}>
-                    {exp.amount > 0 ? formatCurrency(exp.amount) : 'Variable'}
+                    {exp.amount > 0 ? formatCurrency(exp.amount, currency) : 'Variable'}
                   </span>
                   <button onClick={() => removeDefaultExpense(exp.id)} className="text-slate-300 hover:text-red-500">
                     <Trash2 className="w-4 h-4" />
@@ -788,6 +813,7 @@ export default function App() {
   const [expenses, setExpenses] = useState([]);
   const [userSettings, setUserSettings] = useState({
     displayName: '',
+    currency: 'GBP',
     allocationRules: DEFAULT_ALLOCATIONS,
     defaultFixedExpenses: DEFAULT_FIXED_EXPENSES
   });
@@ -797,6 +823,7 @@ export default function App() {
   const [newExpenseAmount, setNewExpenseAmount] = useState('');
   const [isAddingExpense, setIsAddingExpense] = useState(false); // For Modal
   const [searchTerm, setSearchTerm] = useState(''); // Added search state
+  const [sortMode, setSortMode] = useState('date'); // date, amount-desc, name
 
   // Toast Helper
   const showToast = (msg) => {
@@ -838,6 +865,7 @@ export default function App() {
       } else {
         const defaults = {
           displayName: user.displayName || '',
+          currency: 'GBP',
           allocationRules: DEFAULT_ALLOCATIONS,
           defaultFixedExpenses: DEFAULT_FIXED_EXPENSES
         };
@@ -1020,15 +1048,31 @@ export default function App() {
     newDate.setMonth(newDate.getMonth() + delta);
     setCurrentDate(newDate);
   };
+  
+  const toggleSort = () => {
+    triggerHaptic();
+    if (sortMode === 'date') setSortMode('amount-desc');
+    else if (sortMode === 'amount-desc') setSortMode('name');
+    else setSortMode('date');
+    showToast(`Sorting by ${sortMode === 'date' ? 'Amount' : sortMode === 'amount-desc' ? 'Name' : 'Date'}`);
+  };
 
   const totalExpenses = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
   const salaryNum = parseFloat(salary) || 0;
   const remainder = Math.max(0, salaryNum - totalExpenses);
 
   // Filter and Group Expenses
-  const filteredExpenses = expenses.filter(e => 
+  let filteredExpenses = expenses.filter(e => 
     e.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  
+  if (sortMode === 'amount-desc') {
+    filteredExpenses.sort((a, b) => b.amount - a.amount);
+  } else if (sortMode === 'name') {
+    filteredExpenses.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  // Default is date (insertion order), so no sort needed for 'date' if array is already in order
+  
   const fixedExpenses = filteredExpenses.filter(e => e.type === 'fixed');
   const variableExpenses = filteredExpenses.filter(e => e.type === 'variable');
 
@@ -1089,6 +1133,7 @@ export default function App() {
           expenses={expenses}
           allocations={userSettings.allocationRules}
           onClose={() => setActiveReport(null)}
+          currency={userSettings.currency}
         />
       )}
 
@@ -1097,6 +1142,7 @@ export default function App() {
           data={reportData}
           allocations={userSettings.allocationRules}
           onClose={() => setActiveReport(null)}
+          currency={userSettings.currency}
         />
       )}
 
@@ -1149,7 +1195,9 @@ export default function App() {
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 print:hidden">
           <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Net Monthly Salary</label>
           <div className="relative">
-            <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-bold text-slate-300">£</span>
+            <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-bold text-slate-300">
+              {userSettings.currency === 'GBP' ? '£' : userSettings.currency === 'USD' ? '$' : '€'}
+            </span>
             <input 
               type="number" 
               value={salary}
@@ -1165,6 +1213,7 @@ export default function App() {
           salary={salary} 
           expenses={expenses} 
           allocations={userSettings.allocationRules}
+          currency={userSettings.currency}
         />
 
         {/* Stats */}
@@ -1174,6 +1223,7 @@ export default function App() {
             amount={totalExpenses} 
             icon={TrendingDown} 
             colorClass="bg-rose-50 text-rose-500"
+            currency={userSettings.currency}
           />
           <StatCard 
             label="Remainder" 
@@ -1181,6 +1231,7 @@ export default function App() {
             icon={PieChart} 
             colorClass="bg-blue-50 text-blue-600"
             subText="Available for Goals"
+            currency={userSettings.currency}
           />
         </div>
 
@@ -1195,6 +1246,7 @@ export default function App() {
                 amount={remainder * (plan.percentage / 100)} 
                 percentage={plan.percentage} 
                 color={plan.color || 'bg-slate-100 text-slate-700'}
+                currency={userSettings.currency}
               />
             ))}
           </div>
@@ -1216,16 +1268,25 @@ export default function App() {
                </div>
             </div>
             
-            {/* Search Bar */}
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Search expenses..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 rounded-xl border-none text-sm text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-slate-100"
-              />
+            {/* Search Bar and Sort */}
+            <div className="relative w-full flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search expenses..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 rounded-xl border-none text-sm text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-slate-100"
+                />
+              </div>
+              <button 
+                onClick={toggleSort}
+                className={`p-2 rounded-xl transition ${sortMode !== 'date' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                title="Sort Expenses"
+              >
+                <ArrowUpDown className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
@@ -1257,11 +1318,12 @@ export default function App() {
                         <div className="flex-1">
                           {isEditing ? (
                             <input 
+                              autoFocus
                               type="text"
                               defaultValue={expense.name}
                               className="font-medium text-slate-800 w-full bg-slate-50 border-b border-slate-300 outline-none pb-1"
                               onBlur={(e) => updateExpenseName(expense.id, e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
+                              onKeyDown={(e) => e.key === 'Enter' && updateExpenseName(expense.id, e.currentTarget.value)}
                             />
                           ) : (
                             <p className="font-medium text-slate-800">{expense.name}</p>
@@ -1272,7 +1334,9 @@ export default function App() {
                       <div className="flex items-center gap-2">
                         {isEditing ? (
                           <div className="flex items-center gap-1">
-                            <span className="text-slate-400 text-sm">£</span>
+                            <span className="text-slate-400 text-sm">
+                              {userSettings.currency === 'GBP' ? '£' : userSettings.currency === 'USD' ? '$' : '€'}
+                            </span>
                             <input 
                               autoFocus // Set autofocus only on the amount field when editing starts
                               type="number"
@@ -1295,7 +1359,7 @@ export default function App() {
                                 Set Amount <Edit2 className="w-3 h-3 print:hidden" />
                               </span>
                             ) : (
-                              <span className="font-bold text-slate-700 print:text-black">{formatCurrency(expense.amount)}</span>
+                              <span className="font-bold text-slate-700 print:text-black">{formatCurrency(expense.amount, userSettings.currency)}</span>
                             )}
                             
                             {expense.amount > 0 && (
@@ -1343,7 +1407,7 @@ export default function App() {
           </div>
           <div className="p-4 bg-slate-50 text-right">
              <span className="text-sm text-slate-500 mr-2">Total Outgoings:</span>
-             <span className="font-bold text-slate-800">{formatCurrency(totalExpenses)}</span>
+             <span className="font-bold text-slate-800">{formatCurrency(totalExpenses, userSettings.currency)}</span>
           </div>
         </div>
 
