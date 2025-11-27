@@ -16,7 +16,8 @@ import {
   setDoc, 
   onSnapshot,
   deleteDoc,
-  getDocs
+  getDocs,
+  getDoc
 } from 'firebase/firestore';
 import { 
   PieChart, 
@@ -51,7 +52,9 @@ import {
   Coffee,
   Utensils,
   CreditCard,
-  Music
+  Music,
+  Copy,
+  PenLine
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION AREA ---
@@ -147,7 +150,6 @@ const openReportInNewTab = (elementId, title) => {
   window.open(url, '_blank');
 };
 
-// --- SMART ICON LOGIC ---
 const getExpenseIcon = (name) => {
   const lowerName = name.toLowerCase();
   
@@ -164,7 +166,17 @@ const getExpenseIcon = (name) => {
   return CreditCard; // Default
 };
 
-// --- COMPONENTS ---
+// --- TOAST COMPONENT ---
+const Toast = ({ message, onClose }) => (
+  <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl z-[100] animate-in slide-in-from-bottom-4 fade-in duration-300 flex items-center gap-3">
+    <div className="bg-emerald-500 rounded-full p-1">
+      <Check className="w-3 h-3 text-slate-900" />
+    </div>
+    <span className="font-medium text-sm">{message}</span>
+  </div>
+);
+
+// --- OTHER COMPONENTS ---
 
 const BudgetWheel = ({ salary, expenses, allocations }) => {
   if (!salary || parseFloat(salary) <= 0) return null;
@@ -173,33 +185,23 @@ const BudgetWheel = ({ salary, expenses, allocations }) => {
   const totalExpenses = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
   const remainder = Math.max(0, salaryNum - totalExpenses);
 
-  // Calculate segments for Conic Gradient
-  // 1. Expenses
   const expensesPercent = Math.min(100, (totalExpenses / salaryNum) * 100);
-  
-  // 2. Allocations (These are % of the REMAINDER, so we need to convert to % of TOTAL for the chart)
   const remainderPercentOfTotal = 100 - expensesPercent;
   
   let currentDegree = 0;
   const segments = [];
 
-  // Helper to add segment
   const addSegment = (percent, color) => {
     const degrees = (percent / 100) * 360;
     segments.push(`${color} ${currentDegree}deg ${currentDegree + degrees}deg`);
     currentDegree += degrees;
   };
 
-  // Add Expenses Segment (Red/Rose)
   addSegment(expensesPercent, '#f43f5e'); // rose-500
 
-  // Add Allocation Segments
   allocations.forEach(plan => {
-    // Plan % is of remainder. Convert to % of total salary.
     const planPercentOfTotal = (plan.percentage / 100) * remainderPercentOfTotal;
-    
-    // Map tailwind colors to hex for gradient
-    let hex = '#64748b'; // slate
+    let hex = '#64748b'; 
     if (plan.color.includes('indigo')) hex = '#6366f1';
     if (plan.color.includes('emerald')) hex = '#10b981';
     if (plan.color.includes('sky')) hex = '#0ea5e9';
@@ -214,19 +216,8 @@ const BudgetWheel = ({ salary, expenses, allocations }) => {
     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden print:hidden">
       <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 w-full text-left">Where your money goes</h3>
       <div className="relative w-48 h-48">
-        {/* The Pie Chart */}
-        <div 
-          className="w-full h-full rounded-full"
-          style={{ background: gradient }}
-        ></div>
-        {/* The Doughnut Hole */}
+        <div className="w-full h-full rounded-full" style={{ background: gradient }}></div>
         <div className="absolute inset-2 bg-white rounded-full flex flex-col items-center justify-center">
-           <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">Left Over</span>
-           <span className="text-xl font-bold text-slate-800">{formatCurrency(0)}</span> 
-           {/* Note: In a zero-sum budget, 'Left Over' is usually £0 after allocations. 
-               If you want to show Unallocated, that's different. 
-               For now, let's show the Salary for context or just the chart.
-               Actually, let's show the NET SALARY in the middle as the source. */}
            <div className="absolute inset-0 bg-white rounded-full flex flex-col items-center justify-center z-10">
               <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">Net Salary</span>
               <span className="text-xl font-bold text-slate-800">{formatCurrency(salaryNum)}</span>
@@ -234,7 +225,6 @@ const BudgetWheel = ({ salary, expenses, allocations }) => {
         </div>
       </div>
       
-      {/* Legend */}
       <div className="flex flex-wrap justify-center gap-3 mt-6 w-full">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-full bg-rose-500"></div>
@@ -271,12 +261,6 @@ const LoginScreen = ({ onLogin }) => (
         onClick={onLogin}
         className="w-full bg-slate-900 text-white py-4 px-6 rounded-2xl font-semibold flex items-center justify-center gap-3 hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
       >
-        <svg className="w-5 h-5" viewBox="0 0 24 24">
-          <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-          <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-          <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.84z" />
-          <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-        </svg>
         Sign in with Google
       </button>
       <p className="mt-6 text-xs text-slate-400 font-medium">
@@ -522,7 +506,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   const [allocations, setAllocations] = useState(currentSettings.allocationRules || DEFAULT_ALLOCATIONS);
   const [defaultExpenses, setDefaultExpenses] = useState(currentSettings.defaultFixedExpenses || DEFAULT_FIXED_EXPENSES);
   
-  // State for new items
   const [newPlanName, setNewPlanName] = useState('');
   const [newPlanPercent, setNewPlanPercent] = useState('');
   const [newDefExpName, setNewDefExpName] = useState('');
@@ -559,7 +542,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
 
   const addDefaultExpense = () => {
     if(!newDefExpName) return; 
-    // Allow empty amount (0) for variable expenses
     const amountVal = parseFloat(newDefExpAmount) || 0;
     
     setDefaultExpenses([...defaultExpenses, {
@@ -586,7 +568,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
       </div>
 
       <div className="max-w-xl mx-auto p-6 space-y-8 pb-20">
-        {/* Profile Name */}
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Profile</h3>
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -601,7 +582,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
         </section>
 
-        {/* Allocation Rules */}
         <section className="space-y-3">
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Spending Plan</h3>
@@ -654,7 +634,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
         </section>
 
-        {/* Default Fixed Expenses */}
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Default Monthly Bills</h3>
           <p className="text-xs text-slate-500">These automatically copy over when you start a new month.</p>
@@ -695,7 +674,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
         </section>
 
-        {/* Danger Zone */}
         <section className="space-y-3 pt-6 border-t border-slate-100">
            <h3 className="text-sm font-bold text-red-400 uppercase tracking-wider flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" /> Danger Zone
@@ -724,13 +702,12 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   
-  // UI State
   const [showSettings, setShowSettings] = useState(false);
   const [showReportSelector, setShowReportSelector] = useState(false);
-  const [activeReport, setActiveReport] = useState(null); // 'month' or 'history'
+  const [activeReport, setActiveReport] = useState(null);
   const [reportData, setReportData] = useState([]);
+  const [toastMessage, setToastMessage] = useState(null);
   
-  // Data State
   const [salary, setSalary] = useState('');
   const [expenses, setExpenses] = useState([]);
   const [userSettings, setUserSettings] = useState({
@@ -744,7 +721,12 @@ export default function App() {
   const [newExpenseAmount, setNewExpenseAmount] = useState('');
   const [isAddingExpense, setIsAddingExpense] = useState(false);
 
-  // Auth Handling
+  // Toast Helper
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
   useEffect(() => {
     const initAuth = async () => {
       const config = getFirebaseConfig();
@@ -767,7 +749,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch Settings
   useEffect(() => {
     if (!user) return;
     const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
@@ -787,7 +768,6 @@ export default function App() {
     return () => unsub();
   }, [user]);
 
-  // Fetch Monthly Data
   useEffect(() => {
     if (!user) return;
 
@@ -810,7 +790,6 @@ export default function App() {
     return () => unsubscribe();
   }, [user, currentDate, userSettings.defaultFixedExpenses]);
 
-  // Report Generation
   const handleReportSelection = async (type) => {
     if (type === 'month') {
       setActiveReport('month');
@@ -832,7 +811,7 @@ export default function App() {
         setShowReportSelector(false);
       } catch (e) {
         console.error("Error generating history", e);
-        alert("Could not load history data.");
+        showToast("Could not load history.");
       }
     }
   };
@@ -852,6 +831,33 @@ export default function App() {
 
   const handleLogout = () => signOut(auth);
 
+  const copyFromPreviousMonth = async () => {
+    if (!user) return;
+    if (!confirm("Overwrite current month with last month's data?")) return;
+
+    try {
+      const prevDate = new Date(currentDate);
+      prevDate.setMonth(prevDate.getMonth() - 1);
+      const prevMonthId = getMonthId(prevDate);
+      
+      const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgetData', prevMonthId);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setSalary(data.salary || '');
+        setExpenses(data.expenses || []);
+        saveData(data.salary, data.expenses);
+        showToast("Copied from last month!");
+      } else {
+        showToast("No data found for previous month.");
+      }
+    } catch (e) {
+      console.error("Error copying data", e);
+      showToast("Failed to copy data.");
+    }
+  };
+
   const saveData = async (newSalary, newExpenses) => {
     if (!user) return;
     const monthId = getMonthId(currentDate);
@@ -863,15 +869,17 @@ export default function App() {
     if (!user) return;
     const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
     await setDoc(settingsRef, newSettings);
+    showToast("Settings saved!");
   };
 
   const resetCurrentMonth = async () => {
     if (!user) return;
-    if (confirm("Are you sure? This will delete the salary and expenses for this specific month.")) {
+    if (confirm("Are you sure? This will clear all data for this month.")) {
       const monthId = getMonthId(currentDate);
       const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgetData', monthId);
       await deleteDoc(docRef);
       setShowSettings(false);
+      showToast("Month reset.");
     }
   };
 
@@ -894,6 +902,7 @@ export default function App() {
     setNewExpenseName('');
     setNewExpenseAmount('');
     setIsAddingExpense(false);
+    showToast("Bill added!");
   };
 
   const updateExpenseAmount = (id, newAmount) => {
@@ -905,10 +914,20 @@ export default function App() {
     setEditingExpenseId(null);
   };
 
+  const updateExpenseName = (id, newName) => {
+    const updatedExpenses = expenses.map(e => 
+      e.id === id ? { ...e, name: newName } : e
+    );
+    setExpenses(updatedExpenses);
+    saveData(salary, updatedExpenses);
+    setEditingExpenseId(null);
+  };
+
   const removeExpense = (id) => {
     const updatedExpenses = expenses.filter(e => e.id !== id);
     setExpenses(updatedExpenses);
     saveData(salary, updatedExpenses);
+    showToast("Bill removed.");
   };
 
   const changeMonth = (delta) => {
@@ -925,13 +944,24 @@ export default function App() {
   if (!user) return <LoginScreen onLogin={handleLogin} />;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20 font-sans text-slate-900 print:bg-white print:pb-0">
+    <div className="min-h-screen bg-slate-50 pb-24 font-sans text-slate-900 print:bg-white print:pb-0">
       <style>{`
         @media print {
           @page { margin: 10mm; size: A4 landscape; }
           body { -webkit-print-color-adjust: exact; background-color: white !important; }
         }
       `}</style>
+
+      {/* Floating Action Button (FAB) for Mobile Add */}
+      <button 
+        onClick={() => setIsAddingExpense(true)}
+        className="fixed bottom-6 right-6 bg-slate-900 text-white p-4 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition z-40 print:hidden flex items-center justify-center"
+      >
+        <Plus className="w-7 h-7" />
+      </button>
+
+      {/* Toast Notification */}
+      {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
 
       {/* MODALS */}
       {showSettings && (
@@ -1073,12 +1103,14 @@ export default function App() {
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden print:hidden">
           <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white">
             <h3 className="font-bold text-slate-800">Monthly Expenses</h3>
-            <button 
-              onClick={() => setIsAddingExpense(!isAddingExpense)}
-              className="text-xs bg-slate-900 text-white px-4 py-2 rounded-xl font-bold hover:bg-slate-800 transition flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" /> Add Bill
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={copyFromPreviousMonth}
+                className="text-xs bg-slate-100 text-slate-600 px-3 py-2 rounded-xl font-bold hover:bg-slate-200 transition flex items-center gap-2"
+              >
+                <Copy className="w-4 h-4" /> <span className="hidden sm:inline">Copy Last Month</span>
+              </button>
+            </div>
           </div>
 
           {isAddingExpense && (
@@ -1111,23 +1143,35 @@ export default function App() {
           <div className="divide-y divide-slate-100">
             {expenses.map((expense) => {
               const Icon = getExpenseIcon(expense.name);
+              const isEditing = editingExpenseId === expense.id;
+              
               return (
               <div key={expense.id} className="p-4 flex justify-between items-center group hover:bg-slate-50 transition">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-1">
                   <div className={`p-2 rounded-full bg-slate-100 text-slate-500`}>
                     <Icon className="w-4 h-4" />
                   </div>
-                  <div>
-                    <p className="font-medium text-slate-800">{expense.name}</p>
+                  <div className="flex-1">
+                    {isEditing ? (
+                      <input 
+                        autoFocus
+                        type="text"
+                        defaultValue={expense.name}
+                        className="font-medium text-slate-800 w-full bg-slate-50 border-b border-slate-300 outline-none pb-1"
+                        onBlur={(e) => updateExpenseName(expense.id, e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && updateExpenseName(expense.id, e.currentTarget.value)}
+                      />
+                    ) : (
+                      <p className="font-medium text-slate-800">{expense.name}</p>
+                    )}
                     <p className="text-xs text-slate-400 capitalize">{expense.type}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {editingExpenseId === expense.id ? (
+                  {isEditing ? (
                     <div className="flex items-center gap-1">
                       <span className="text-slate-400 text-sm">£</span>
                       <input 
-                        autoFocus
                         type="number"
                         defaultValue={expense.amount}
                         onBlur={(e) => updateExpenseAmount(expense.id, e.target.value)}
@@ -1147,23 +1191,31 @@ export default function App() {
                       ) : (
                         <span className="font-bold text-slate-700">{formatCurrency(expense.amount)}</span>
                       )}
+                      
                       {expense.amount > 0 && (
-                        <Edit2 className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100" />
+                        <PenLine className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100" />
                       )}
                     </button>
                   )}
-                  <button 
-                    onClick={() => removeExpense(expense.id)}
-                    className="text-slate-300 hover:text-red-500 transition p-2 ml-1 rounded-full hover:bg-red-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  
+                  {!isEditing && (
+                    <button 
+                      onClick={() => removeExpense(expense.id)}
+                      className="text-slate-300 hover:text-red-500 transition p-2 ml-1 rounded-full hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             )})}
             {expenses.length === 0 && (
-              <div className="p-8 text-center text-slate-400">
-                No expenses added for this month yet.
+              <div className="p-8 text-center text-slate-400 flex flex-col items-center gap-2">
+                <div className="bg-slate-50 p-4 rounded-full">
+                  <ShoppingCart className="w-6 h-6 text-slate-300" />
+                </div>
+                <p>No expenses yet.</p>
+                <p className="text-xs text-slate-400">Tap the + button to add one.</p>
               </div>
             )}
           </div>
