@@ -102,6 +102,46 @@ const formatCurrency = (amount) => {
 
 const getMonthId = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
+const openReportInNewTab = (elementId, title) => {
+  const element = document.getElementById(elementId);
+  if (!element) return;
+
+  // Create a complete HTML document string
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${title}</title>
+      <script src="https://cdn.tailwindcss.com"></script>
+      <style>
+        body { background-color: white; padding: 20px; font-family: sans-serif; -webkit-print-color-adjust: exact; }
+        @media print { 
+          body { padding: 0; }
+          .no-print { display: none; } 
+        }
+      </style>
+    </head>
+    <body>
+      <div class="max-w-4xl mx-auto">
+        ${element.innerHTML}
+      </div>
+      <div class="fixed bottom-4 right-4 no-print flex gap-2">
+        <button onclick="window.print()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold shadow-lg">Print / Save as PDF</button>
+      </div>
+    </body>
+    </html>
+  `;
+
+  // Create a Blob from the HTML string
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  
+  // Open in new tab
+  window.open(url, '_blank');
+};
+
 // --- COMPONENTS ---
 
 const LoginScreen = ({ onLogin }) => (
@@ -229,10 +269,13 @@ const MonthReportView = ({ date, salary, expenses, allocations, onClose }) => {
   return (
     <div className="fixed inset-0 bg-white z-[70] overflow-y-auto">
       <div className="bg-slate-900 text-white p-4 sticky top-0 z-20 flex justify-between items-center shadow-lg print:hidden">
-        <h2 className="font-bold">Monthly Statement</h2>
+        <h2 className="font-bold">Monthly Statement Preview</h2>
         <div className="flex gap-2">
-          <button onClick={() => window.print()} className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm hover:bg-emerald-400">
-            <Printer className="w-4 h-4" /> Print PDF
+          <button 
+            onClick={() => openReportInNewTab('printable-month-report', `Budget Statement - ${MONTH_NAMES[date.getMonth()]}`)} 
+            className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm hover:bg-emerald-400"
+          >
+            <Printer className="w-4 h-4" /> Open Printable PDF
           </button>
           <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full">
             <X className="w-5 h-5" />
@@ -240,7 +283,7 @@ const MonthReportView = ({ date, salary, expenses, allocations, onClose }) => {
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto p-8 print:p-0">
+      <div id="printable-month-report" className="max-w-3xl mx-auto p-8 print:p-0">
         <div className="border-b-2 border-slate-800 pb-4 mb-8 flex justify-between items-end">
           <div>
             <h1 className="text-4xl font-bold text-slate-900 mb-1">Budget Statement</h1>
@@ -300,10 +343,13 @@ const HistoryReportView = ({ data, allocations, onClose }) => {
   return (
     <div className="fixed inset-0 bg-white z-[70] overflow-y-auto">
       <div className="bg-slate-900 text-white p-4 sticky top-0 z-20 flex justify-between items-center shadow-lg print:hidden">
-        <h2 className="font-bold">Annual History</h2>
+        <h2 className="font-bold">Annual History Preview</h2>
         <div className="flex gap-2">
-          <button onClick={() => window.print()} className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm hover:bg-emerald-400">
-            <Printer className="w-4 h-4" /> Print PDF
+          <button 
+            onClick={() => openReportInNewTab('printable-history-report', 'Annual Financial Report')} 
+            className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm hover:bg-emerald-400"
+          >
+            <Printer className="w-4 h-4" /> Open Printable PDF
           </button>
           <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full">
             <X className="w-5 h-5" />
@@ -311,7 +357,7 @@ const HistoryReportView = ({ data, allocations, onClose }) => {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto p-8 print:p-0 print:landscape">
+      <div id="printable-history-report" className="max-w-5xl mx-auto p-8 print:p-0 print:landscape">
         <h1 className="text-2xl font-bold text-slate-900 mb-6 hidden print:block">Annual Financial Report</h1>
         
         <div className="overflow-x-auto">
@@ -362,6 +408,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   const [allocations, setAllocations] = useState(currentSettings.allocationRules || DEFAULT_ALLOCATIONS);
   const [defaultExpenses, setDefaultExpenses] = useState(currentSettings.defaultFixedExpenses || DEFAULT_FIXED_EXPENSES);
   
+  // State for new items
   const [newPlanName, setNewPlanName] = useState('');
   const [newPlanPercent, setNewPlanPercent] = useState('');
   const [newDefExpName, setNewDefExpName] = useState('');
@@ -398,6 +445,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
 
   const addDefaultExpense = () => {
     if(!newDefExpName) return; 
+    // Allow empty amount (0) for variable expenses
     const amountVal = parseFloat(newDefExpAmount) || 0;
     
     setDefaultExpenses([...defaultExpenses, {
@@ -424,6 +472,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
       </div>
 
       <div className="max-w-xl mx-auto p-6 space-y-8 pb-20">
+        {/* Profile Name */}
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Profile</h3>
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -438,6 +487,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
         </section>
 
+        {/* Allocation Rules */}
         <section className="space-y-3">
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Spending Plan</h3>
@@ -490,6 +540,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
         </section>
 
+        {/* Default Fixed Expenses */}
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Default Monthly Bills</h3>
           <p className="text-xs text-slate-500">These automatically copy over when you start a new month.</p>
@@ -530,6 +581,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
         </section>
 
+        {/* Danger Zone */}
         <section className="space-y-3 pt-6 border-t border-slate-100">
            <h3 className="text-sm font-bold text-red-400 uppercase tracking-wider flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" /> Danger Zone
