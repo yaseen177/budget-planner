@@ -54,7 +54,8 @@ import {
   CreditCard,
   Music,
   Copy,
-  PenLine
+  PenLine,
+  Search
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION AREA ---
@@ -113,6 +114,12 @@ const formatCurrency = (amount) => {
 };
 
 const getMonthId = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+const triggerHaptic = () => {
+  if (navigator.vibrate) {
+    navigator.vibrate(15); // Light vibration
+  }
+};
 
 const openReportInNewTab = (elementId, title) => {
   const element = document.getElementById(elementId);
@@ -506,6 +513,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   const [allocations, setAllocations] = useState(currentSettings.allocationRules || DEFAULT_ALLOCATIONS);
   const [defaultExpenses, setDefaultExpenses] = useState(currentSettings.defaultFixedExpenses || DEFAULT_FIXED_EXPENSES);
   
+  // State for new items
   const [newPlanName, setNewPlanName] = useState('');
   const [newPlanPercent, setNewPlanPercent] = useState('');
   const [newDefExpName, setNewDefExpName] = useState('');
@@ -542,6 +550,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
 
   const addDefaultExpense = () => {
     if(!newDefExpName) return; 
+    // Allow empty amount (0) for variable expenses
     const amountVal = parseFloat(newDefExpAmount) || 0;
     
     setDefaultExpenses([...defaultExpenses, {
@@ -568,6 +577,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
       </div>
 
       <div className="max-w-xl mx-auto p-6 space-y-8 pb-20">
+        {/* Profile Name */}
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Profile</h3>
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -582,6 +592,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
         </section>
 
+        {/* Allocation Rules */}
         <section className="space-y-3">
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Spending Plan</h3>
@@ -634,6 +645,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
         </section>
 
+        {/* Default Fixed Expenses */}
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Default Monthly Bills</h3>
           <p className="text-xs text-slate-500">These automatically copy over when you start a new month.</p>
@@ -720,6 +732,7 @@ export default function App() {
   const [newExpenseName, setNewExpenseName] = useState('');
   const [newExpenseAmount, setNewExpenseAmount] = useState('');
   const [isAddingExpense, setIsAddingExpense] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(''); // Added search state
 
   // Toast Helper
   const showToast = (msg) => {
@@ -833,6 +846,7 @@ export default function App() {
 
   const copyFromPreviousMonth = async () => {
     if (!user) return;
+    triggerHaptic(); // Haptic
     if (!confirm("Overwrite current month with last month's data?")) return;
 
     try {
@@ -867,6 +881,7 @@ export default function App() {
 
   const saveSettings = async (newSettings) => {
     if (!user) return;
+    triggerHaptic(); // Haptic
     const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
     await setDoc(settingsRef, newSettings);
     showToast("Settings saved!");
@@ -874,6 +889,7 @@ export default function App() {
 
   const resetCurrentMonth = async () => {
     if (!user) return;
+    triggerHaptic(); // Haptic
     if (confirm("Are you sure? This will clear all data for this month.")) {
       const monthId = getMonthId(currentDate);
       const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgetData', monthId);
@@ -890,6 +906,7 @@ export default function App() {
 
   const addExpense = () => {
     if (!newExpenseName || !newExpenseAmount) return;
+    triggerHaptic(); // Haptic
     const newExp = {
       id: Date.now().toString(),
       name: newExpenseName,
@@ -924,6 +941,7 @@ export default function App() {
   };
 
   const removeExpense = (id) => {
+    triggerHaptic(); // Haptic
     const updatedExpenses = expenses.filter(e => e.id !== id);
     setExpenses(updatedExpenses);
     saveData(salary, updatedExpenses);
@@ -931,6 +949,7 @@ export default function App() {
   };
 
   const changeMonth = (delta) => {
+    triggerHaptic(); // Haptic
     const newDate = new Date(currentDate);
     newDate.setMonth(newDate.getMonth() + delta);
     setCurrentDate(newDate);
@@ -939,6 +958,13 @@ export default function App() {
   const totalExpenses = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
   const salaryNum = parseFloat(salary) || 0;
   const remainder = Math.max(0, salaryNum - totalExpenses);
+
+  // Filter and Group Expenses
+  const filteredExpenses = expenses.filter(e => 
+    e.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const fixedExpenses = filteredExpenses.filter(e => e.type === 'fixed');
+  const variableExpenses = filteredExpenses.filter(e => e.type === 'variable');
 
   if (loading) return <div className="h-screen flex items-center justify-center text-emerald-600">Loading Planner...</div>;
   if (!user) return <LoginScreen onLogin={handleLogin} />;
@@ -954,7 +980,10 @@ export default function App() {
 
       {/* Floating Action Button (FAB) for Mobile Add */}
       <button 
-        onClick={() => setIsAddingExpense(true)}
+        onClick={() => {
+          triggerHaptic();
+          setIsAddingExpense(true);
+        }}
         className="fixed bottom-6 right-6 bg-slate-900 text-white p-4 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition z-40 print:hidden flex items-center justify-center"
       >
         <Plus className="w-7 h-7" />
@@ -1101,15 +1130,27 @@ export default function App() {
 
         {/* Expenses */}
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden print:hidden">
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white">
-            <h3 className="font-bold text-slate-800">Monthly Expenses</h3>
-            <div className="flex gap-2">
-              <button 
-                onClick={copyFromPreviousMonth}
-                className="text-xs bg-slate-100 text-slate-600 px-3 py-2 rounded-xl font-bold hover:bg-slate-200 transition flex items-center gap-2"
-              >
-                <Copy className="w-4 h-4" /> <span className="hidden sm:inline">Copy Last Month</span>
-              </button>
+          <div className="p-5 border-b border-slate-100 flex flex-col gap-3 bg-white">
+            <div className="flex justify-between items-center">
+               <h3 className="font-bold text-slate-800">Monthly Expenses</h3>
+               <button 
+                 onClick={copyFromPreviousMonth}
+                 className="text-xs bg-slate-100 text-slate-600 px-3 py-2 rounded-xl font-bold hover:bg-slate-200 transition flex items-center gap-2"
+               >
+                 <Copy className="w-4 h-4" /> <span className="hidden sm:inline">Copy Last Month</span>
+               </button>
+            </div>
+            
+            {/* Search Bar */}
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Search expenses..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 rounded-xl border-none text-sm text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-slate-100"
+              />
             </div>
           </div>
 
@@ -1141,74 +1182,95 @@ export default function App() {
           )}
 
           <div className="divide-y divide-slate-100">
-            {expenses.map((expense) => {
-              const Icon = getExpenseIcon(expense.name);
-              const isEditing = editingExpenseId === expense.id;
-              
-              return (
-              <div key={expense.id} className="p-4 flex justify-between items-center group hover:bg-slate-50 transition">
-                <div className="flex items-center gap-3 flex-1">
-                  <div className={`p-2 rounded-full bg-slate-100 text-slate-500`}>
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1">
-                    {isEditing ? (
-                      <input 
-                        autoFocus
-                        type="text"
-                        defaultValue={expense.name}
-                        className="font-medium text-slate-800 w-full bg-slate-50 border-b border-slate-300 outline-none pb-1"
-                        onBlur={(e) => updateExpenseName(expense.id, e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && updateExpenseName(expense.id, e.currentTarget.value)}
-                      />
-                    ) : (
-                      <p className="font-medium text-slate-800">{expense.name}</p>
-                    )}
-                    <p className="text-xs text-slate-400 capitalize">{expense.type}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {isEditing ? (
-                    <div className="flex items-center gap-1">
-                      <span className="text-slate-400 text-sm">£</span>
-                      <input 
-                        type="number"
-                        defaultValue={expense.amount}
-                        onBlur={(e) => updateExpenseAmount(expense.id, e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && updateExpenseAmount(expense.id, e.currentTarget.value)}
-                        className="w-20 p-1 border rounded bg-white text-right font-bold text-slate-800"
-                      />
+            {/* Render Groups */}
+            {[
+              { title: 'Fixed Bills', items: fixedExpenses },
+              { title: 'Variable Spending', items: variableExpenses }
+            ].map(group => (
+              group.items.length > 0 && (
+                <React.Fragment key={group.title}>
+                  {/* Group Header (Only show if searching or if both exist) */}
+                  {(searchTerm || (fixedExpenses.length > 0 && variableExpenses.length > 0)) && (
+                    <div className="bg-slate-50/50 px-5 py-2 border-y border-slate-100">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{group.title}</h4>
                     </div>
-                  ) : (
-                    <button 
-                      onClick={() => setEditingExpenseId(expense.id)}
-                      className={`flex items-center gap-2 hover:bg-slate-50 px-2 py-1 rounded-lg transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200' : ''}`}
-                    >
-                      {expense.amount === 0 ? (
-                        <span className="text-orange-600 text-sm font-bold flex items-center gap-1 px-1">
-                          Set Amount <Edit2 className="w-3 h-3" />
-                        </span>
-                      ) : (
-                        <span className="font-bold text-slate-700">{formatCurrency(expense.amount)}</span>
-                      )}
-                      
-                      {expense.amount > 0 && (
-                        <PenLine className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100" />
-                      )}
-                    </button>
                   )}
                   
-                  {!isEditing && (
-                    <button 
-                      onClick={() => removeExpense(expense.id)}
-                      className="text-slate-300 hover:text-red-500 transition p-2 ml-1 rounded-full hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            )})}
+                  {group.items.map((expense) => {
+                    const Icon = getExpenseIcon(expense.name);
+                    const isEditing = editingExpenseId === expense.id;
+                    
+                    return (
+                    <div key={expense.id} className="p-4 flex justify-between items-center group hover:bg-slate-50 transition">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className={`p-2 rounded-full bg-slate-100 text-slate-500`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1">
+                          {isEditing ? (
+                            <input 
+                              autoFocus
+                              type="text"
+                              defaultValue={expense.name}
+                              className="font-medium text-slate-800 w-full bg-slate-50 border-b border-slate-300 outline-none pb-1"
+                              onBlur={(e) => updateExpenseName(expense.id, e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && updateExpenseName(expense.id, e.currentTarget.value)}
+                            />
+                          ) : (
+                            <p className="font-medium text-slate-800">{expense.name}</p>
+                          )}
+                          <p className="text-xs text-slate-400 capitalize">{expense.type}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isEditing ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-slate-400 text-sm">£</span>
+                            <input 
+                              type="number"
+                              defaultValue={expense.amount}
+                              onBlur={(e) => updateExpenseAmount(expense.id, e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && updateExpenseAmount(expense.id, e.currentTarget.value)}
+                              className="w-20 p-1 border rounded bg-white text-right font-bold text-slate-800"
+                            />
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => {
+                              triggerHaptic();
+                              setEditingExpenseId(expense.id);
+                            }}
+                            className={`flex items-center gap-2 hover:bg-slate-50 px-2 py-1 rounded-lg transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200' : ''} print:hover:bg-transparent print:p-0 print:ring-0`}
+                          >
+                            {expense.amount === 0 ? (
+                              <span className="text-orange-600 text-sm font-bold flex items-center gap-1 px-1 print:text-slate-400 print:italic">
+                                Set Amount <Edit2 className="w-3 h-3 print:hidden" />
+                              </span>
+                            ) : (
+                              <span className="font-bold text-slate-700 print:text-black">{formatCurrency(expense.amount)}</span>
+                            )}
+                            
+                            {expense.amount > 0 && (
+                              <PenLine className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 print:hidden" />
+                            )}
+                          </button>
+                        )}
+                        
+                        {!isEditing && (
+                          <button 
+                            onClick={() => removeExpense(expense.id)}
+                            className="text-slate-300 hover:text-red-500 transition p-2 ml-1 rounded-full hover:bg-red-50 print:hidden"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )})}
+                </React.Fragment>
+              )
+            ))}
+            
             {expenses.length === 0 && (
               <div className="p-8 text-center text-slate-400 flex flex-col items-center gap-2">
                 <div className="bg-slate-50 p-4 rounded-full">
@@ -1216,6 +1278,11 @@ export default function App() {
                 </div>
                 <p>No expenses yet.</p>
                 <p className="text-xs text-slate-400">Tap the + button to add one.</p>
+              </div>
+            )}
+             {expenses.length > 0 && filteredExpenses.length === 0 && (
+              <div className="p-8 text-center text-slate-400">
+                <p>No expenses match "{searchTerm}"</p>
               </div>
             )}
           </div>
