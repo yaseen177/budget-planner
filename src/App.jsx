@@ -16,7 +16,8 @@ import {
   setDoc, 
   onSnapshot,
   deleteDoc,
-  getDoc
+  getDoc,
+  getDocs
 } from 'firebase/firestore';
 import { 
   PieChart, 
@@ -38,7 +39,9 @@ import {
   Target,
   AlertTriangle,
   Printer,
-  RotateCcw
+  RotateCcw,
+  FileText,
+  Download
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION AREA ---
@@ -63,8 +66,7 @@ const getFirebaseConfig = () => {
 const app = initializeApp(getFirebaseConfig());
 const auth = getAuth(app);
 const db = getFirestore(app);
-// FIX: Using a static app ID to prevent path errors in database
-const appId = 'nuha-budget-app';
+const appId = 'nuha-budget-app'; // Static ID for safety
 
 // --- CONSTANTS & DEFAULTS ---
 const MONTH_NAMES = [
@@ -145,7 +147,6 @@ const StatCard = ({ label, amount, icon: Icon, colorClass, subText }) => (
 );
 
 const AllocationCard = ({ title, amount, percentage, color }) => {
-  // Extract Tailwind color classes for the progress bar
   let barColor = 'bg-slate-500';
   if (color.includes('indigo')) barColor = 'bg-indigo-500';
   if (color.includes('emerald')) barColor = 'bg-emerald-500';
@@ -164,7 +165,6 @@ const AllocationCard = ({ title, amount, percentage, color }) => {
         <p className="text-lg font-bold text-slate-800 print:text-black">{amount > 0 ? formatCurrency(amount) : '£0.00'}</p>
       </div>
       
-      {/* Progress Bar */}
       <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
         <div 
           className={`h-2.5 rounded-full ${barColor} transition-all duration-1000 ease-out`} 
@@ -178,12 +178,78 @@ const AllocationCard = ({ title, amount, percentage, color }) => {
   );
 };
 
+// --- REPORT VIEW COMPONENT ---
+const ReportView = ({ data, allocations, onClose }) => {
+  const handlePrint = () => window.print();
+
+  return (
+    <div className="fixed inset-0 bg-white z-[60] overflow-y-auto">
+      <div className="bg-slate-900 text-white p-6 sticky top-0 z-10 flex justify-between items-center shadow-lg print:hidden">
+        <h2 className="text-xl font-bold flex items-center gap-2">
+          <FileText className="w-6 h-6" /> Budget History Report
+        </h2>
+        <div className="flex gap-2">
+          <button onClick={handlePrint} className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-400">
+            <Download className="w-4 h-4" /> PDF / Print
+          </button>
+          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto p-8 print:p-0">
+        <h1 className="text-2xl font-bold text-slate-900 mb-6 hidden print:block">Financial Report</h1>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b-2 border-slate-200">
+                <th className="py-3 px-2 font-bold text-slate-700">Month</th>
+                <th className="py-3 px-2 font-bold text-slate-700 text-right">Net Salary</th>
+                <th className="py-3 px-2 font-bold text-slate-700 text-right">Expenses</th>
+                <th className="py-3 px-2 font-bold text-slate-700 text-right">Remainder</th>
+                {allocations.map(plan => (
+                  <th key={plan.id} className="py-3 px-2 font-bold text-indigo-700 text-right text-xs uppercase w-32">
+                    {plan.name} ({plan.percentage}%)
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {data.map((row) => {
+                const totalExpenses = (row.expenses || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                const salary = parseFloat(row.salary) || 0;
+                const remainder = Math.max(0, salary - totalExpenses);
+
+                return (
+                  <tr key={row.id} className="hover:bg-slate-50">
+                    <td className="py-3 px-2 font-medium text-slate-800">{row.id}</td>
+                    <td className="py-3 px-2 text-right font-mono font-bold text-emerald-600">{formatCurrency(salary)}</td>
+                    <td className="py-3 px-2 text-right font-mono text-rose-500">{formatCurrency(totalExpenses)}</td>
+                    <td className="py-3 px-2 text-right font-mono font-bold text-slate-900">{formatCurrency(remainder)}</td>
+                    {allocations.map(plan => (
+                      <td key={plan.id} className="py-3 px-2 text-right font-mono text-slate-600 text-sm">
+                        {formatCurrency(remainder * (plan.percentage / 100))}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-8 text-xs text-slate-400 text-center print:block hidden">Generated by Nuha's Budget Planner</p>
+      </div>
+    </div>
+  );
+};
+
 const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onResetMonth }) => {
   const [displayName, setDisplayName] = useState(currentSettings.displayName || user.displayName || '');
   const [allocations, setAllocations] = useState(currentSettings.allocationRules || DEFAULT_ALLOCATIONS);
   const [defaultExpenses, setDefaultExpenses] = useState(currentSettings.defaultFixedExpenses || DEFAULT_FIXED_EXPENSES);
   
-  // State for new items
   const [newPlanName, setNewPlanName] = useState('');
   const [newPlanPercent, setNewPlanPercent] = useState('');
   const [newDefExpName, setNewDefExpName] = useState('');
@@ -220,7 +286,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
 
   const addDefaultExpense = () => {
     if(!newDefExpName) return; 
-    // Allow empty amount (0) for variable expenses
     const amountVal = parseFloat(newDefExpAmount) || 0;
     
     setDefaultExpenses([...defaultExpenses, {
@@ -247,7 +312,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
       </div>
 
       <div className="max-w-xl mx-auto p-6 space-y-8 pb-20">
-        {/* Profile Name */}
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Profile</h3>
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -262,7 +326,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
         </section>
 
-        {/* Allocation Rules */}
         <section className="space-y-3">
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Spending Plan</h3>
@@ -315,7 +378,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
         </section>
 
-        {/* Default Fixed Expenses */}
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Default Monthly Bills</h3>
           <p className="text-xs text-slate-500">These automatically copy over when you start a new month.</p>
@@ -356,7 +418,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
         </section>
 
-        {/* Danger Zone */}
         <section className="space-y-3 pt-6 border-t border-slate-100">
            <h3 className="text-sm font-bold text-red-400 uppercase tracking-wider flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" /> Danger Zone
@@ -385,8 +446,9 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showSettings, setShowSettings] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportData, setReportData] = useState([]);
   
-  // Data State
   const [salary, setSalary] = useState('');
   const [expenses, setExpenses] = useState([]);
   const [userSettings, setUserSettings] = useState({
@@ -395,13 +457,11 @@ export default function App() {
     defaultFixedExpenses: DEFAULT_FIXED_EXPENSES
   });
 
-  // UI State
   const [editingExpenseId, setEditingExpenseId] = useState(null);
   const [newExpenseName, setNewExpenseName] = useState('');
   const [newExpenseAmount, setNewExpenseAmount] = useState('');
   const [isAddingExpense, setIsAddingExpense] = useState(false);
 
-  // Auth Handling
   useEffect(() => {
     const initAuth = async () => {
       const config = getFirebaseConfig();
@@ -417,7 +477,7 @@ export default function App() {
           console.error("Auth error", e);
         }
       } else {
-        // Standard flow: wait for user to click login
+        // Standard flow
       }
     };
     initAuth();
@@ -429,7 +489,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch Settings
   useEffect(() => {
     if (!user) return;
     const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
@@ -449,7 +508,6 @@ export default function App() {
     return () => unsub();
   }, [user]);
 
-  // Fetch Monthly Data
   useEffect(() => {
     if (!user) return;
 
@@ -472,7 +530,6 @@ export default function App() {
     return () => unsubscribe();
   }, [user, currentDate, userSettings.defaultFixedExpenses]);
 
-  // Actions
   const handleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
@@ -488,7 +545,28 @@ export default function App() {
   };
 
   const handleLogout = () => signOut(auth);
-  const handlePrint = () => window.print();
+  // Replaced simple print with Report Generation
+  const handleGenerateReport = async () => {
+    if (!user) return;
+    try {
+      const colRef = collection(db, 'artifacts', appId, 'users', user.uid, 'budgetData');
+      const snapshot = await getDocs(colRef);
+      const data = [];
+      snapshot.forEach(doc => {
+        const val = doc.data();
+        if (val.salary && parseFloat(val.salary) > 0) {
+          data.push({ id: doc.id, ...val });
+        }
+      });
+      // Sort by date string (YYYY-MM)
+      data.sort((a, b) => a.id.localeCompare(b.id));
+      setReportData(data);
+      setShowReport(true);
+    } catch (e) {
+      console.error("Error generating report", e);
+      alert("Could not load report data.");
+    }
+  };
 
   const saveData = async (newSalary, newExpenses) => {
     if (!user) return;
@@ -560,7 +638,6 @@ export default function App() {
     setCurrentDate(newDate);
   };
 
-  // Calculations
   const totalExpenses = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
   const salaryNum = parseFloat(salary) || 0;
   const remainder = Math.max(0, salaryNum - totalExpenses);
@@ -574,7 +651,7 @@ export default function App() {
       {/* Print Styles */}
       <style>{`
         @media print {
-          @page { margin: 15mm; size: A4; }
+          @page { margin: 10mm; size: A4 landscape; }
           body { -webkit-print-color-adjust: exact; background-color: white !important; }
         }
       `}</style>
@@ -589,25 +666,32 @@ export default function App() {
         />
       )}
 
+      {showReport && (
+        <ReportView 
+          data={reportData} 
+          allocations={userSettings.allocationRules}
+          onClose={() => setShowReport(false)}
+        />
+      )}
+
       {/* Modern Header - Compact & Dark */}
-      <header className="bg-slate-900 text-white pt-6 pb-20 px-6 rounded-b-[2rem] shadow-xl relative print:bg-white print:text-black print:p-0 print:shadow-none print:mb-8 print:border-b-2 print:border-slate-800">
-        <div className="max-w-2xl mx-auto flex justify-between items-center mb-4 print:mb-2">
+      <header className="bg-slate-900 text-white pt-6 pb-20 px-6 rounded-b-[2rem] shadow-xl relative print:hidden">
+        <div className="max-w-2xl mx-auto flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
-            <div className="bg-emerald-500 p-2 rounded-xl text-slate-900 print:hidden">
+            <div className="bg-emerald-500 p-2 rounded-xl text-slate-900">
               <Wallet className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight print:text-4xl print:text-slate-900">
-                <span className="print:hidden">Hello, </span>
+              <h1 className="text-xl font-bold tracking-tight">
                 {userSettings.displayName || (user.displayName ? user.displayName.split(' ')[0] : 'Guest')}
-                <span className="hidden print:inline">'s Budget</span>
+                's Budget
               </h1>
-              <p className="text-slate-400 text-xs font-medium print:text-slate-500">Wealth Planner</p>
+              <p className="text-slate-400 text-xs font-medium">Wealth Planner</p>
             </div>
           </div>
-          <div className="flex gap-2 print:hidden">
-            <button onClick={handlePrint} className="bg-slate-800 p-2 rounded-xl hover:bg-slate-700 transition border border-slate-700/50" title="Print / Save PDF">
-              <Printer className="w-5 h-5 text-slate-300" />
+          <div className="flex gap-2">
+            <button onClick={handleGenerateReport} className="bg-slate-800 p-2 rounded-xl hover:bg-slate-700 transition border border-slate-700/50" title="History & Report">
+              <FileText className="w-5 h-5 text-emerald-400" />
             </button>
             <button onClick={() => setShowSettings(true)} className="bg-slate-800 p-2 rounded-xl hover:bg-slate-700 transition border border-slate-700/50">
               <Settings className="w-5 h-5 text-slate-300" />
@@ -620,17 +704,17 @@ export default function App() {
       </header>
 
       {/* Main Content Area */}
-      <div className="px-4 -mt-12 max-w-2xl mx-auto space-y-5 print:mt-0 print:px-0">
+      <div className="px-4 -mt-12 max-w-2xl mx-auto space-y-5 relative z-10 print:mt-0 print:px-0">
         
         {/* Month Selector - Floating Card style */}
-        <div className="flex items-center justify-between bg-white p-2 rounded-2xl shadow-lg border border-slate-100 max-w-xs mx-auto mb-2 print:bg-white print:p-0 print:m-0 print:justify-start print:shadow-none print:border-none">
-          <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-50 rounded-xl transition print:hidden">
+        <div className="flex items-center justify-between bg-white p-2 rounded-2xl shadow-lg border border-slate-100 max-w-xs mx-auto mb-2 print:hidden">
+          <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-50 rounded-xl transition">
             <ChevronLeft className="w-5 h-5 text-slate-400" />
           </button>
-          <span className="font-bold text-sm text-slate-800 uppercase tracking-wide print:text-left print:text-2xl print:text-slate-700 print:pl-0">
+          <span className="font-bold text-sm text-slate-800 uppercase tracking-wide">
             {MONTH_NAMES[currentDate.getMonth()]} {currentDate.getFullYear()}
           </span>
-          <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-50 rounded-xl transition print:hidden">
+          <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-50 rounded-xl transition">
             <ChevronRight className="w-5 h-5 text-slate-400" />
           </button>
         </div>
@@ -721,7 +805,7 @@ export default function App() {
               </div>
               <button 
                 onClick={addExpense}
-                className="w-full bg-emerald-600 text-white py-3 rounded-xl text-sm font-semibold shadow-sm active:bg-slate-900"
+                className="w-full bg-emerald-600 text-white py-3 rounded-xl text-sm font-semibold shadow-sm active:bg-emerald-700"
               >
                 Save Expense
               </button>
