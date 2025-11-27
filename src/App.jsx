@@ -994,7 +994,7 @@ export default function App() {
     );
     setExpenses(updatedExpenses);
     saveData(salary, updatedExpenses);
-    setEditingExpenseId(null);
+    // Removed setEditingExpenseId(null) to keep edit mode open
   };
 
   const updateExpenseName = (id, newName) => {
@@ -1003,7 +1003,7 @@ export default function App() {
     );
     setExpenses(updatedExpenses);
     saveData(salary, updatedExpenses);
-    setEditingExpenseId(null);
+    // Removed setEditingExpenseId(null)
   };
 
   const removeExpense = (id) => {
@@ -1257,12 +1257,11 @@ export default function App() {
                         <div className="flex-1">
                           {isEditing ? (
                             <input 
-                              autoFocus
                               type="text"
                               defaultValue={expense.name}
                               className="font-medium text-slate-800 w-full bg-slate-50 border-b border-slate-300 outline-none pb-1"
                               onBlur={(e) => updateExpenseName(expense.id, e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && updateExpenseName(expense.id, e.currentTarget.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
                             />
                           ) : (
                             <p className="font-medium text-slate-800">{expense.name}</p>
@@ -1275,10 +1274,11 @@ export default function App() {
                           <div className="flex items-center gap-1">
                             <span className="text-slate-400 text-sm">£</span>
                             <input 
+                              autoFocus // Set autofocus only on the amount field when editing starts
                               type="number"
                               defaultValue={expense.amount}
                               onBlur={(e) => updateExpenseAmount(expense.id, e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && updateExpenseAmount(expense.id, e.currentTarget.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
                               className="w-20 p-1 border rounded bg-white text-right font-bold text-slate-800"
                             />
                           </div>
@@ -1304,7 +1304,14 @@ export default function App() {
                           </button>
                         )}
                         
-                        {!isEditing && (
+                        {isEditing ? (
+                           <button 
+                             onClick={() => setEditingExpenseId(null)}
+                             className="bg-emerald-100 text-emerald-600 p-2 rounded-full hover:bg-emerald-200 transition"
+                           >
+                             <Check className="w-4 h-4" />
+                           </button>
+                        ) : (
                           <button 
                             onClick={() => removeExpense(expense.id)}
                             className="text-slate-300 hover:text-red-500 transition p-2 ml-1 rounded-full hover:bg-red-50 print:hidden"
