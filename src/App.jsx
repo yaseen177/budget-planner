@@ -16,7 +16,6 @@ import {
   setDoc, 
   onSnapshot,
   deleteDoc,
-  getDoc,
   getDocs
 } from 'firebase/firestore';
 import { 
@@ -41,7 +40,9 @@ import {
   Printer,
   RotateCcw,
   FileText,
-  Download
+  Download,
+  Calendar,
+  Table
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION AREA ---
@@ -66,7 +67,7 @@ const getFirebaseConfig = () => {
 const app = initializeApp(getFirebaseConfig());
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = 'nuha-budget-app'; // Static ID for safety
+const appId = 'nuha-budget-app';
 
 // --- CONSTANTS & DEFAULTS ---
 const MONTH_NAMES = [
@@ -178,28 +179,140 @@ const AllocationCard = ({ title, amount, percentage, color }) => {
   );
 };
 
-// --- REPORT VIEW COMPONENT ---
-const ReportView = ({ data, allocations, onClose }) => {
-  const handlePrint = () => window.print();
+// --- REPORT COMPONENTS ---
+
+const ReportSelector = ({ onClose, onSelect }) => (
+  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in">
+    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+      <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
+        <h2 className="font-bold text-lg flex items-center gap-2">
+          <FileText className="w-5 h-5 text-emerald-400" /> Report Center
+        </h2>
+        <button onClick={onClose} className="p-1 hover:bg-slate-800 rounded-full"><X className="w-5 h-5" /></button>
+      </div>
+      <div className="p-6 space-y-3">
+        <button 
+          onClick={() => onSelect('month')}
+          className="w-full flex items-center gap-4 p-4 rounded-xl border border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 transition group text-left"
+        >
+          <div className="bg-indigo-100 p-3 rounded-full text-indigo-600 group-hover:bg-indigo-200">
+            <Calendar className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-800">Current Month Statement</h3>
+            <p className="text-xs text-slate-500">Detailed breakdown for {MONTH_NAMES[new Date().getMonth()]}</p>
+          </div>
+        </button>
+
+        <button 
+          onClick={() => onSelect('history')}
+          className="w-full flex items-center gap-4 p-4 rounded-xl border border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 transition group text-left"
+        >
+          <div className="bg-amber-100 p-3 rounded-full text-amber-600 group-hover:bg-amber-200">
+            <Table className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-800">Full Annual History</h3>
+            <p className="text-xs text-slate-500">Table view of all tracked months</p>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+const MonthReportView = ({ date, salary, expenses, allocations, onClose }) => {
+  const totalExpenses = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+  const salaryNum = parseFloat(salary) || 0;
+  const remainder = Math.max(0, salaryNum - totalExpenses);
 
   return (
-    <div className="fixed inset-0 bg-white z-[60] overflow-y-auto">
-      <div className="bg-slate-900 text-white p-6 sticky top-0 z-10 flex justify-between items-center shadow-lg print:hidden">
-        <h2 className="text-xl font-bold flex items-center gap-2">
-          <FileText className="w-6 h-6" /> Budget History Report
-        </h2>
+    <div className="fixed inset-0 bg-white z-[70] overflow-y-auto">
+      <div className="bg-slate-900 text-white p-4 sticky top-0 z-20 flex justify-between items-center shadow-lg print:hidden">
+        <h2 className="font-bold">Monthly Statement</h2>
         <div className="flex gap-2">
-          <button onClick={handlePrint} className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-400">
-            <Download className="w-4 h-4" /> PDF / Print
+          <button onClick={() => window.print()} className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm hover:bg-emerald-400">
+            <Printer className="w-4 h-4" /> Print PDF
           </button>
           <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full">
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto p-8 print:p-0">
-        <h1 className="text-2xl font-bold text-slate-900 mb-6 hidden print:block">Financial Report</h1>
+      <div className="max-w-3xl mx-auto p-8 print:p-0">
+        <div className="border-b-2 border-slate-800 pb-4 mb-8 flex justify-between items-end">
+          <div>
+            <h1 className="text-4xl font-bold text-slate-900 mb-1">Budget Statement</h1>
+            <p className="text-slate-500">{MONTH_NAMES[date.getMonth()]} {date.getFullYear()}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs font-bold text-slate-400 uppercase">Net Salary</p>
+            <p className="text-2xl font-bold text-emerald-600">{formatCurrency(salaryNum)}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-8 mb-8">
+          <div>
+            <h3 className="font-bold text-slate-800 border-b border-slate-200 pb-2 mb-3">Expenses</h3>
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-slate-100">
+                {expenses.map(e => (
+                  <tr key={e.id}>
+                    <td className="py-2 text-slate-600">{e.name}</td>
+                    <td className="py-2 text-right font-medium">{formatCurrency(e.amount)}</td>
+                  </tr>
+                ))}
+                <tr className="font-bold text-slate-900">
+                  <td className="py-3 pt-4">Total Expenses</td>
+                  <td className="py-3 pt-4 text-right">{formatCurrency(totalExpenses)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div>
+            <h3 className="font-bold text-slate-800 border-b border-slate-200 pb-2 mb-3">Savings & Goals</h3>
+            <div className="space-y-3">
+              {allocations.map(plan => (
+                <div key={plan.id} className="flex justify-between items-center text-sm">
+                  <span className="text-slate-600">{plan.name} <span className="text-xs text-slate-400">({plan.percentage}%)</span></span>
+                  <span className="font-medium">{formatCurrency(remainder * (plan.percentage / 100))}</span>
+                </div>
+              ))}
+              <div className="border-t border-slate-200 pt-3 flex justify-between font-bold text-slate-900 mt-2">
+                <span>Total Allocated</span>
+                <span>{formatCurrency(remainder)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-center print:border-slate-300">
+          <p className="text-sm text-slate-500">This report was generated automatically. Keep it for your records.</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const HistoryReportView = ({ data, allocations, onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-white z-[70] overflow-y-auto">
+      <div className="bg-slate-900 text-white p-4 sticky top-0 z-20 flex justify-between items-center shadow-lg print:hidden">
+        <h2 className="font-bold">Annual History</h2>
+        <div className="flex gap-2">
+          <button onClick={() => window.print()} className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm hover:bg-emerald-400">
+            <Printer className="w-4 h-4" /> Print PDF
+          </button>
+          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto p-8 print:p-0 print:landscape">
+        <h1 className="text-2xl font-bold text-slate-900 mb-6 hidden print:block">Annual Financial Report</h1>
         
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -223,7 +336,7 @@ const ReportView = ({ data, allocations, onClose }) => {
                 const remainder = Math.max(0, salary - totalExpenses);
 
                 return (
-                  <tr key={row.id} className="hover:bg-slate-50">
+                  <tr key={row.id} className="hover:bg-slate-50 break-inside-avoid">
                     <td className="py-3 px-2 font-medium text-slate-800">{row.id}</td>
                     <td className="py-3 px-2 text-right font-mono font-bold text-emerald-600">{formatCurrency(salary)}</td>
                     <td className="py-3 px-2 text-right font-mono text-rose-500">{formatCurrency(totalExpenses)}</td>
@@ -239,7 +352,6 @@ const ReportView = ({ data, allocations, onClose }) => {
             </tbody>
           </table>
         </div>
-        <p className="mt-8 text-xs text-slate-400 text-center print:block hidden">Generated by Nuha's Budget Planner</p>
       </div>
     </div>
   );
@@ -445,10 +557,14 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
+  
+  // UI State
   const [showSettings, setShowSettings] = useState(false);
-  const [showReport, setShowReport] = useState(false);
+  const [showReportSelector, setShowReportSelector] = useState(false);
+  const [activeReport, setActiveReport] = useState(null); // 'month' or 'history'
   const [reportData, setReportData] = useState([]);
   
+  // Data State
   const [salary, setSalary] = useState('');
   const [expenses, setExpenses] = useState([]);
   const [userSettings, setUserSettings] = useState({
@@ -462,13 +578,11 @@ export default function App() {
   const [newExpenseAmount, setNewExpenseAmount] = useState('');
   const [isAddingExpense, setIsAddingExpense] = useState(false);
 
+  // Auth Handling
   useEffect(() => {
     const initAuth = async () => {
       const config = getFirebaseConfig();
-      if (!config.apiKey) {
-        console.warn("No Firebase Config found");
-        return;
-      }
+      if (!config.apiKey) return;
 
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
         try {
@@ -476,8 +590,6 @@ export default function App() {
         } catch (e) {
           console.error("Auth error", e);
         }
-      } else {
-        // Standard flow
       }
     };
     initAuth();
@@ -489,6 +601,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Fetch Settings
   useEffect(() => {
     if (!user) return;
     const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
@@ -508,6 +621,7 @@ export default function App() {
     return () => unsub();
   }, [user]);
 
+  // Fetch Monthly Data
   useEffect(() => {
     if (!user) return;
 
@@ -530,12 +644,39 @@ export default function App() {
     return () => unsubscribe();
   }, [user, currentDate, userSettings.defaultFixedExpenses]);
 
+  // Report Generation
+  const handleReportSelection = async (type) => {
+    if (type === 'month') {
+      // Just open the month view overlay
+      setActiveReport('month');
+      setShowReportSelector(false);
+    } else if (type === 'history') {
+      try {
+        const colRef = collection(db, 'artifacts', appId, 'users', user.uid, 'budgetData');
+        const snapshot = await getDocs(colRef);
+        const data = [];
+        snapshot.forEach(doc => {
+          const val = doc.data();
+          if (val.salary && parseFloat(val.salary) > 0) {
+            data.push({ id: doc.id, ...val });
+          }
+        });
+        data.sort((a, b) => a.id.localeCompare(b.id));
+        setReportData(data);
+        setActiveReport('history');
+        setShowReportSelector(false);
+      } catch (e) {
+        console.error("Error generating history", e);
+        alert("Could not load history data.");
+      }
+    }
+  };
+
   const handleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
     } catch (error) {
-      console.error("Login failed", error);
       if (!YOUR_FIREBASE_KEYS.apiKey) {
         await signInAnonymously(auth);
       } else {
@@ -545,39 +686,12 @@ export default function App() {
   };
 
   const handleLogout = () => signOut(auth);
-  // Replaced simple print with Report Generation
-  const handleGenerateReport = async () => {
-    if (!user) return;
-    try {
-      const colRef = collection(db, 'artifacts', appId, 'users', user.uid, 'budgetData');
-      const snapshot = await getDocs(colRef);
-      const data = [];
-      snapshot.forEach(doc => {
-        const val = doc.data();
-        if (val.salary && parseFloat(val.salary) > 0) {
-          data.push({ id: doc.id, ...val });
-        }
-      });
-      // Sort by date string (YYYY-MM)
-      data.sort((a, b) => a.id.localeCompare(b.id));
-      setReportData(data);
-      setShowReport(true);
-    } catch (e) {
-      console.error("Error generating report", e);
-      alert("Could not load report data.");
-    }
-  };
 
   const saveData = async (newSalary, newExpenses) => {
     if (!user) return;
     const monthId = getMonthId(currentDate);
     const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgetData', monthId);
-    
-    await setDoc(docRef, {
-      salary: newSalary,
-      expenses: newExpenses,
-      lastUpdated: new Date()
-    });
+    await setDoc(docRef, { salary: newSalary, expenses: newExpenses, lastUpdated: new Date() });
   };
 
   const saveSettings = async (newSettings) => {
@@ -588,7 +702,7 @@ export default function App() {
 
   const resetCurrentMonth = async () => {
     if (!user) return;
-    if (confirm("Are you sure? This will delete the salary and expenses for this specific month and reload your defaults.")) {
+    if (confirm("Are you sure? This will delete the salary and expenses for this specific month.")) {
       const monthId = getMonthId(currentDate);
       const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgetData', monthId);
       await deleteDoc(docRef);
@@ -647,8 +761,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 font-sans text-slate-900 print:bg-white print:pb-0">
-      
-      {/* Print Styles */}
       <style>{`
         @media print {
           @page { margin: 10mm; size: A4 landscape; }
@@ -656,6 +768,7 @@ export default function App() {
         }
       `}</style>
 
+      {/* MODALS */}
       {showSettings && (
         <SettingsScreen 
           user={user} 
@@ -666,16 +779,33 @@ export default function App() {
         />
       )}
 
-      {showReport && (
-        <ReportView 
-          data={reportData} 
-          allocations={userSettings.allocationRules}
-          onClose={() => setShowReport(false)}
+      {showReportSelector && (
+        <ReportSelector 
+          onClose={() => setShowReportSelector(false)}
+          onSelect={handleReportSelection}
         />
       )}
 
-      {/* Modern Header - Compact & Dark */}
-      <header className="bg-slate-900 text-white pt-6 pb-20 px-6 rounded-b-[2rem] shadow-xl relative print:hidden">
+      {activeReport === 'month' && (
+        <MonthReportView 
+          date={currentDate}
+          salary={salary}
+          expenses={expenses}
+          allocations={userSettings.allocationRules}
+          onClose={() => setActiveReport(null)}
+        />
+      )}
+
+      {activeReport === 'history' && (
+        <HistoryReportView 
+          data={reportData}
+          allocations={userSettings.allocationRules}
+          onClose={() => setActiveReport(null)}
+        />
+      )}
+
+      {/* MAIN APP HEADER */}
+      <header className="bg-slate-900 text-white pt-6 pb-20 px-6 rounded-b-[2rem] shadow-xl relative z-0 print:hidden">
         <div className="max-w-2xl mx-auto flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
             <div className="bg-emerald-500 p-2 rounded-xl text-slate-900">
@@ -690,7 +820,7 @@ export default function App() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleGenerateReport} className="bg-slate-800 p-2 rounded-xl hover:bg-slate-700 transition border border-slate-700/50" title="History & Report">
+            <button onClick={() => setShowReportSelector(true)} className="bg-slate-800 p-2 rounded-xl hover:bg-slate-700 transition border border-slate-700/50" title="Reports">
               <FileText className="w-5 h-5 text-emerald-400" />
             </button>
             <button onClick={() => setShowSettings(true)} className="bg-slate-800 p-2 rounded-xl hover:bg-slate-700 transition border border-slate-700/50">
@@ -703,10 +833,10 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Content Area */}
+      {/* MAIN CONTENT */}
       <div className="px-4 -mt-12 max-w-2xl mx-auto space-y-5 relative z-10 print:mt-0 print:px-0">
         
-        {/* Month Selector - Floating Card style */}
+        {/* Month Selector */}
         <div className="flex items-center justify-between bg-white p-2 rounded-2xl shadow-lg border border-slate-100 max-w-xs mx-auto mb-2 print:hidden">
           <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-50 rounded-xl transition">
             <ChevronLeft className="w-5 h-5 text-slate-400" />
@@ -719,28 +849,23 @@ export default function App() {
           </button>
         </div>
 
-        {/* Salary Input Card */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 print:shadow-none print:border-slate-300 print:bg-slate-50">
-          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 print:text-slate-600">Net Monthly Salary</label>
+        {/* Salary Input */}
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 print:hidden">
+          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Net Monthly Salary</label>
           <div className="relative">
-            <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-bold text-slate-300 print:hidden">£</span>
-            {/* Print Only Version */}
-            <div className="hidden print:block text-4xl font-bold text-slate-900">
-              {salary ? formatCurrency(parseFloat(salary)) : '£0.00'}
-            </div>
-            {/* Screen Only Version */}
+            <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-bold text-slate-300">£</span>
             <input 
               type="number" 
               value={salary}
               onChange={(e) => updateSalary(e.target.value)}
               placeholder="0.00"
-              className="w-full pl-6 text-4xl font-bold text-slate-800 placeholder-slate-200 outline-none bg-transparent py-1 print:hidden"
+              className="w-full pl-6 text-4xl font-bold text-slate-800 placeholder-slate-200 outline-none bg-transparent py-1"
             />
           </div>
         </div>
 
-        {/* Overview Stats */}
-        <div className="grid grid-cols-2 gap-4">
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4 print:hidden">
           <StatCard 
             label="Total Expenses" 
             amount={totalExpenses} 
@@ -756,10 +881,10 @@ export default function App() {
           />
         </div>
 
-        {/* Allocations Section - Dynamic based on Settings */}
+        {/* Allocations */}
         {salaryNum > 0 && (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 print:break-inside-avoid">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider px-2 print:mt-4 print:mb-2 print:text-black">Financial Goals</h3>
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 print:hidden">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider px-2">Financial Goals</h3>
             {userSettings.allocationRules.map(plan => (
               <AllocationCard 
                 key={plan.id}
@@ -772,25 +897,24 @@ export default function App() {
           </div>
         )}
 
-        {/* Expenses List */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none print:mt-6">
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white print:bg-white print:px-0 print:border-b-2 print:border-slate-800">
-            <h3 className="font-bold text-slate-800 print:text-black print:text-xl">Monthly Expenses</h3>
+        {/* Expenses */}
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden print:hidden">
+          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white">
+            <h3 className="font-bold text-slate-800">Monthly Expenses</h3>
             <button 
               onClick={() => setIsAddingExpense(!isAddingExpense)}
-              className="text-xs bg-slate-900 text-white px-4 py-2 rounded-xl font-bold hover:bg-slate-800 transition flex items-center gap-2 print:hidden"
+              className="text-xs bg-slate-900 text-white px-4 py-2 rounded-xl font-bold hover:bg-slate-800 transition flex items-center gap-2"
             >
               <Plus className="w-4 h-4" /> Add Bill
             </button>
           </div>
 
-          {/* Add New Expense Form */}
           {isAddingExpense && (
-            <div className="p-4 bg-slate-50 border-b border-slate-100 animate-in slide-in-from-top-2 print:hidden">
+            <div className="p-4 bg-slate-50 border-b border-slate-100 animate-in slide-in-from-top-2">
               <div className="flex gap-2 mb-2">
                 <input 
                   type="text" 
-                  placeholder="Bill Name (e.g. Netflix)" 
+                  placeholder="Bill Name" 
                   className="flex-1 p-3 rounded-xl border border-slate-200 text-sm"
                   value={newExpenseName}
                   onChange={(e) => setNewExpenseName(e.target.value)}
@@ -812,22 +936,19 @@ export default function App() {
             </div>
           )}
 
-          {/* List */}
-          <div className="divide-y divide-slate-100 print:divide-slate-200">
+          <div className="divide-y divide-slate-100">
             {expenses.map((expense) => (
-              <div key={expense.id} className="p-4 flex justify-between items-center group hover:bg-slate-50 transition print:hover:bg-transparent print:px-0 print:py-2">
+              <div key={expense.id} className="p-4 flex justify-between items-center group hover:bg-slate-50 transition">
                 <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${expense.type === 'fixed' ? 'bg-slate-400' : 'bg-orange-400'} print:hidden`}></div>
+                  <div className={`w-2 h-2 rounded-full ${expense.type === 'fixed' ? 'bg-slate-400' : 'bg-orange-400'}`}></div>
                   <div>
-                    <p className="font-medium text-slate-800 print:text-black">{expense.name}</p>
-                    <p className="text-xs text-slate-400 capitalize print:hidden">{expense.type}</p>
+                    <p className="font-medium text-slate-800">{expense.name}</p>
+                    <p className="text-xs text-slate-400 capitalize">{expense.type}</p>
                   </div>
                 </div>
-                
-                {/* Editable Amount Section */}
                 <div className="flex items-center gap-2">
                   {editingExpenseId === expense.id ? (
-                    <div className="flex items-center gap-1 print:hidden">
+                    <div className="flex items-center gap-1">
                       <span className="text-slate-400 text-sm">£</span>
                       <input 
                         autoFocus
@@ -841,25 +962,23 @@ export default function App() {
                   ) : (
                     <button 
                       onClick={() => setEditingExpenseId(expense.id)}
-                      className={`flex items-center gap-2 hover:bg-slate-50 px-2 py-1 rounded-lg transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200' : ''} print:hover:bg-transparent print:p-0 print:ring-0`}
+                      className={`flex items-center gap-2 hover:bg-slate-50 px-2 py-1 rounded-lg transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200' : ''}`}
                     >
                       {expense.amount === 0 ? (
-                        <span className="text-orange-600 text-sm font-bold flex items-center gap-1 px-1 print:text-slate-400 print:italic">
-                          Set Amount <Edit2 className="w-3 h-3 print:hidden" />
+                        <span className="text-orange-600 text-sm font-bold flex items-center gap-1 px-1">
+                          Set Amount <Edit2 className="w-3 h-3" />
                         </span>
                       ) : (
-                        <span className="font-bold text-slate-700 print:text-black">{formatCurrency(expense.amount)}</span>
+                        <span className="font-bold text-slate-700">{formatCurrency(expense.amount)}</span>
                       )}
-                      
                       {expense.amount > 0 && (
-                        <Edit2 className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 print:hidden" />
+                        <Edit2 className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100" />
                       )}
                     </button>
                   )}
-                  
                   <button 
                     onClick={() => removeExpense(expense.id)}
-                    className="text-slate-300 hover:text-red-500 transition p-2 ml-1 rounded-full hover:bg-red-50 print:hidden"
+                    className="text-slate-300 hover:text-red-500 transition p-2 ml-1 rounded-full hover:bg-red-50"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -867,14 +986,14 @@ export default function App() {
               </div>
             ))}
             {expenses.length === 0 && (
-              <div className="p-8 text-center text-slate-400 print:text-slate-500 print:italic">
+              <div className="p-8 text-center text-slate-400">
                 No expenses added for this month yet.
               </div>
             )}
           </div>
-          <div className="p-4 bg-slate-50 text-right print:bg-white print:border-t-2 print:border-slate-800 print:px-0">
-             <span className="text-sm text-slate-500 mr-2 print:text-black">Total Outgoings:</span>
-             <span className="font-bold text-slate-800 print:text-black">{formatCurrency(totalExpenses)}</span>
+          <div className="p-4 bg-slate-50 text-right">
+             <span className="text-sm text-slate-500 mr-2">Total Outgoings:</span>
+             <span className="font-bold text-slate-800">{formatCurrency(totalExpenses)}</span>
           </div>
         </div>
 
