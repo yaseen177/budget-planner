@@ -59,7 +59,6 @@ import {
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION AREA ---
-// PASTE YOUR KEYS INSIDE THE QUOTES BELOW
 const YOUR_FIREBASE_KEYS = {
   apiKey: "AIzaSyA6K0QPohae3zLl2z9yqVwblJCfaAmEVlQ",
   authDomain: "budget-planner-d36b4.firebaseapp.com",
@@ -182,6 +181,69 @@ const Toast = ({ message, onClose }) => (
     <span className="font-medium text-sm">{message}</span>
   </div>
 );
+
+// --- ADD EXPENSE MODAL ---
+const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
+  const [name, setName] = useState('');
+  const [amount, setAmount] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!name || !amount) return;
+    onSave(name, amount);
+    setName('');
+    setAmount('');
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4 animate-in fade-in">
+      <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
+        <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+          <h3 className="font-bold text-lg text-slate-800">New Expense</h3>
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition">
+            <X className="w-5 h-5 text-slate-500" />
+          </button>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Bill Name</label>
+            <input 
+              autoFocus
+              type="text" 
+              placeholder="e.g. Netflix" 
+              className="w-full p-4 rounded-xl bg-slate-50 border-none text-lg font-medium text-slate-800 placeholder-slate-300 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Amount</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-400">£</span>
+              <input 
+                type="number" 
+                placeholder="0.00" 
+                className="w-full pl-10 p-4 rounded-xl bg-slate-50 border-none text-lg font-bold text-slate-800 placeholder-slate-300 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </div>
+          </div>
+          
+          <button 
+            type="submit"
+            className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 active:scale-95 transition-all mt-2"
+          >
+            Add Expense
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 // --- OTHER COMPONENTS ---
 
@@ -714,12 +776,14 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   
+  // UI State
   const [showSettings, setShowSettings] = useState(false);
   const [showReportSelector, setShowReportSelector] = useState(false);
-  const [activeReport, setActiveReport] = useState(null);
+  const [activeReport, setActiveReport] = useState(null); // 'month' or 'history'
   const [reportData, setReportData] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
   
+  // Data State
   const [salary, setSalary] = useState('');
   const [expenses, setExpenses] = useState([]);
   const [userSettings, setUserSettings] = useState({
@@ -731,7 +795,7 @@ export default function App() {
   const [editingExpenseId, setEditingExpenseId] = useState(null);
   const [newExpenseName, setNewExpenseName] = useState('');
   const [newExpenseAmount, setNewExpenseAmount] = useState('');
-  const [isAddingExpense, setIsAddingExpense] = useState(false);
+  const [isAddingExpense, setIsAddingExpense] = useState(false); // For Modal
   const [searchTerm, setSearchTerm] = useState(''); // Added search state
 
   // Toast Helper
@@ -747,7 +811,10 @@ export default function App() {
 
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
         try {
-          await signInWithCustomToken(auth, __initial_auth_token);
+          // If using own keys, avoid using preview tokens
+          if (YOUR_FIREBASE_KEYS.apiKey === "") {
+             await signInWithCustomToken(auth, __initial_auth_token);
+          }
         } catch (e) {
           console.error("Auth error", e);
         }
@@ -904,23 +971,22 @@ export default function App() {
     saveData(val, expenses);
   };
 
-  const addExpense = () => {
-    if (!newExpenseName || !newExpenseAmount) return;
+  // Add Expense via Modal
+  const handleAddExpenseSave = (name, amount) => {
     triggerHaptic(); // Haptic
     const newExp = {
       id: Date.now().toString(),
-      name: newExpenseName,
-      amount: parseFloat(newExpenseAmount),
+      name: name,
+      amount: parseFloat(amount),
       type: 'variable'
     };
     const updatedExpenses = [...expenses, newExp];
     setExpenses(updatedExpenses);
     saveData(salary, updatedExpenses);
-    setNewExpenseName('');
-    setNewExpenseAmount('');
     setIsAddingExpense(false);
     showToast("Bill added!");
   };
+
 
   const updateExpenseAmount = (id, newAmount) => {
     const updatedExpenses = expenses.map(e => 
@@ -978,21 +1044,27 @@ export default function App() {
         }
       `}</style>
 
-      {/* Floating Action Button (FAB) for Mobile Add */}
+      {/* Floating Action Button (FAB) - REPLACED WITH PILL */}
       <button 
         onClick={() => {
           triggerHaptic();
           setIsAddingExpense(true);
         }}
-        className="fixed bottom-6 right-6 bg-slate-900 text-white p-4 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition z-40 print:hidden flex items-center justify-center"
+        className="fixed bottom-6 right-6 bg-slate-900 text-white px-6 py-4 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition z-40 print:hidden flex items-center gap-2 font-bold"
       >
-        <Plus className="w-7 h-7" />
+        <Plus className="w-5 h-5" /> New Expense
       </button>
 
       {/* Toast Notification */}
       {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
 
       {/* MODALS */}
+      <AddExpenseModal 
+        isOpen={isAddingExpense} 
+        onClose={() => setIsAddingExpense(false)}
+        onSave={handleAddExpenseSave}
+      />
+
       {showSettings && (
         <SettingsScreen 
           user={user} 
@@ -1133,12 +1205,15 @@ export default function App() {
           <div className="p-5 border-b border-slate-100 flex flex-col gap-3 bg-white">
             <div className="flex justify-between items-center">
                <h3 className="font-bold text-slate-800">Monthly Expenses</h3>
-               <button 
-                 onClick={copyFromPreviousMonth}
-                 className="text-xs bg-slate-100 text-slate-600 px-3 py-2 rounded-xl font-bold hover:bg-slate-200 transition flex items-center gap-2"
-               >
-                 <Copy className="w-4 h-4" /> <span className="hidden sm:inline">Copy Last Month</span>
-               </button>
+               <div className="flex gap-2">
+                 <button 
+                   onClick={copyFromPreviousMonth}
+                   className="text-xs bg-slate-100 text-slate-600 px-3 py-2 rounded-xl font-bold hover:bg-slate-200 transition flex items-center gap-2"
+                 >
+                   <Copy className="w-4 h-4" /> <span className="hidden sm:inline">Copy Last Month</span>
+                 </button>
+                 {/* Original Inline Add Button - Removed as requested, replaced by FAB */}
+               </div>
             </div>
             
             {/* Search Bar */}
@@ -1153,33 +1228,6 @@ export default function App() {
               />
             </div>
           </div>
-
-          {isAddingExpense && (
-            <div className="p-4 bg-slate-50 border-b border-slate-100 animate-in slide-in-from-top-2">
-              <div className="flex gap-2 mb-2">
-                <input 
-                  type="text" 
-                  placeholder="Bill Name" 
-                  className="flex-1 p-3 rounded-xl border border-slate-200 text-sm"
-                  value={newExpenseName}
-                  onChange={(e) => setNewExpenseName(e.target.value)}
-                />
-                <input 
-                  type="number" 
-                  placeholder="£" 
-                  className="w-24 p-3 rounded-xl border border-slate-200 text-sm"
-                  value={newExpenseAmount}
-                  onChange={(e) => setNewExpenseAmount(e.target.value)}
-                />
-              </div>
-              <button 
-                onClick={addExpense}
-                className="w-full bg-emerald-600 text-white py-3 rounded-xl text-sm font-semibold shadow-sm active:bg-emerald-700"
-              >
-                Save Expense
-              </button>
-            </div>
-          )}
 
           <div className="divide-y divide-slate-100">
             {/* Render Groups */}
