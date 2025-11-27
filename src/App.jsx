@@ -38,11 +38,20 @@ import {
   Target,
   AlertTriangle,
   Printer,
-  RotateCcw,
   FileText,
   Download,
   Calendar,
-  Table
+  Table,
+  ShoppingCart,
+  Car,
+  Home,
+  Zap,
+  Smartphone,
+  Tv,
+  Coffee,
+  Utensils,
+  CreditCard,
+  Music
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION AREA ---
@@ -106,7 +115,6 @@ const openReportInNewTab = (elementId, title) => {
   const element = document.getElementById(elementId);
   if (!element) return;
 
-  // Create a complete HTML document string
   const htmlContent = `
     <!DOCTYPE html>
     <html lang="en">
@@ -134,15 +142,121 @@ const openReportInNewTab = (elementId, title) => {
     </html>
   `;
 
-  // Create a Blob from the HTML string
   const blob = new Blob([htmlContent], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
-  
-  // Open in new tab
   window.open(url, '_blank');
 };
 
+// --- SMART ICON LOGIC ---
+const getExpenseIcon = (name) => {
+  const lowerName = name.toLowerCase();
+  
+  if (lowerName.includes('netflix') || lowerName.includes('sky') || lowerName.includes('tv') || lowerName.includes('prime') || lowerName.includes('disney')) return Tv;
+  if (lowerName.includes('food') || lowerName.includes('tesco') || lowerName.includes('asda') || lowerName.includes('lidl') || lowerName.includes('sainsbury') || lowerName.includes('aldi') || lowerName.includes('grocer')) return ShoppingCart;
+  if (lowerName.includes('car') || lowerName.includes('fuel') || lowerName.includes('petrol') || lowerName.includes('uber') || lowerName.includes('train') || lowerName.includes('bus') || lowerName.includes('transport')) return Car;
+  if (lowerName.includes('rent') || lowerName.includes('mortgage') || lowerName.includes('house') || lowerName.includes('home')) return Home;
+  if (lowerName.includes('electric') || lowerName.includes('gas') || lowerName.includes('water') || lowerName.includes('bill') || lowerName.includes('council')) return Zap;
+  if (lowerName.includes('phone') || lowerName.includes('mobile') || lowerName.includes('ee') || lowerName.includes('vodafone') || lowerName.includes('o2')) return Smartphone;
+  if (lowerName.includes('coffee') || lowerName.includes('cafe') || lowerName.includes('starbucks')) return Coffee;
+  if (lowerName.includes('restaurant') || lowerName.includes('eat') || lowerName.includes('dinner') || lowerName.includes('lunch')) return Utensils;
+  if (lowerName.includes('spotify') || lowerName.includes('music') || lowerName.includes('apple')) return Music;
+  
+  return CreditCard; // Default
+};
+
 // --- COMPONENTS ---
+
+const BudgetWheel = ({ salary, expenses, allocations }) => {
+  if (!salary || parseFloat(salary) <= 0) return null;
+
+  const salaryNum = parseFloat(salary);
+  const totalExpenses = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+  const remainder = Math.max(0, salaryNum - totalExpenses);
+
+  // Calculate segments for Conic Gradient
+  // 1. Expenses
+  const expensesPercent = Math.min(100, (totalExpenses / salaryNum) * 100);
+  
+  // 2. Allocations (These are % of the REMAINDER, so we need to convert to % of TOTAL for the chart)
+  const remainderPercentOfTotal = 100 - expensesPercent;
+  
+  let currentDegree = 0;
+  const segments = [];
+
+  // Helper to add segment
+  const addSegment = (percent, color) => {
+    const degrees = (percent / 100) * 360;
+    segments.push(`${color} ${currentDegree}deg ${currentDegree + degrees}deg`);
+    currentDegree += degrees;
+  };
+
+  // Add Expenses Segment (Red/Rose)
+  addSegment(expensesPercent, '#f43f5e'); // rose-500
+
+  // Add Allocation Segments
+  allocations.forEach(plan => {
+    // Plan % is of remainder. Convert to % of total salary.
+    const planPercentOfTotal = (plan.percentage / 100) * remainderPercentOfTotal;
+    
+    // Map tailwind colors to hex for gradient
+    let hex = '#64748b'; // slate
+    if (plan.color.includes('indigo')) hex = '#6366f1';
+    if (plan.color.includes('emerald')) hex = '#10b981';
+    if (plan.color.includes('sky')) hex = '#0ea5e9';
+    if (plan.color.includes('amber')) hex = '#f59e0b';
+    
+    addSegment(planPercentOfTotal, hex);
+  });
+
+  const gradient = `conic-gradient(${segments.join(', ')})`;
+
+  return (
+    <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden print:hidden">
+      <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 w-full text-left">Where your money goes</h3>
+      <div className="relative w-48 h-48">
+        {/* The Pie Chart */}
+        <div 
+          className="w-full h-full rounded-full"
+          style={{ background: gradient }}
+        ></div>
+        {/* The Doughnut Hole */}
+        <div className="absolute inset-2 bg-white rounded-full flex flex-col items-center justify-center">
+           <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">Left Over</span>
+           <span className="text-xl font-bold text-slate-800">{formatCurrency(0)}</span> 
+           {/* Note: In a zero-sum budget, 'Left Over' is usually £0 after allocations. 
+               If you want to show Unallocated, that's different. 
+               For now, let's show the Salary for context or just the chart.
+               Actually, let's show the NET SALARY in the middle as the source. */}
+           <div className="absolute inset-0 bg-white rounded-full flex flex-col items-center justify-center z-10">
+              <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">Net Salary</span>
+              <span className="text-xl font-bold text-slate-800">{formatCurrency(salaryNum)}</span>
+           </div>
+        </div>
+      </div>
+      
+      {/* Legend */}
+      <div className="flex flex-wrap justify-center gap-3 mt-6 w-full">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+          <span className="text-xs font-medium text-slate-600">Expenses</span>
+        </div>
+        {allocations.map(plan => {
+           let bgClass = 'bg-slate-500';
+           if (plan.color.includes('indigo')) bgClass = 'bg-indigo-500';
+           if (plan.color.includes('emerald')) bgClass = 'bg-emerald-500';
+           if (plan.color.includes('sky')) bgClass = 'bg-sky-500';
+           if (plan.color.includes('amber')) bgClass = 'bg-amber-500';
+           return (
+            <div key={plan.id} className="flex items-center gap-1.5">
+              <div className={`w-3 h-3 rounded-full ${bgClass}`}></div>
+              <span className="text-xs font-medium text-slate-600">{plan.name.split(' ')[0]}</span>
+            </div>
+           );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const LoginScreen = ({ onLogin }) => (
   <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-100 flex flex-col items-center justify-center p-6">
@@ -699,7 +813,6 @@ export default function App() {
   // Report Generation
   const handleReportSelection = async (type) => {
     if (type === 'month') {
-      // Just open the month view overlay
       setActiveReport('month');
       setShowReportSelector(false);
     } else if (type === 'history') {
@@ -916,6 +1029,13 @@ export default function App() {
           </div>
         </div>
 
+        {/* Budget Wheel */}
+        <BudgetWheel 
+          salary={salary} 
+          expenses={expenses} 
+          allocations={userSettings.allocationRules}
+        />
+
         {/* Stats */}
         <div className="grid grid-cols-2 gap-4 print:hidden">
           <StatCard 
@@ -989,10 +1109,14 @@ export default function App() {
           )}
 
           <div className="divide-y divide-slate-100">
-            {expenses.map((expense) => (
+            {expenses.map((expense) => {
+              const Icon = getExpenseIcon(expense.name);
+              return (
               <div key={expense.id} className="p-4 flex justify-between items-center group hover:bg-slate-50 transition">
                 <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${expense.type === 'fixed' ? 'bg-slate-400' : 'bg-orange-400'}`}></div>
+                  <div className={`p-2 rounded-full bg-slate-100 text-slate-500`}>
+                    <Icon className="w-4 h-4" />
+                  </div>
                   <div>
                     <p className="font-medium text-slate-800">{expense.name}</p>
                     <p className="text-xs text-slate-400 capitalize">{expense.type}</p>
@@ -1036,7 +1160,7 @@ export default function App() {
                   </button>
                 </div>
               </div>
-            ))}
+            )})}
             {expenses.length === 0 && (
               <div className="p-8 text-center text-slate-400">
                 No expenses added for this month yet.
