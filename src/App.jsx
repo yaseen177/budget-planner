@@ -59,8 +59,7 @@ import {
   ArrowUpDown,
   ArrowRight,
   BarChart3,
-  FlaskConical,
-  CalendarClock
+  FlaskConical
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION AREA ---
@@ -255,6 +254,31 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
     </div>
   );
 };
+
+// --- SANDBOX INFO MODAL ---
+const SandboxInfoModal = ({ onClose, onConfirm }) => (
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex items-center justify-center p-4 animate-in fade-in">
+    <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl scale-100 animate-in zoom-in-95 duration-200 p-6 text-center">
+      <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+        <FlaskConical className="w-8 h-8 text-indigo-600" />
+      </div>
+      <h3 className="font-bold text-xl text-slate-800 mb-2">Simulation Mode</h3>
+      <p className="text-slate-500 text-sm mb-6">
+        Enter a safe playground where you can change salaries, add huge expenses, or delete bills to test "What If" scenarios.
+        <br/><br/>
+        <strong>Nothing you do here will be saved.</strong>
+      </p>
+      <div className="flex gap-3">
+        <button onClick={onClose} className="flex-1 py-3 rounded-xl font-semibold text-slate-600 hover:bg-slate-100 transition">
+          Cancel
+        </button>
+        <button onClick={onConfirm} className="flex-1 py-3 rounded-xl font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg transition">
+          Enter Sandbox
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
 // --- OTHER COMPONENTS ---
 
@@ -871,6 +895,7 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false); // New state for analytics dashboard
   const [isSandbox, setIsSandbox] = useState(false); // New state for sandbox mode
+  const [showSandboxInfo, setShowSandboxInfo] = useState(false);
 
   // Data State
   const [salary, setSalary] = useState('');
@@ -1215,34 +1240,23 @@ export default function App() {
 
   const toggleSandbox = () => {
       triggerHaptic();
-      if (!isSandbox) {
-          // Enter Sandbox: Copy current real data to sandbox state
-          setSandboxSalary(salary);
-          setSandboxExpenses([...expenses]);
-          setSandboxActualSavings({...actualSavings});
-          showToast("Entered Sandbox Mode. Changes won't be saved.");
-      } else {
+      if (isSandbox) {
+          // Exit immediately
+          setIsSandbox(false);
           showToast("Exited Sandbox Mode.");
+      } else {
+          // Show info modal before entering
+          setShowSandboxInfo(true);
       }
-      setIsSandbox(!isSandbox);
   };
 
-  // Helper to get daily budget
-  const getDailyBudget = () => {
-    const now = new Date();
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const daysLeft = Math.max(1, lastDay.getDate() - now.getDate());
-    
-    // Find Current Account allocation - assuming it has "Current Account" in name or is the last one? 
-    // Let's find the one named "Current Account" or fallback to a generic logic
-    const currentAccountPlan = userSettings.allocationRules.find(p => p.name.toLowerCase().includes('current account'));
-    
-    if (!currentAccountPlan) return 0;
-
-    const remainder = Math.max(0, parseFloat(displaySalary || 0) - totalExpenses);
-    const budget = remainder * (currentAccountPlan.percentage / 100);
-    
-    return budget / daysLeft;
+  const confirmEnterSandbox = () => {
+      setSandboxSalary(salary);
+      setSandboxExpenses([...expenses]);
+      setSandboxActualSavings({...actualSavings});
+      setIsSandbox(true);
+      setShowSandboxInfo(false);
+      showToast("Entered Sandbox Mode.");
   };
 
   const totalExpenses = displayExpenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
@@ -1268,8 +1282,6 @@ export default function App() {
   
   const fixedExpenses = filteredExpenses.filter(e => e.type === 'fixed');
   const variableExpenses = filteredExpenses.filter(e => e.type === 'variable');
-
-  const dailyBudget = getDailyBudget();
 
   if (loading) return <div className="h-screen flex items-center justify-center text-emerald-600">Loading Planner...</div>;
   if (!user) return <LoginScreen onLogin={handleLogin} />;
@@ -1334,6 +1346,13 @@ export default function App() {
           user={user} 
           onClose={() => setShowAnalytics(false)}
           currency={userSettings.currency}
+        />
+      )}
+
+      {showSandboxInfo && (
+        <SandboxInfoModal 
+            onClose={() => setShowSandboxInfo(false)}
+            onConfirm={confirmEnterSandbox}
         />
       )}
 
@@ -1435,7 +1454,7 @@ export default function App() {
         />
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 print:hidden">
+        <div className="grid grid-cols-2 gap-4 print:hidden">
           <StatCard 
             label="Total Expenses" 
             amount={totalExpenses} 
@@ -1451,19 +1470,6 @@ export default function App() {
             subText="Available for Goals"
             currency={userSettings.currency}
           />
-          {/* Safe-To-Spend Card */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-full col-span-2 md:col-span-1">
-            <div className="flex justify-between items-start mb-2">
-              <div className="p-2.5 rounded-xl bg-amber-50 border border-slate-200 text-amber-600">
-                <CalendarClock className="w-5 h-5" />
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Daily Safe Spend</p>
-              <h3 className="text-2xl font-bold text-slate-800 tracking-tight">{formatCurrency(dailyBudget, userSettings.currency)}</h3>
-              <p className="text-xs text-slate-400 mt-1 font-medium">Based on Current Account</p>
-            </div>
-          </div>
         </div>
 
         {/* Allocations */}
