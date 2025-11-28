@@ -57,7 +57,7 @@ import {
   PenLine,
   Search,
   ArrowUpDown,
-  Globe
+  ArrowRight
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION AREA ---
@@ -123,7 +123,7 @@ const getMonthId = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1
 
 const triggerHaptic = () => {
   if (navigator.vibrate) {
-    navigator.vibrate(15); // Light vibration
+    navigator.vibrate(15); 
   }
 };
 
@@ -259,7 +259,6 @@ const BudgetWheel = ({ salary, expenses, allocations, currency }) => {
 
   const salaryNum = parseFloat(salary);
   const totalExpenses = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-  // const remainder = Math.max(0, salaryNum - totalExpenses); // unused here
 
   const expensesPercent = Math.min(100, (totalExpenses / salaryNum) * 100);
   const remainderPercentOfTotal = 100 - expensesPercent;
@@ -361,7 +360,7 @@ const StatCard = ({ label, amount, icon: Icon, colorClass, subText, currency }) 
   </div>
 );
 
-const AllocationCard = ({ title, amount, percentage, color, currency }) => {
+const AllocationCard = ({ title, targetAmount, actualAmount, percentage, color, currency, onUpdateActual }) => {
   let barColor = 'bg-slate-500';
   if (color.includes('indigo')) barColor = 'bg-indigo-500';
   if (color.includes('emerald')) barColor = 'bg-emerald-500';
@@ -377,17 +376,46 @@ const AllocationCard = ({ title, amount, percentage, color, currency }) => {
           </div>
           <h4 className="font-bold text-slate-700 print:text-black">{title}</h4>
         </div>
-        <p className="text-lg font-bold text-slate-800 print:text-black">{amount > 0 ? formatCurrency(amount, currency) : formatCurrency(0, currency)}</p>
+        <div className="text-right">
+           <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Target</p>
+           <p className="text-lg font-bold text-slate-800 print:text-black">{formatCurrency(targetAmount, currency)}</p>
+        </div>
       </div>
       
-      <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+      {/* Progress Bar */}
+      <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden mb-3">
         <div 
           className={`h-2.5 rounded-full ${barColor} transition-all duration-1000 ease-out`} 
           style={{ width: `${percentage}%` }}
         ></div>
       </div>
-      <div className="text-right mt-1">
-        <span className="text-xs font-semibold text-slate-400">{percentage}% allocation</span>
+
+      {/* Actual Input Row */}
+      <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl print:bg-transparent print:p-0 print:border-t print:rounded-none print:mt-2">
+         <span className="text-xs font-bold text-slate-500 uppercase">Actual Saved</span>
+         <div className="flex items-center gap-2">
+           {onUpdateActual && (
+              <button 
+                onClick={() => onUpdateActual(targetAmount)}
+                className="text-xs text-emerald-600 font-bold hover:bg-emerald-100 px-2 py-1 rounded print:hidden"
+                title="Match Target"
+              >
+                Match Target
+              </button>
+           )}
+           <div className="relative">
+             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
+                {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}
+             </span>
+             <input 
+                type="number"
+                value={actualAmount || ''}
+                onChange={(e) => onUpdateActual(e.target.value)}
+                placeholder="0"
+                className="w-24 text-right bg-white border border-slate-200 rounded-lg py-1 pr-2 pl-6 text-sm font-bold text-slate-800 focus:border-emerald-500 outline-none print:bg-transparent print:border-none"
+             />
+           </div>
+         </div>
       </div>
     </div>
   );
@@ -435,7 +463,7 @@ const ReportSelector = ({ onClose, onSelect }) => (
   </div>
 );
 
-const MonthReportView = ({ date, salary, expenses, allocations, onClose, currency }) => {
+const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose, currency }) => {
   const totalExpenses = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
   const salaryNum = parseFloat(salary) || 0;
   const remainder = Math.max(0, salaryNum - totalExpenses);
@@ -489,19 +517,31 @@ const MonthReportView = ({ date, salary, expenses, allocations, onClose, currenc
           </div>
 
           <div>
-            <h3 className="font-bold text-slate-800 border-b border-slate-200 pb-2 mb-3">Savings & Goals</h3>
-            <div className="space-y-3">
-              {allocations.map(plan => (
-                <div key={plan.id} className="flex justify-between items-center text-sm">
-                  <span className="text-slate-600">{plan.name} <span className="text-xs text-slate-400">({plan.percentage}%)</span></span>
-                  <span className="font-medium">{formatCurrency(remainder * (plan.percentage / 100), currency)}</span>
-                </div>
-              ))}
-              <div className="border-t border-slate-200 pt-3 flex justify-between font-bold text-slate-900 mt-2">
-                <span>Total Allocated</span>
-                <span>{formatCurrency(remainder, currency)}</span>
-              </div>
-            </div>
+            <h3 className="font-bold text-slate-800 border-b border-slate-200 pb-2 mb-3">Savings Breakdown</h3>
+            <table className="w-full text-sm">
+               <thead>
+                 <tr className="text-xs text-slate-400 uppercase">
+                   <th className="text-left py-2">Goal</th>
+                   <th className="text-right py-2">Target</th>
+                   <th className="text-right py-2">Actual</th>
+                 </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-100">
+                 {allocations.map(plan => {
+                   const target = remainder * (plan.percentage / 100);
+                   const actual = actuals && actuals[plan.id] ? parseFloat(actuals[plan.id]) : 0;
+                   return (
+                     <tr key={plan.id}>
+                        <td className="py-2 text-slate-600">{plan.name}</td>
+                        <td className="py-2 text-right text-slate-400">{formatCurrency(target, currency)}</td>
+                        <td className={`py-2 text-right font-bold ${actual >= target ? 'text-emerald-600' : 'text-orange-500'}`}>
+                          {formatCurrency(actual, currency)}
+                        </td>
+                     </tr>
+                   )
+                 })}
+               </tbody>
+            </table>
           </div>
         </div>
 
@@ -535,16 +575,16 @@ const HistoryReportView = ({ data, allocations, onClose, currency }) => {
         <h1 className="text-2xl font-bold text-slate-900 mb-6 hidden print:block">Annual Financial Report</h1>
         
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="border-b-2 border-slate-200">
                 <th className="py-3 px-2 font-bold text-slate-700">Month</th>
                 <th className="py-3 px-2 font-bold text-slate-700 text-right">Net Salary</th>
                 <th className="py-3 px-2 font-bold text-slate-700 text-right">Expenses</th>
-                <th className="py-3 px-2 font-bold text-slate-700 text-right">Remainder</th>
+                <th className="py-3 px-2 font-bold text-slate-700 text-right border-r border-slate-200 pr-4">Target Savings</th>
                 {allocations.map(plan => (
-                  <th key={plan.id} className="py-3 px-2 font-bold text-indigo-700 text-right text-xs uppercase w-32">
-                    {plan.name} ({plan.percentage}%)
+                  <th key={plan.id} className="py-3 px-2 font-bold text-indigo-700 text-right text-xs uppercase w-24">
+                    {plan.name.split(' ')[0]} (Act)
                   </th>
                 ))}
               </tr>
@@ -554,18 +594,25 @@ const HistoryReportView = ({ data, allocations, onClose, currency }) => {
                 const totalExpenses = (row.expenses || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
                 const salary = parseFloat(row.salary) || 0;
                 const remainder = Math.max(0, salary - totalExpenses);
+                const actuals = row.actualSavings || {};
 
                 return (
                   <tr key={row.id} className="hover:bg-slate-50 break-inside-avoid">
                     <td className="py-3 px-2 font-medium text-slate-800">{row.id}</td>
                     <td className="py-3 px-2 text-right font-mono font-bold text-emerald-600">{formatCurrency(salary, currency)}</td>
                     <td className="py-3 px-2 text-right font-mono text-rose-500">{formatCurrency(totalExpenses, currency)}</td>
-                    <td className="py-3 px-2 text-right font-mono font-bold text-slate-900">{formatCurrency(remainder, currency)}</td>
-                    {allocations.map(plan => (
-                      <td key={plan.id} className="py-3 px-2 text-right font-mono text-slate-600 text-sm">
-                        {formatCurrency(remainder * (plan.percentage / 100), currency)}
-                      </td>
-                    ))}
+                    <td className="py-3 px-2 text-right font-mono font-bold text-slate-900 border-r border-slate-200 pr-4">{formatCurrency(remainder, currency)}</td>
+                    {allocations.map(plan => {
+                      const actual = actuals[plan.id] ? parseFloat(actuals[plan.id]) : 0;
+                      const target = remainder * (plan.percentage / 100);
+                      const isMet = actual >= target - 1; // Tolerance of 1
+                      
+                      return (
+                        <td key={plan.id} className={`py-3 px-2 text-right font-mono text-sm ${isMet ? 'text-emerald-600' : 'text-orange-500'}`}>
+                          {formatCurrency(actual, currency)}
+                        </td>
+                      );
+                    })}
                   </tr>
                 );
               })}
@@ -621,7 +668,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
 
   const addDefaultExpense = () => {
     if(!newDefExpName) return; 
-    // Allow empty amount (0) for variable expenses
     const amountVal = parseFloat(newDefExpAmount) || 0;
     
     setDefaultExpenses([...defaultExpenses, {
@@ -801,16 +847,16 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   
-  // UI State
   const [showSettings, setShowSettings] = useState(false);
   const [showReportSelector, setShowReportSelector] = useState(false);
   const [activeReport, setActiveReport] = useState(null); // 'month' or 'history'
   const [reportData, setReportData] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
   
-  // Data State
   const [salary, setSalary] = useState('');
   const [expenses, setExpenses] = useState([]);
+  const [actualSavings, setActualSavings] = useState({}); // New State for Actuals
+  
   const [userSettings, setUserSettings] = useState({
     displayName: '',
     currency: 'GBP',
@@ -823,7 +869,7 @@ export default function App() {
   const [newExpenseAmount, setNewExpenseAmount] = useState('');
   const [isAddingExpense, setIsAddingExpense] = useState(false); // For Modal
   const [searchTerm, setSearchTerm] = useState(''); // Added search state
-  const [sortMode, setSortMode] = useState('date'); // date, amount-desc, name
+  const [sortMode, setSortMode] = useState('date');
 
   // Toast Helper
   const showToast = (msg) => {
@@ -838,7 +884,6 @@ export default function App() {
 
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
         try {
-          // If using own keys, avoid using preview tokens
           if (YOUR_FIREBASE_KEYS.apiKey === "") {
              await signInWithCustomToken(auth, __initial_auth_token);
           }
@@ -887,9 +932,11 @@ export default function App() {
         const data = docSnap.data();
         setSalary(data.salary || '');
         setExpenses(data.expenses || []);
+        setActualSavings(data.actualSavings || {});
       } else {
         setSalary('');
         setExpenses(userSettings.defaultFixedExpenses || DEFAULT_FIXED_EXPENSES);
+        setActualSavings({});
       }
     }, (error) => {
       console.error("Error fetching data:", error);
@@ -956,7 +1003,7 @@ export default function App() {
         const data = docSnap.data();
         setSalary(data.salary || '');
         setExpenses(data.expenses || []);
-        saveData(data.salary, data.expenses);
+        saveData(data.salary, data.expenses, {}); // Don't copy actuals, they are new
         showToast("Copied from last month!");
       } else {
         showToast("No data found for previous month.");
@@ -967,11 +1014,16 @@ export default function App() {
     }
   };
 
-  const saveData = async (newSalary, newExpenses) => {
+  const saveData = async (newSalary, newExpenses, newActuals) => {
     if (!user) return;
     const monthId = getMonthId(currentDate);
     const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgetData', monthId);
-    await setDoc(docRef, { salary: newSalary, expenses: newExpenses, lastUpdated: new Date() });
+    await setDoc(docRef, { 
+      salary: newSalary, 
+      expenses: newExpenses, 
+      actualSavings: newActuals || actualSavings,
+      lastUpdated: new Date() 
+    });
   };
 
   const saveSettings = async (newSettings) => {
@@ -996,10 +1048,15 @@ export default function App() {
 
   const updateSalary = (val) => {
     setSalary(val);
-    saveData(val, expenses);
+    saveData(val, expenses, actualSavings);
   };
 
-  // Add Expense via Modal
+  const updateActualSavings = (planId, val) => {
+     const newActuals = { ...actualSavings, [planId]: val };
+     setActualSavings(newActuals);
+     saveData(salary, expenses, newActuals);
+  };
+
   const handleAddExpenseSave = (name, amount) => {
     triggerHaptic(); // Haptic
     const newExp = {
@@ -1010,7 +1067,7 @@ export default function App() {
     };
     const updatedExpenses = [...expenses, newExp];
     setExpenses(updatedExpenses);
-    saveData(salary, updatedExpenses);
+    saveData(salary, updatedExpenses, actualSavings);
     setIsAddingExpense(false);
     showToast("Bill added!");
   };
@@ -1021,8 +1078,7 @@ export default function App() {
       e.id === id ? { ...e, amount: parseFloat(newAmount) || 0 } : e
     );
     setExpenses(updatedExpenses);
-    saveData(salary, updatedExpenses);
-    // Removed setEditingExpenseId(null) to keep edit mode open
+    saveData(salary, updatedExpenses, actualSavings);
   };
 
   const updateExpenseName = (id, newName) => {
@@ -1030,15 +1086,14 @@ export default function App() {
       e.id === id ? { ...e, name: newName } : e
     );
     setExpenses(updatedExpenses);
-    saveData(salary, updatedExpenses);
-    // Removed setEditingExpenseId(null)
+    saveData(salary, updatedExpenses, actualSavings);
   };
 
   const removeExpense = (id) => {
     triggerHaptic(); // Haptic
     const updatedExpenses = expenses.filter(e => e.id !== id);
     setExpenses(updatedExpenses);
-    saveData(salary, updatedExpenses);
+    saveData(salary, updatedExpenses, actualSavings);
     showToast("Bill removed.");
   };
 
@@ -1071,7 +1126,6 @@ export default function App() {
   } else if (sortMode === 'name') {
     filteredExpenses.sort((a, b) => a.name.localeCompare(b.name));
   }
-  // Default is date (insertion order), so no sort needed for 'date' if array is already in order
   
   const fixedExpenses = filteredExpenses.filter(e => e.type === 'fixed');
   const variableExpenses = filteredExpenses.filter(e => e.type === 'variable');
@@ -1132,6 +1186,7 @@ export default function App() {
           salary={salary}
           expenses={expenses}
           allocations={userSettings.allocationRules}
+          actuals={actualSavings}
           onClose={() => setActiveReport(null)}
           currency={userSettings.currency}
         />
@@ -1239,16 +1294,21 @@ export default function App() {
         {salaryNum > 0 && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 print:hidden">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider px-2">Financial Goals</h3>
-            {userSettings.allocationRules.map(plan => (
-              <AllocationCard 
-                key={plan.id}
-                title={plan.name} 
-                amount={remainder * (plan.percentage / 100)} 
-                percentage={plan.percentage} 
-                color={plan.color || 'bg-slate-100 text-slate-700'}
-                currency={userSettings.currency}
-              />
-            ))}
+            {userSettings.allocationRules.map(plan => {
+              const target = remainder * (plan.percentage / 100);
+              return (
+                <AllocationCard 
+                  key={plan.id}
+                  title={plan.name} 
+                  targetAmount={target}
+                  actualAmount={actualSavings[plan.id]}
+                  percentage={plan.percentage} 
+                  color={plan.color || 'bg-slate-100 text-slate-700'}
+                  currency={userSettings.currency}
+                  onUpdateActual={(val) => updateActualSavings(plan.id, val)}
+                />
+              );
+            })}
           </div>
         )}
 
@@ -1323,7 +1383,7 @@ export default function App() {
                               defaultValue={expense.name}
                               className="font-medium text-slate-800 w-full bg-slate-50 border-b border-slate-300 outline-none pb-1"
                               onBlur={(e) => updateExpenseName(expense.id, e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && updateExpenseName(expense.id, e.currentTarget.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
                             />
                           ) : (
                             <p className="font-medium text-slate-800">{expense.name}</p>
