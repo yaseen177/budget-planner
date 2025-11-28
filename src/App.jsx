@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
@@ -59,7 +59,9 @@ import {
   ArrowUpDown,
   ArrowRight,
   BarChart3,
-  FlaskConical
+  FlaskConical,
+  TrendingUp,
+  Maximize2
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION AREA ---
@@ -87,6 +89,11 @@ const appId = 'nuha-budget-app';
 
 // --- CONSTANTS & DEFAULTS ---
 const MONTH_NAMES = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+];
+
+const FULL_MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
 ];
@@ -109,77 +116,365 @@ const DEFAULT_ALLOCATIONS = [
 
 // --- HELPER FUNCTIONS ---
 const formatCurrency = (amount, currency = 'GBP') => {
-  const localeMap = {
-    'GBP': 'en-GB',
-    'USD': 'en-US',
-    'EUR': 'de-DE'
-  };
+  const localeMap = { 'GBP': 'en-GB', 'USD': 'en-US', 'EUR': 'de-DE' };
   return new Intl.NumberFormat(localeMap[currency] || 'en-GB', {
     style: 'currency',
     currency: currency,
-    minimumFractionDigits: 0, // Simplified for charts
-    maximumFractionDigits: 2
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
   }).format(amount);
 };
 
 const getMonthId = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
 const triggerHaptic = () => {
-  if (navigator.vibrate) {
-    navigator.vibrate(15); 
-  }
+  if (navigator.vibrate) navigator.vibrate(15);
 };
 
 const openReportInNewTab = (elementId, title) => {
   const element = document.getElementById(elementId);
   if (!element) return;
-
   const htmlContent = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${title}</title>
-      <script src="https://cdn.tailwindcss.com"></script>
-      <style>
-        body { background-color: white; padding: 20px; font-family: sans-serif; -webkit-print-color-adjust: exact; }
-        @media print { 
-          body { padding: 0; }
-          .no-print { display: none; } 
-        }
-      </style>
+      <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${title}</title><script src="https://cdn.tailwindcss.com"></script>
+      <style>body { background-color: white; padding: 20px; font-family: sans-serif; -webkit-print-color-adjust: exact; } @media print { body { padding: 0; } .no-print { display: none; } }</style>
     </head>
     <body>
-      <div class="max-w-4xl mx-auto">
-        ${element.innerHTML}
-      </div>
-      <div class="fixed bottom-4 right-4 no-print flex gap-2">
-        <button onclick="window.print()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold shadow-lg">Print / Save as PDF</button>
-      </div>
+      <div class="max-w-4xl mx-auto">${element.innerHTML}</div>
+      <div class="fixed bottom-4 right-4 no-print flex gap-2"><button onclick="window.print()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold shadow-lg">Print / Save as PDF</button></div>
     </body>
-    </html>
-  `;
-
+    </html>`;
   const blob = new Blob([htmlContent], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank');
+  window.open(URL.createObjectURL(blob), '_blank');
 };
 
 const getExpenseIcon = (name) => {
   const lowerName = name.toLowerCase();
+  if (lowerName.includes('netflix') || lowerName.includes('sky') || lowerName.includes('tv') || lowerName.includes('prime')) return Tv;
+  if (lowerName.includes('food') || lowerName.includes('tesco') || lowerName.includes('asda') || lowerName.includes('lidl') || lowerName.includes('sainsbury')) return ShoppingCart;
+  if (lowerName.includes('car') || lowerName.includes('fuel') || lowerName.includes('petrol') || lowerName.includes('uber') || lowerName.includes('train')) return Car;
+  if (lowerName.includes('rent') || lowerName.includes('mortgage') || lowerName.includes('house')) return Home;
+  if (lowerName.includes('electric') || lowerName.includes('gas') || lowerName.includes('water')) return Zap;
+  if (lowerName.includes('phone') || lowerName.includes('mobile') || lowerName.includes('ee')) return Smartphone;
+  if (lowerName.includes('coffee') || lowerName.includes('cafe')) return Coffee;
+  if (lowerName.includes('restaurant') || lowerName.includes('eat') || lowerName.includes('lunch')) return Utensils;
+  if (lowerName.includes('spotify') || lowerName.includes('music')) return Music;
+  return CreditCard;
+};
+
+// --- CHART COMPONENTS ---
+
+const SimpleLineChart = ({ data, dataKey, color, height = 64, showArea = false }) => {
+  if (!data || data.length === 0) return null;
+  const values = data.map(d => d[dataKey]);
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0); // Optional: set to 0 for absolute scale
+  const range = max - 0; // Base on 0
   
-  if (lowerName.includes('netflix') || lowerName.includes('sky') || lowerName.includes('tv') || lowerName.includes('prime') || lowerName.includes('disney')) return Tv;
-  if (lowerName.includes('food') || lowerName.includes('tesco') || lowerName.includes('asda') || lowerName.includes('lidl') || lowerName.includes('sainsbury') || lowerName.includes('aldi') || lowerName.includes('grocer')) return ShoppingCart;
-  if (lowerName.includes('car') || lowerName.includes('fuel') || lowerName.includes('petrol') || lowerName.includes('uber') || lowerName.includes('train') || lowerName.includes('bus') || lowerName.includes('transport')) return Car;
-  if (lowerName.includes('rent') || lowerName.includes('mortgage') || lowerName.includes('house') || lowerName.includes('home')) return Home;
-  if (lowerName.includes('electric') || lowerName.includes('gas') || lowerName.includes('water') || lowerName.includes('bill') || lowerName.includes('council')) return Zap;
-  if (lowerName.includes('phone') || lowerName.includes('mobile') || lowerName.includes('ee') || lowerName.includes('vodafone') || lowerName.includes('o2')) return Smartphone;
-  if (lowerName.includes('coffee') || lowerName.includes('cafe') || lowerName.includes('starbucks')) return Coffee;
-  if (lowerName.includes('restaurant') || lowerName.includes('eat') || lowerName.includes('dinner') || lowerName.includes('lunch')) return Utensils;
-  if (lowerName.includes('spotify') || lowerName.includes('music') || lowerName.includes('apple')) return Music;
+  const points = values.map((val, i) => {
+    const x = (i / (values.length - 1)) * 100;
+    const y = 100 - ((val / range) * 100);
+    return `${x},${y}`;
+  }).join(' ');
+
+  const areaPoints = `0,100 ${points} 100,100`;
+
+  return (
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
+      {showArea && (
+         <polygon points={areaPoints} fill={color} fillOpacity="0.2" />
+      )}
+      <polyline 
+        fill="none" 
+        stroke={color} 
+        strokeWidth="3" 
+        points={points} 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+      {/* Dots */}
+      {values.map((val, i) => {
+         const x = (i / (values.length - 1)) * 100;
+         const y = 100 - ((val / range) * 100);
+         return <circle key={i} cx={x} cy={y} r="1.5" fill="white" stroke={color} strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
+      })}
+    </svg>
+  );
+};
+
+const BarChart = ({ data, dataKey, color, height = 100 }) => {
+  const max = Math.max(...data.map(d => d[dataKey]), 100);
   
-  return CreditCard; // Default
+  return (
+    <div className="flex items-end justify-between gap-1 h-full w-full">
+      {data.map((d, i) => {
+        const h = Math.max(5, (d[dataKey] / max) * 100);
+        return (
+          <div key={i} className="flex flex-col items-center flex-1 h-full justify-end group relative">
+            <div 
+              className={`w-full max-w-[20px] rounded-t-md transition-all duration-500 ${color}`}
+              style={{ height: `${h}%` }}
+            ></div>
+            <div className="absolute bottom-full mb-1 opacity-0 group-hover:opacity-100 bg-slate-800 text-white text-[10px] px-1 rounded pointer-events-none whitespace-nowrap z-10">
+               {d.label}: {Math.round(d[dataKey])}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  );
+};
+
+const MultiBarChart = ({ data, keys, colors }) => {
+    const max = Math.max(...data.map(d => Math.max(d[keys[0]], d[keys[1]])), 100);
+
+    return (
+      <div className="flex items-end justify-between gap-2 h-full w-full px-1">
+        {data.map((d, i) => {
+          const h1 = Math.max(2, (d[keys[0]] / max) * 100);
+          const h2 = Math.max(2, (d[keys[1]] / max) * 100);
+          return (
+            <div key={i} className="flex flex-col items-center justify-end flex-1 h-full gap-1 group relative">
+               <div className="flex items-end gap-[1px] w-full justify-center h-full">
+                  <div style={{height: `${h1}%`}} className={`flex-1 max-w-[12px] rounded-t-sm ${colors[0]} opacity-80`}></div>
+                  <div style={{height: `${h2}%`}} className={`flex-1 max-w-[12px] rounded-t-sm ${colors[1]}`}></div>
+               </div>
+               <div className="text-[8px] text-slate-400 mt-1">{d.label}</div>
+               {/* Tooltip */}
+               <div className="absolute bottom-full mb-1 opacity-0 group-hover:opacity-100 bg-slate-800 text-white text-[10px] p-2 rounded pointer-events-none z-10">
+                   <div className="font-bold mb-1">{d.fullLabel}</div>
+                   <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${colors[0]}`}></span> Target: {Math.round(d[keys[0]])}</div>
+                   <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${colors[1]}`}></span> Actual: {Math.round(d[keys[1]])}</div>
+               </div>
+            </div>
+          )
+        })}
+      </div>
+    );
+};
+
+// --- ANALYTICS DASHBOARD ---
+const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
+  const [history, setHistory] = useState([]);
+  const [timeRange, setTimeRange] = useState('6M'); // 3M, 6M, 12M, ALL
+  const [loading, setLoading] = useState(true);
+  const [selectedPot, setSelectedPot] = useState(null);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const colRef = collection(db, 'artifacts', appId, 'users', user.uid, 'budgetData');
+        const snapshot = await getDocs(colRef);
+        let rawData = [];
+        snapshot.forEach(doc => {
+          const val = doc.data();
+          // Extract basic stats
+          const salary = parseFloat(val.salary) || 0;
+          const expensesTotal = (val.expenses || []).reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+          const remainder = Math.max(0, salary - expensesTotal);
+          const actuals = val.actualSavings || {};
+          
+          // Calculate target vs actual for each pot
+          const potData = {};
+          allocationRules.forEach(rule => {
+             potData[rule.id] = {
+                 target: remainder * (rule.percentage / 100),
+                 actual: parseFloat(actuals[rule.id]) || 0
+             };
+          });
+
+          if (salary > 0) {
+            rawData.push({
+              id: doc.id, // YYYY-MM
+              label: MONTH_NAMES[parseInt(doc.id.split('-')[1]) - 1],
+              fullLabel: `${FULL_MONTH_NAMES[parseInt(doc.id.split('-')[1]) - 1]} ${doc.id.split('-')[0]}`,
+              salary,
+              expenses: expensesTotal,
+              remainder,
+              pots: potData
+            });
+          }
+        });
+        rawData.sort((a, b) => a.id.localeCompare(b.id));
+        setHistory(rawData);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHistory();
+  }, [user]);
+
+  // Filter Data based on Time Range
+  const filteredData = useMemo(() => {
+    if (timeRange === 'ALL') return history;
+    const months = parseInt(timeRange.replace('M', ''));
+    return history.slice(-months);
+  }, [history, timeRange]);
+
+  if (loading) return <div className="fixed inset-0 z-[100] bg-white flex items-center justify-center">Loading Analytics...</div>;
+
+  // -- RENDER --
+  return (
+    <div className="fixed inset-0 bg-slate-50 z-[60] overflow-y-auto animate-in fade-in slide-in-from-bottom-8">
+      
+      {/* Header */}
+      <div className="bg-white p-4 sticky top-0 z-20 shadow-sm flex justify-between items-center">
+        <h2 className="font-bold text-lg flex items-center gap-2 text-slate-800">
+          <BarChart3 className="w-5 h-5 text-emerald-500" /> Analytics
+        </h2>
+        
+        {/* Range Selector */}
+        <div className="flex bg-slate-100 p-1 rounded-lg">
+           {['3M', '6M', '12M', 'ALL'].map(r => (
+             <button 
+               key={r}
+               onClick={() => setTimeRange(r)}
+               className={`px-3 py-1 text-xs font-bold rounded-md transition ${timeRange === r ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+             >
+               {r}
+             </button>
+           ))}
+        </div>
+
+        <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full">
+          <X className="w-5 h-5 text-slate-500" />
+        </button>
+      </div>
+
+      <div className="max-w-2xl mx-auto p-4 space-y-6 pb-20">
+        
+        {filteredData.length < 2 ? (
+           <div className="text-center py-20 text-slate-400">
+             <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-20" />
+             <p>Need more data to show trends.</p>
+             <p className="text-xs">Keep tracking your months!</p>
+           </div>
+        ) : (
+          <>
+            {/* 1. SALARY GRAPH */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+               <div className="flex justify-between items-center mb-4">
+                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Income Trend</h3>
+                 <span className="text-emerald-600 text-xs font-bold bg-emerald-50 px-2 py-1 rounded-lg">
+                   Avg: {formatCurrency(filteredData.reduce((a,b)=>a+b.salary,0)/filteredData.length, currency)}
+                 </span>
+               </div>
+               <div className="h-32">
+                  <SimpleLineChart data={filteredData} dataKey="salary" color="#10b981" showArea={true} />
+               </div>
+               <div className="flex justify-between mt-2 px-1">
+                  {filteredData.map((d, i) => (
+                    <span key={i} className="text-[10px] text-slate-400 font-mono">{d.label}</span>
+                  ))}
+               </div>
+            </div>
+
+            {/* 2. EXPENSES GRAPH */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+               <div className="flex justify-between items-center mb-4">
+                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Monthly Expenses</h3>
+                 <span className="text-rose-500 text-xs font-bold bg-rose-50 px-2 py-1 rounded-lg">
+                    Avg: {formatCurrency(filteredData.reduce((a,b)=>a+b.expenses,0)/filteredData.length, currency)}
+                 </span>
+               </div>
+               <div className="h-32">
+                  <BarChart data={filteredData} dataKey="expenses" color="bg-rose-400" />
+               </div>
+                <div className="flex justify-between mt-2 px-1">
+                  {filteredData.map((d, i) => (
+                    <span key={i} className="text-[10px] text-slate-400 font-mono">{d.label}</span>
+                  ))}
+               </div>
+            </div>
+
+            {/* 3. POTS MINI GRAPHS GRID */}
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 mb-3 px-2">Savings Performance</h3>
+              <div className="grid grid-cols-2 gap-3">
+                 {allocationRules.map(rule => {
+                    // Prepare mini data for this pot
+                    const potHistory = filteredData.map(d => ({ 
+                        label: d.label, 
+                        value: d.pots[rule.id]?.actual || 0 
+                    }));
+                    const totalSaved = potHistory.reduce((sum, x) => sum + x.value, 0);
+                    
+                    // Color mapping
+                    let color = '#64748b';
+                    if (rule.color.includes('indigo')) color = '#6366f1';
+                    if (rule.color.includes('emerald')) color = '#10b981';
+                    if (rule.color.includes('sky')) color = '#0ea5e9';
+                    if (rule.color.includes('amber')) color = '#f59e0b';
+
+                    return (
+                      <button 
+                        key={rule.id}
+                        onClick={() => setSelectedPot({ ...rule, colorCode: color })}
+                        className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:border-slate-300 transition text-left group"
+                      >
+                         <div className="flex justify-between items-start mb-2">
+                            <span className="text-xs font-bold text-slate-500 truncate max-w-[80px]">{rule.name}</span>
+                            <Maximize2 className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
+                         </div>
+                         <div className="h-12 mb-2">
+                            <SimpleLineChart data={potHistory} dataKey="value" color={color} />
+                         </div>
+                         <div className="text-lg font-bold text-slate-800">{formatCurrency(totalSaved, currency)}</div>
+                         <div className="text-[10px] text-slate-400">Total Saved ({timeRange})</div>
+                      </button>
+                    );
+                 })}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* POT DETAIL MODAL */}
+      {selectedPot && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4 animate-in fade-in">
+           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                 <div>
+                    <h3 className="font-bold text-lg text-slate-800">{selectedPot.name}</h3>
+                    <p className="text-xs text-slate-500">Target vs Actual • {timeRange}</p>
+                 </div>
+                 <button onClick={() => setSelectedPot(null)} className="p-2 hover:bg-slate-200 rounded-full"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="p-6">
+                 <div className="h-64 w-full">
+                    <MultiBarChart 
+                       data={filteredData.map(d => ({
+                          label: d.label,
+                          fullLabel: d.fullLabel,
+                          target: d.pots[selectedPot.id]?.target || 0,
+                          actual: d.pots[selectedPot.id]?.actual || 0
+                       }))}
+                       keys={['target', 'actual']}
+                       colors={['bg-slate-300', selectedPot.color.split(' ')[0].replace('bg-', 'bg-')]} // Hacky color extraction or pass explicit
+                    />
+                 </div>
+                 <div className="flex justify-center gap-6 mt-6">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                       <div className="w-3 h-3 bg-slate-300 rounded-sm"></div> Target
+                    </div>
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                       <div className={`w-3 h-3 rounded-sm ${selectedPot.color.split(' ')[0]}`}></div> Actual
+                    </div>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+    </div>
+  );
 };
 
 // --- TOAST COMPONENT ---
@@ -1346,6 +1641,7 @@ export default function App() {
           user={user} 
           onClose={() => setShowAnalytics(false)}
           currency={userSettings.currency}
+          allocationRules={userSettings.allocationRules}
         />
       )}
 
