@@ -254,23 +254,23 @@ const AnalyticsDashboard = ({ user, onClose, currency }) => {
             {/* Cash Flow Chart */}
             <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
               <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6">6-Month Cash Flow</h3>
-              <div className="flex items-end justify-between gap-2 h-48">
+              <div className="flex justify-between gap-2 h-48">
                 {data.map((d, i) => {
                   const salH = Math.max(5, (d.salary / maxVal) * 100);
                   const expH = Math.max(5, (d.expenses / maxVal) * 100);
                   return (
-                    <div key={d.month} className="flex flex-col items-center gap-1 flex-1 group relative">
-                      <div className="w-full flex gap-1 items-end justify-center h-full">
-                        <div style={{ height: `${salH}%` }} className="w-2 bg-emerald-400 rounded-t-sm transition-all duration-500"></div>
-                        <div style={{ height: `${expH}%` }} className="w-2 bg-rose-400 rounded-t-sm transition-all duration-500"></div>
+                    <div key={d.month} className="flex flex-col items-center justify-end gap-2 flex-1 group relative h-full">
+                      <div className="w-full flex-1 flex gap-1 items-end justify-center">
+                        <div style={{ height: `${salH}%` }} className="w-2 bg-emerald-400 rounded-t-sm transition-all duration-500 relative group-hover:opacity-80"></div>
+                        <div style={{ height: `${expH}%` }} className="w-2 bg-rose-400 rounded-t-sm transition-all duration-500 relative group-hover:opacity-80"></div>
                       </div>
                       <span className="text-[10px] text-slate-400 font-mono truncate w-full text-center">{d.month.split('-')[1]}</span>
                       
                       {/* Tooltip */}
-                      <div className="absolute bottom-full mb-2 bg-slate-800 text-white text-xs p-2 rounded opacity-0 group-hover:opacity-100 transition pointer-events-none z-20 w-max">
-                        <div className="font-bold">{d.month}</div>
-                        <div className="text-emerald-300">In: {formatCurrency(d.salary, currency)}</div>
-                        <div className="text-rose-300">Out: {formatCurrency(d.expenses, currency)}</div>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-800 text-white text-xs p-2 rounded opacity-0 group-hover:opacity-100 transition pointer-events-none z-20 w-max shadow-xl">
+                        <div className="font-bold border-b border-slate-600 pb-1 mb-1">{d.month}</div>
+                        <div className="text-emerald-300 flex justify-between gap-3"><span>In:</span> <span>{formatCurrency(d.salary, currency)}</span></div>
+                        <div className="text-rose-300 flex justify-between gap-3"><span>Out:</span> <span>{formatCurrency(d.expenses, currency)}</span></div>
                       </div>
                     </div>
                   );
@@ -285,17 +285,19 @@ const AnalyticsDashboard = ({ user, onClose, currency }) => {
             {/* Savings Growth */}
             <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
               <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6">Actual Savings Trend</h3>
-               <div className="flex items-end justify-between gap-2 h-40">
+               <div className="flex justify-between gap-2 h-40">
                 {data.map((d, i) => {
                   const maxSave = Math.max(...data.map(x => x.savings), 100);
                   const h = Math.max(5, (d.savings / maxSave) * 100);
                   return (
-                    <div key={d.month} className="flex flex-col items-center gap-1 flex-1 group relative">
-                      <div 
-                        style={{ height: `${h}%` }} 
-                        className="w-full bg-indigo-100 hover:bg-indigo-200 rounded-t-lg transition-all duration-500 flex items-end justify-center pb-1"
-                      >
-                         <span className="text-[9px] text-indigo-600 font-bold -rotate-90 opacity-0 group-hover:opacity-100 transition">{formatCurrency(d.savings, currency)}</span>
+                    <div key={d.month} className="flex flex-col items-center justify-end gap-2 flex-1 group relative h-full">
+                      <div className="w-full flex-1 flex items-end justify-center">
+                        <div 
+                          style={{ height: `${h}%` }} 
+                          className="w-full bg-indigo-100 hover:bg-indigo-200 rounded-t-lg transition-all duration-500 flex items-end justify-center pb-1 relative"
+                        >
+                           <span className="text-[9px] text-indigo-600 font-bold -rotate-90 opacity-0 group-hover:opacity-100 transition absolute bottom-2">{formatCurrency(d.savings, currency)}</span>
+                        </div>
                       </div>
                       <span className="text-[10px] text-slate-400 font-mono">{d.month.split('-')[1]}</span>
                     </div>
