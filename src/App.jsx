@@ -57,7 +57,8 @@ import {
   PenLine,
   Search,
   ArrowUpDown,
-  ArrowRight
+  ArrowRight,
+  BarChart3
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION AREA ---
@@ -115,7 +116,8 @@ const formatCurrency = (amount, currency = 'GBP') => {
   return new Intl.NumberFormat(localeMap[currency] || 'en-GB', {
     style: 'currency',
     currency: currency,
-    minimumFractionDigits: 2
+    minimumFractionDigits: 0, // Simplified for charts
+    maximumFractionDigits: 0
   }).format(amount);
 };
 
@@ -188,6 +190,125 @@ const Toast = ({ message, onClose }) => (
     <span className="font-medium text-sm">{message}</span>
   </div>
 );
+
+// --- ANALYTICS DASHBOARD ---
+const AnalyticsDashboard = ({ user, onClose, currency }) => {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const colRef = collection(db, 'artifacts', appId, 'users', user.uid, 'budgetData');
+        const snapshot = await getDocs(colRef);
+        let rawData = [];
+        snapshot.forEach(doc => {
+          const val = doc.data();
+          if (val.salary && parseFloat(val.salary) > 0) {
+            const totalExpenses = (val.expenses || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            const totalSavings = Object.values(val.actualSavings || {}).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+            rawData.push({
+              month: doc.id, // YYYY-MM
+              salary: parseFloat(val.salary),
+              expenses: totalExpenses,
+              savings: totalSavings
+            });
+          }
+        });
+        // Sort and take last 6 months
+        rawData.sort((a, b) => a.month.localeCompare(b.month));
+        setData(rawData.slice(-6));
+      } catch (e) {
+        console.error("Analytics Error", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [user]);
+
+  if (loading) return <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center text-white">Loading Trends...</div>;
+
+  // Calculations for Chart Scaling
+  const maxVal = Math.max(...data.map(d => Math.max(d.salary, d.expenses)), 1000);
+  
+  return (
+    <div className="fixed inset-0 bg-white/95 backdrop-blur-md z-[70] overflow-y-auto animate-in slide-in-from-bottom-10">
+       <div className="bg-slate-900 text-white p-6 sticky top-0 z-10 flex justify-between items-center shadow-lg">
+        <h2 className="font-bold text-lg flex items-center gap-2">
+          <BarChart3 className="w-5 h-5 text-emerald-400" /> Trends & Insights
+        </h2>
+        <button onClick={onClose} className="p-1 hover:bg-slate-800 rounded-full"><X className="w-5 h-5" /></button>
+      </div>
+
+      <div className="max-w-xl mx-auto p-6 space-y-8 pb-20">
+        
+        {data.length === 0 ? (
+          <div className="text-center text-slate-400 py-20">
+            <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-20" />
+            <p>Not enough data history yet.</p>
+            <p className="text-xs">Start tracking months to see trends!</p>
+          </div>
+        ) : (
+          <>
+            {/* Cash Flow Chart */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6">6-Month Cash Flow</h3>
+              <div className="flex items-end justify-between gap-2 h-48">
+                {data.map((d, i) => {
+                  const salH = Math.max(5, (d.salary / maxVal) * 100);
+                  const expH = Math.max(5, (d.expenses / maxVal) * 100);
+                  return (
+                    <div key={d.month} className="flex flex-col items-center gap-1 flex-1 group relative">
+                      <div className="w-full flex gap-1 items-end justify-center h-full">
+                        <div style={{ height: `${salH}%` }} className="w-2 bg-emerald-400 rounded-t-sm transition-all duration-500"></div>
+                        <div style={{ height: `${expH}%` }} className="w-2 bg-rose-400 rounded-t-sm transition-all duration-500"></div>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono truncate w-full text-center">{d.month.split('-')[1]}</span>
+                      
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full mb-2 bg-slate-800 text-white text-xs p-2 rounded opacity-0 group-hover:opacity-100 transition pointer-events-none z-20 w-max">
+                        <div className="font-bold">{d.month}</div>
+                        <div className="text-emerald-300">In: {formatCurrency(d.salary, currency)}</div>
+                        <div className="text-rose-300">Out: {formatCurrency(d.expenses, currency)}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-center gap-4 mt-4">
+                <div className="flex items-center gap-1 text-xs text-slate-500"><div className="w-2 h-2 bg-emerald-400 rounded-full"></div> Income</div>
+                <div className="flex items-center gap-1 text-xs text-slate-500"><div className="w-2 h-2 bg-rose-400 rounded-full"></div> Expenses</div>
+              </div>
+            </div>
+
+            {/* Savings Growth */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6">Actual Savings Trend</h3>
+               <div className="flex items-end justify-between gap-2 h-40">
+                {data.map((d, i) => {
+                  const maxSave = Math.max(...data.map(x => x.savings), 100);
+                  const h = Math.max(5, (d.savings / maxSave) * 100);
+                  return (
+                    <div key={d.month} className="flex flex-col items-center gap-1 flex-1 group relative">
+                      <div 
+                        style={{ height: `${h}%` }} 
+                        className="w-full bg-indigo-100 hover:bg-indigo-200 rounded-t-lg transition-all duration-500 flex items-end justify-center pb-1"
+                      >
+                         <span className="text-[9px] text-indigo-600 font-bold -rotate-90 opacity-0 group-hover:opacity-100 transition">{formatCurrency(d.savings, currency)}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">{d.month.split('-')[1]}</span>
+                    </div>
+                  );
+                })}
+               </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // --- ADD EXPENSE MODAL ---
 const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
@@ -865,7 +986,8 @@ export default function App() {
   const [activeReport, setActiveReport] = useState(null); // 'month' or 'history'
   const [reportData, setReportData] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
-  
+  const [showAnalytics, setShowAnalytics] = useState(false); // New state for analytics dashboard
+
   // Data State
   const [salary, setSalary] = useState('');
   const [expenses, setExpenses] = useState([]);
@@ -1218,6 +1340,14 @@ export default function App() {
           onSelect={handleReportSelection}
         />
       )}
+      
+      {showAnalytics && (
+        <AnalyticsDashboard 
+          user={user} 
+          onClose={() => setShowAnalytics(false)}
+          currency={userSettings.currency}
+        />
+      )}
 
       {activeReport === 'month' && (
         <MonthReportView 
@@ -1256,6 +1386,9 @@ export default function App() {
             </div>
           </div>
           <div className="flex gap-2">
+            <button onClick={() => setShowAnalytics(true)} className="bg-slate-800 p-2 rounded-xl hover:bg-slate-700 transition border border-slate-700/50" title="Trends">
+              <BarChart3 className="w-5 h-5 text-emerald-400" />
+            </button>
             <button onClick={() => setShowReportSelector(true)} className="bg-slate-800 p-2 rounded-xl hover:bg-slate-700 transition border border-slate-700/50" title="Reports">
               <FileText className="w-5 h-5 text-emerald-400" />
             </button>
