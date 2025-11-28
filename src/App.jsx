@@ -58,7 +58,9 @@ import {
   Search,
   ArrowUpDown,
   ArrowRight,
-  BarChart3
+  BarChart3,
+  FlaskConical,
+  CalendarClock
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION AREA ---
@@ -117,7 +119,7 @@ const formatCurrency = (amount, currency = 'GBP') => {
     style: 'currency',
     currency: currency,
     minimumFractionDigits: 0, // Simplified for charts
-    maximumFractionDigits: 0
+    maximumFractionDigits: 2
   }).format(amount);
 };
 
@@ -190,127 +192,6 @@ const Toast = ({ message, onClose }) => (
     <span className="font-medium text-sm">{message}</span>
   </div>
 );
-
-// --- ANALYTICS DASHBOARD ---
-const AnalyticsDashboard = ({ user, onClose, currency }) => {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const colRef = collection(db, 'artifacts', appId, 'users', user.uid, 'budgetData');
-        const snapshot = await getDocs(colRef);
-        let rawData = [];
-        snapshot.forEach(doc => {
-          const val = doc.data();
-          if (val.salary && parseFloat(val.salary) > 0) {
-            const totalExpenses = (val.expenses || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-            const totalSavings = Object.values(val.actualSavings || {}).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
-            rawData.push({
-              month: doc.id, // YYYY-MM
-              salary: parseFloat(val.salary),
-              expenses: totalExpenses,
-              savings: totalSavings
-            });
-          }
-        });
-        // Sort and take last 6 months
-        rawData.sort((a, b) => a.month.localeCompare(b.month));
-        setData(rawData.slice(-6));
-      } catch (e) {
-        console.error("Analytics Error", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [user]);
-
-  if (loading) return <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center text-white">Loading Trends...</div>;
-
-  // Calculations for Chart Scaling
-  const maxVal = Math.max(...data.map(d => Math.max(d.salary, d.expenses)), 1000);
-  
-  return (
-    <div className="fixed inset-0 bg-white/95 backdrop-blur-md z-[70] overflow-y-auto animate-in slide-in-from-bottom-10">
-       <div className="bg-slate-900 text-white p-6 sticky top-0 z-10 flex justify-between items-center shadow-lg">
-        <h2 className="font-bold text-lg flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-emerald-400" /> Trends & Insights
-        </h2>
-        <button onClick={onClose} className="p-1 hover:bg-slate-800 rounded-full"><X className="w-5 h-5" /></button>
-      </div>
-
-      <div className="max-w-xl mx-auto p-6 space-y-8 pb-20">
-        
-        {data.length === 0 ? (
-          <div className="text-center text-slate-400 py-20">
-            <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-20" />
-            <p>Not enough data history yet.</p>
-            <p className="text-xs">Start tracking months to see trends!</p>
-          </div>
-        ) : (
-          <>
-            {/* Cash Flow Chart */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6">6-Month Cash Flow</h3>
-              <div className="flex justify-between gap-2 h-48">
-                {data.map((d, i) => {
-                  const salH = Math.max(5, (d.salary / maxVal) * 100);
-                  const expH = Math.max(5, (d.expenses / maxVal) * 100);
-                  return (
-                    <div key={d.month} className="flex flex-col items-center justify-end gap-2 flex-1 group relative h-full">
-                      <div className="w-full flex-1 flex gap-1 items-end justify-center">
-                        <div style={{ height: `${salH}%` }} className="w-2 bg-emerald-400 rounded-t-sm transition-all duration-500 relative group-hover:opacity-80"></div>
-                        <div style={{ height: `${expH}%` }} className="w-2 bg-rose-400 rounded-t-sm transition-all duration-500 relative group-hover:opacity-80"></div>
-                      </div>
-                      <span className="text-[10px] text-slate-400 font-mono truncate w-full text-center">{d.month.split('-')[1]}</span>
-                      
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-800 text-white text-xs p-2 rounded opacity-0 group-hover:opacity-100 transition pointer-events-none z-20 w-max shadow-xl">
-                        <div className="font-bold border-b border-slate-600 pb-1 mb-1">{d.month}</div>
-                        <div className="text-emerald-300 flex justify-between gap-3"><span>In:</span> <span>{formatCurrency(d.salary, currency)}</span></div>
-                        <div className="text-rose-300 flex justify-between gap-3"><span>Out:</span> <span>{formatCurrency(d.expenses, currency)}</span></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex justify-center gap-4 mt-4">
-                <div className="flex items-center gap-1 text-xs text-slate-500"><div className="w-2 h-2 bg-emerald-400 rounded-full"></div> Income</div>
-                <div className="flex items-center gap-1 text-xs text-slate-500"><div className="w-2 h-2 bg-rose-400 rounded-full"></div> Expenses</div>
-              </div>
-            </div>
-
-            {/* Savings Growth */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6">Actual Savings Trend</h3>
-               <div className="flex justify-between gap-2 h-40">
-                {data.map((d, i) => {
-                  const maxSave = Math.max(...data.map(x => x.savings), 100);
-                  const h = Math.max(5, (d.savings / maxSave) * 100);
-                  return (
-                    <div key={d.month} className="flex flex-col items-center justify-end gap-2 flex-1 group relative h-full">
-                      <div className="w-full flex-1 flex items-end justify-center">
-                        <div 
-                          style={{ height: `${h}%` }} 
-                          className="w-full bg-indigo-100 hover:bg-indigo-200 rounded-t-lg transition-all duration-500 flex items-end justify-center pb-1 relative"
-                        >
-                           <span className="text-[9px] text-indigo-600 font-bold -rotate-90 opacity-0 group-hover:opacity-100 transition absolute bottom-2">{formatCurrency(d.savings, currency)}</span>
-                        </div>
-                      </div>
-                      <span className="text-[10px] text-slate-400 font-mono">{d.month.split('-')[1]}</span>
-                    </div>
-                  );
-                })}
-               </div>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
 
 // --- ADD EXPENSE MODAL ---
 const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
@@ -989,12 +870,18 @@ export default function App() {
   const [reportData, setReportData] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false); // New state for analytics dashboard
+  const [isSandbox, setIsSandbox] = useState(false); // New state for sandbox mode
 
   // Data State
   const [salary, setSalary] = useState('');
   const [expenses, setExpenses] = useState([]);
   const [actualSavings, setActualSavings] = useState({}); // New State for Actuals
   
+  // Sandbox Data State
+  const [sandboxSalary, setSandboxSalary] = useState('');
+  const [sandboxExpenses, setSandboxExpenses] = useState([]);
+  const [sandboxActualSavings, setSandboxActualSavings] = useState({});
+
   const [userSettings, setUserSettings] = useState({
     displayName: '',
     currency: 'GBP',
@@ -1008,6 +895,11 @@ export default function App() {
   const [isAddingExpense, setIsAddingExpense] = useState(false); // For Modal
   const [searchTerm, setSearchTerm] = useState(''); // Added search state
   const [sortMode, setSortMode] = useState('date');
+
+  // Derived state variables to toggle between real and sandbox data
+  const displaySalary = isSandbox ? sandboxSalary : salary;
+  const displayExpenses = isSandbox ? sandboxExpenses : expenses;
+  const displayActualSavings = isSandbox ? sandboxActualSavings : actualSavings;
 
   // Toast Helper
   const showToast = (msg) => {
@@ -1139,9 +1031,15 @@ export default function App() {
 
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setSalary(data.salary || '');
-        setExpenses(data.expenses || []);
-        saveData(data.salary, data.expenses, {}); // Don't copy actuals, they are new
+        if (isSandbox) {
+             setSandboxSalary(data.salary || '');
+             setSandboxExpenses(data.expenses || []);
+             // sandbox doesn't save to DB
+        } else {
+            setSalary(data.salary || '');
+            setExpenses(data.expenses || []);
+            saveData(data.salary, data.expenses, {}); // Don't copy actuals, they are new
+        }
         showToast("Copied from last month!");
       } else {
         showToast("No data found for previous month.");
@@ -1153,7 +1051,7 @@ export default function App() {
   };
 
   const saveData = async (newSalary, newExpenses, newActuals) => {
-    if (!user) return;
+    if (!user || isSandbox) return; // Block saving in Sandbox mode
     const monthId = getMonthId(currentDate);
     const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgetData', monthId);
     await setDoc(docRef, { 
@@ -1175,6 +1073,15 @@ export default function App() {
   const resetCurrentMonth = async () => {
     if (!user) return;
     triggerHaptic(); // Haptic
+    if (isSandbox) {
+        setSandboxSalary('');
+        setSandboxExpenses([]);
+        setSandboxActualSavings({});
+        showToast("Sandbox reset.");
+        setShowSettings(false);
+        return;
+    }
+
     if (confirm("Are you sure? This will clear all data for this month.")) {
       const monthId = getMonthId(currentDate);
       const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgetData', monthId);
@@ -1185,19 +1092,23 @@ export default function App() {
   };
 
   const updateSalary = (val) => {
-    setSalary(val);
-    saveData(val, expenses, actualSavings);
+    if (isSandbox) {
+        setSandboxSalary(val);
+    } else {
+        setSalary(val);
+        saveData(val, expenses, actualSavings);
+    }
   };
 
   const fillRemainder = (targetPlanId) => {
-    const salaryNum = parseFloat(salary) || 0;
-    const totalExp = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    const salaryNum = parseFloat(displaySalary) || 0;
+    const totalExp = displayExpenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
     const remainder = Math.max(0, salaryNum - totalExp);
 
     // Calculate total allocated to other plans
     const otherAllocated = userSettings.allocationRules.reduce((sum, plan) => {
       if (plan.id === targetPlanId) return sum;
-      const val = actualSavings[plan.id];
+      const val = displayActualSavings[plan.id];
       return sum + (parseFloat(val) || 0);
     }, 0);
     
@@ -1207,9 +1118,13 @@ export default function App() {
   };
 
   const updateActualSavings = (planId, val) => {
-     const newActuals = { ...actualSavings, [planId]: val };
-     setActualSavings(newActuals);
-     saveData(salary, expenses, newActuals);
+     if (isSandbox) {
+         setSandboxActualSavings({ ...sandboxActualSavings, [planId]: val });
+     } else {
+         const newActuals = { ...actualSavings, [planId]: val };
+         setActualSavings(newActuals);
+         saveData(salary, expenses, newActuals);
+     }
   };
 
   const handleAddExpenseSave = (name, amount) => {
@@ -1220,37 +1135,56 @@ export default function App() {
       amount: parseFloat(amount),
       type: 'variable'
     };
-    const updatedExpenses = [...expenses, newExp];
-    setExpenses(updatedExpenses);
-    saveData(salary, updatedExpenses, actualSavings);
+    if (isSandbox) {
+        setSandboxExpenses([...sandboxExpenses, newExp]);
+    } else {
+        const updatedExpenses = [...expenses, newExp];
+        setExpenses(updatedExpenses);
+        saveData(salary, updatedExpenses, actualSavings);
+    }
     setIsAddingExpense(false);
     showToast("Bill added!");
   };
 
 
   const updateExpenseAmount = (id, newAmount) => {
-    const updatedExpenses = expenses.map(e => 
+    const updatedExpenses = displayExpenses.map(e => 
       e.id === id ? { ...e, amount: parseFloat(newAmount) || 0 } : e
     );
-    setExpenses(updatedExpenses);
-    saveData(salary, updatedExpenses, actualSavings);
+    
+    if (isSandbox) {
+        setSandboxExpenses(updatedExpenses);
+    } else {
+        setExpenses(updatedExpenses);
+        saveData(salary, updatedExpenses, actualSavings);
+    }
     // Removed setEditingExpenseId(null) to keep edit mode open
   };
 
   const updateExpenseName = (id, newName) => {
-    const updatedExpenses = expenses.map(e => 
+    const updatedExpenses = displayExpenses.map(e => 
       e.id === id ? { ...e, name: newName } : e
     );
-    setExpenses(updatedExpenses);
-    saveData(salary, updatedExpenses, actualSavings);
+
+    if (isSandbox) {
+        setSandboxExpenses(updatedExpenses);
+    } else {
+        setExpenses(updatedExpenses);
+        saveData(salary, updatedExpenses, actualSavings);
+    }
     // Removed setEditingExpenseId(null)
   };
 
   const removeExpense = (id) => {
     triggerHaptic(); // Haptic
-    const updatedExpenses = expenses.filter(e => e.id !== id);
-    setExpenses(updatedExpenses);
-    saveData(salary, updatedExpenses, actualSavings);
+    const updatedExpenses = displayExpenses.filter(e => e.id !== id);
+    
+    if (isSandbox) {
+        setSandboxExpenses(updatedExpenses);
+    } else {
+        setExpenses(updatedExpenses);
+        saveData(salary, updatedExpenses, actualSavings);
+    }
     showToast("Bill removed.");
   };
 
@@ -1259,6 +1193,16 @@ export default function App() {
     const newDate = new Date(currentDate);
     newDate.setMonth(newDate.getMonth() + delta);
     setCurrentDate(newDate);
+    // If changing month while in sandbox, maybe reset sandbox or load that month into sandbox?
+    // For simplicity, let's exit sandbox or load that month's data INTO sandbox
+    if (isSandbox) {
+        // When changing month in sandbox, we should probably just load the new month's data
+        // But since we don't want to fetch inside this handler easily, let's just reset sandbox to empty or maybe toggle off?
+        // Better UX: stay in sandbox, load data for that month (handled by useEffect but we need to intercept it)
+        // Actually, the main useEffect for fetching data will fire when currentDate changes.
+        // We need to make sure that effect updates SANDBOX state if isSandbox is true.
+        // Let's modify the main useEffect.
+    }
   };
   
   const toggleSort = () => {
@@ -1269,18 +1213,50 @@ export default function App() {
     showToast(`Sorting by ${sortMode === 'date' ? 'Amount' : sortMode === 'amount-desc' ? 'Name' : 'Date'}`);
   };
 
-  const totalExpenses = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-  const salaryNum = parseFloat(salary) || 0;
+  const toggleSandbox = () => {
+      triggerHaptic();
+      if (!isSandbox) {
+          // Enter Sandbox: Copy current real data to sandbox state
+          setSandboxSalary(salary);
+          setSandboxExpenses([...expenses]);
+          setSandboxActualSavings({...actualSavings});
+          showToast("Entered Sandbox Mode. Changes won't be saved.");
+      } else {
+          showToast("Exited Sandbox Mode.");
+      }
+      setIsSandbox(!isSandbox);
+  };
+
+  // Helper to get daily budget
+  const getDailyBudget = () => {
+    const now = new Date();
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const daysLeft = Math.max(1, lastDay.getDate() - now.getDate());
+    
+    // Find Current Account allocation - assuming it has "Current Account" in name or is the last one? 
+    // Let's find the one named "Current Account" or fallback to a generic logic
+    const currentAccountPlan = userSettings.allocationRules.find(p => p.name.toLowerCase().includes('current account'));
+    
+    if (!currentAccountPlan) return 0;
+
+    const remainder = Math.max(0, parseFloat(displaySalary || 0) - totalExpenses);
+    const budget = remainder * (currentAccountPlan.percentage / 100);
+    
+    return budget / daysLeft;
+  };
+
+  const totalExpenses = displayExpenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+  const salaryNum = parseFloat(displaySalary) || 0;
   const remainder = Math.max(0, salaryNum - totalExpenses);
 
   // Count how many plans have an actual value entered
   const filledPlansCount = userSettings.allocationRules.filter(plan => {
-      const val = actualSavings[plan.id];
+      const val = displayActualSavings[plan.id];
       return val !== undefined && val !== '';
   }).length;
 
   // Filter and Group Expenses
-  let filteredExpenses = expenses.filter(e => 
+  let filteredExpenses = displayExpenses.filter(e => 
     e.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
@@ -1293,11 +1269,13 @@ export default function App() {
   const fixedExpenses = filteredExpenses.filter(e => e.type === 'fixed');
   const variableExpenses = filteredExpenses.filter(e => e.type === 'variable');
 
+  const dailyBudget = getDailyBudget();
+
   if (loading) return <div className="h-screen flex items-center justify-center text-emerald-600">Loading Planner...</div>;
   if (!user) return <LoginScreen onLogin={handleLogin} />;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24 font-sans text-slate-900 print:bg-white print:pb-0">
+    <div className={`min-h-screen pb-24 font-sans transition-colors duration-500 ${isSandbox ? 'bg-indigo-50' : 'bg-slate-50'} print:bg-white print:pb-0`}>
       <style>{`
         @media print {
           @page { margin: 10mm; size: A4 landscape; }
@@ -1305,13 +1283,21 @@ export default function App() {
         }
       `}</style>
 
+      {/* Sandbox Banner */}
+      {isSandbox && (
+        <div className="bg-indigo-600 text-white px-4 py-2 text-center text-sm font-bold sticky top-0 z-50 shadow-md flex justify-between items-center">
+            <span>🧪 Sandbox Mode Active - Changes are NOT saved</span>
+            <button onClick={toggleSandbox} className="bg-white/20 p-1 rounded hover:bg-white/30"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+
       {/* Floating Action Button (FAB) - REPLACED WITH PILL */}
       <button 
         onClick={() => {
           triggerHaptic();
           setIsAddingExpense(true);
         }}
-        className="fixed bottom-6 right-6 bg-slate-900 text-white px-6 py-4 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition z-40 print:hidden flex items-center gap-2 font-bold"
+        className={`fixed bottom-6 right-6 text-white px-6 py-4 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition z-40 print:hidden flex items-center gap-2 font-bold ${isSandbox ? 'bg-indigo-600' : 'bg-slate-900'}`}
       >
         <Plus className="w-5 h-5" /> New Expense
       </button>
@@ -1373,31 +1359,34 @@ export default function App() {
       )}
 
       {/* MAIN APP HEADER */}
-      <header className="bg-slate-900 text-white pt-6 pb-20 px-6 rounded-b-[2rem] shadow-xl relative z-0 print:hidden">
+      <header className={`text-white pt-6 pb-20 px-6 rounded-b-[2rem] shadow-xl relative z-0 print:hidden transition-colors duration-500 ${isSandbox ? 'bg-indigo-900' : 'bg-slate-900'}`}>
         <div className="max-w-2xl mx-auto flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
-            <div className="bg-emerald-500 p-2 rounded-xl text-slate-900">
-              <Wallet className="w-5 h-5" />
+            <div className={`p-2 rounded-xl text-slate-900 ${isSandbox ? 'bg-indigo-400' : 'bg-emerald-500'}`}>
+              {isSandbox ? <FlaskConical className="w-5 h-5 text-white" /> : <Wallet className="w-5 h-5" />}
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight">
                 {userSettings.displayName || (user.displayName ? user.displayName.split(' ')[0] : 'Guest')}
                 's Budget
               </h1>
-              <p className="text-slate-400 text-xs font-medium">Wealth Planner</p>
+              <p className="text-slate-400 text-xs font-medium">{isSandbox ? 'Simulation Mode' : 'Wealth Planner'}</p>
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setShowAnalytics(true)} className="bg-slate-800 p-2 rounded-xl hover:bg-slate-700 transition border border-slate-700/50" title="Trends">
-              <BarChart3 className="w-5 h-5 text-emerald-400" />
+             <button onClick={toggleSandbox} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} title="Sandbox Mode">
+              <FlaskConical className={`w-5 h-5 ${isSandbox ? 'text-white' : 'text-purple-400'}`} />
             </button>
-            <button onClick={() => setShowReportSelector(true)} className="bg-slate-800 p-2 rounded-xl hover:bg-slate-700 transition border border-slate-700/50" title="Reports">
-              <FileText className="w-5 h-5 text-emerald-400" />
+            <button onClick={() => setShowAnalytics(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} title="Trends">
+              <BarChart3 className={`w-5 h-5 ${isSandbox ? 'text-indigo-200' : 'text-emerald-400'}`} />
             </button>
-            <button onClick={() => setShowSettings(true)} className="bg-slate-800 p-2 rounded-xl hover:bg-slate-700 transition border border-slate-700/50">
+            <button onClick={() => setShowReportSelector(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} title="Reports">
+              <FileText className={`w-5 h-5 ${isSandbox ? 'text-indigo-200' : 'text-emerald-400'}`} />
+            </button>
+            <button onClick={() => setShowSettings(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`}>
               <Settings className="w-5 h-5 text-slate-300" />
             </button>
-            <button onClick={handleLogout} className="bg-slate-800 p-2 rounded-xl hover:bg-red-900/50 hover:text-red-200 transition border border-slate-700/50">
+            <button onClick={handleLogout} className={`p-2 rounded-xl hover:bg-red-900/50 hover:text-red-200 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`}>
               <LogOut className="w-5 h-5 text-slate-300" />
             </button>
           </div>
@@ -1429,7 +1418,7 @@ export default function App() {
             </span>
             <input 
               type="number" 
-              value={salary}
+              value={displaySalary}
               onChange={(e) => updateSalary(e.target.value)}
               placeholder="0.00"
               className="w-full pl-6 text-4xl font-bold text-slate-800 placeholder-slate-200 outline-none bg-transparent py-1"
@@ -1439,14 +1428,14 @@ export default function App() {
 
         {/* Budget Wheel */}
         <BudgetWheel 
-          salary={salary} 
-          expenses={expenses} 
+          salary={displaySalary} 
+          expenses={displayExpenses} 
           allocations={userSettings.allocationRules}
           currency={userSettings.currency}
         />
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4 print:hidden">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 print:hidden">
           <StatCard 
             label="Total Expenses" 
             amount={totalExpenses} 
@@ -1462,6 +1451,19 @@ export default function App() {
             subText="Available for Goals"
             currency={userSettings.currency}
           />
+          {/* Safe-To-Spend Card */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-full col-span-2 md:col-span-1">
+            <div className="flex justify-between items-start mb-2">
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-slate-200 text-amber-600">
+                <CalendarClock className="w-5 h-5" />
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Daily Safe Spend</p>
+              <h3 className="text-2xl font-bold text-slate-800 tracking-tight">{formatCurrency(dailyBudget, userSettings.currency)}</h3>
+              <p className="text-xs text-slate-400 mt-1 font-medium">Based on Current Account</p>
+            </div>
+          </div>
         </div>
 
         {/* Allocations */}
@@ -1472,7 +1474,7 @@ export default function App() {
               const target = remainder * (plan.percentage / 100);
               
               // Check if this is the specific scenario for the Remainder button
-              const isFilled = actualSavings[plan.id] !== undefined && actualSavings[plan.id] !== '';
+              const isFilled = displayActualSavings[plan.id] !== undefined && displayActualSavings[plan.id] !== '';
               const isLastToFill = !isFilled && (userSettings.allocationRules.length - filledPlansCount === 1);
 
               return (
@@ -1480,7 +1482,7 @@ export default function App() {
                   key={plan.id}
                   title={plan.name} 
                   targetAmount={target}
-                  actualAmount={actualSavings[plan.id]}
+                  actualAmount={displayActualSavings[plan.id]}
                   percentage={plan.percentage} 
                   color={plan.color || 'bg-slate-100 text-slate-700'}
                   currency={userSettings.currency}
