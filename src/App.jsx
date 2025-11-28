@@ -360,7 +360,7 @@ const StatCard = ({ label, amount, icon: Icon, colorClass, subText, currency }) 
   </div>
 );
 
-const AllocationCard = ({ title, targetAmount, actualAmount, percentage, color, currency, onUpdateActual }) => {
+const AllocationCard = ({ title, targetAmount, actualAmount, percentage, color, currency, onUpdateActual, showRemainderButton, onFillRemainder }) => {
   let barColor = 'bg-slate-500';
   if (color.includes('indigo')) barColor = 'bg-indigo-500';
   if (color.includes('emerald')) barColor = 'bg-emerald-500';
@@ -394,14 +394,24 @@ const AllocationCard = ({ title, targetAmount, actualAmount, percentage, color, 
       <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl print:bg-transparent print:p-0 print:border-t print:rounded-none print:mt-2">
          <span className="text-xs font-bold text-slate-500 uppercase">Actual Saved</span>
          <div className="flex items-center gap-2">
-           {onUpdateActual && (
+           {showRemainderButton ? (
               <button 
-                onClick={() => onUpdateActual(targetAmount)}
-                className="text-xs text-emerald-600 font-bold hover:bg-emerald-100 px-2 py-1 rounded print:hidden"
-                title="Match Target"
+                onClick={onFillRemainder}
+                className="text-xs bg-blue-100 text-blue-600 font-bold hover:bg-blue-200 px-3 py-1.5 rounded-lg print:hidden flex items-center gap-1"
+                title="Fill with remaining budget"
               >
-                Match Target
+                Remainder
               </button>
+           ) : (
+              onUpdateActual && (
+                <button 
+                  onClick={() => onUpdateActual(targetAmount)}
+                  className="text-xs text-emerald-600 font-bold hover:bg-emerald-100 px-2 py-1 rounded print:hidden"
+                  title="Match Target"
+                >
+                  Match Target
+                </button>
+              )
            )}
            <div className="relative">
              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
@@ -517,31 +527,19 @@ const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose
           </div>
 
           <div>
-            <h3 className="font-bold text-slate-800 border-b border-slate-200 pb-2 mb-3">Savings Breakdown</h3>
-            <table className="w-full text-sm">
-               <thead>
-                 <tr className="text-xs text-slate-400 uppercase">
-                   <th className="text-left py-2">Goal</th>
-                   <th className="text-right py-2">Target</th>
-                   <th className="text-right py-2">Actual</th>
-                 </tr>
-               </thead>
-               <tbody className="divide-y divide-slate-100">
-                 {allocations.map(plan => {
-                   const target = remainder * (plan.percentage / 100);
-                   const actual = actuals && actuals[plan.id] ? parseFloat(actuals[plan.id]) : 0;
-                   return (
-                     <tr key={plan.id}>
-                        <td className="py-2 text-slate-600">{plan.name}</td>
-                        <td className="py-2 text-right text-slate-400">{formatCurrency(target, currency)}</td>
-                        <td className={`py-2 text-right font-bold ${actual >= target ? 'text-emerald-600' : 'text-orange-500'}`}>
-                          {formatCurrency(actual, currency)}
-                        </td>
-                     </tr>
-                   )
-                 })}
-               </tbody>
-            </table>
+            <h3 className="font-bold text-slate-800 border-b border-slate-200 pb-2 mb-3">Savings & Goals</h3>
+            <div className="space-y-3">
+              {allocations.map(plan => (
+                <div key={plan.id} className="flex justify-between items-center text-sm">
+                  <span className="text-slate-600">{plan.name} <span className="text-xs text-slate-400">({plan.percentage}%)</span></span>
+                  <span className="font-medium">{formatCurrency(remainder * (plan.percentage / 100), currency)}</span>
+                </div>
+              ))}
+              <div className="border-t border-slate-200 pt-3 flex justify-between font-bold text-slate-900 mt-2">
+                <span>Total Allocated</span>
+                <span>{formatCurrency(remainder, currency)}</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -847,12 +845,14 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   
+  // UI State
   const [showSettings, setShowSettings] = useState(false);
   const [showReportSelector, setShowReportSelector] = useState(false);
   const [activeReport, setActiveReport] = useState(null); // 'month' or 'history'
   const [reportData, setReportData] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
   
+  // Data State
   const [salary, setSalary] = useState('');
   const [expenses, setExpenses] = useState([]);
   const [actualSavings, setActualSavings] = useState({}); // New State for Actuals
@@ -1051,6 +1051,23 @@ export default function App() {
     saveData(val, expenses, actualSavings);
   };
 
+  const fillRemainder = (targetPlanId) => {
+    const salaryNum = parseFloat(salary) || 0;
+    const totalExp = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    const remainder = Math.max(0, salaryNum - totalExp);
+
+    // Calculate total allocated to other plans
+    const otherAllocated = userSettings.allocationRules.reduce((sum, plan) => {
+      if (plan.id === targetPlanId) return sum;
+      const val = actualSavings[plan.id];
+      return sum + (parseFloat(val) || 0);
+    }, 0);
+    
+    const remainingToAllocate = Math.max(0, remainder - otherAllocated);
+    updateActualSavings(targetPlanId, remainingToAllocate.toFixed(2)); // 2 decimal places for currency
+    triggerHaptic();
+  };
+
   const updateActualSavings = (planId, val) => {
      const newActuals = { ...actualSavings, [planId]: val };
      setActualSavings(newActuals);
@@ -1079,6 +1096,7 @@ export default function App() {
     );
     setExpenses(updatedExpenses);
     saveData(salary, updatedExpenses, actualSavings);
+    // Removed setEditingExpenseId(null) to keep edit mode open
   };
 
   const updateExpenseName = (id, newName) => {
@@ -1087,6 +1105,7 @@ export default function App() {
     );
     setExpenses(updatedExpenses);
     saveData(salary, updatedExpenses, actualSavings);
+    // Removed setEditingExpenseId(null)
   };
 
   const removeExpense = (id) => {
@@ -1115,6 +1134,12 @@ export default function App() {
   const totalExpenses = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
   const salaryNum = parseFloat(salary) || 0;
   const remainder = Math.max(0, salaryNum - totalExpenses);
+
+  // Count how many plans have an actual value entered
+  const filledPlansCount = userSettings.allocationRules.filter(plan => {
+      const val = actualSavings[plan.id];
+      return val !== undefined && val !== '';
+  }).length;
 
   // Filter and Group Expenses
   let filteredExpenses = expenses.filter(e => 
@@ -1296,6 +1321,11 @@ export default function App() {
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider px-2">Financial Goals</h3>
             {userSettings.allocationRules.map(plan => {
               const target = remainder * (plan.percentage / 100);
+              
+              // Check if this is the specific scenario for the Remainder button
+              const isFilled = actualSavings[plan.id] !== undefined && actualSavings[plan.id] !== '';
+              const isLastToFill = !isFilled && (userSettings.allocationRules.length - filledPlansCount === 1);
+
               return (
                 <AllocationCard 
                   key={plan.id}
@@ -1306,6 +1336,8 @@ export default function App() {
                   color={plan.color || 'bg-slate-100 text-slate-700'}
                   currency={userSettings.currency}
                   onUpdateActual={(val) => updateActualSavings(plan.id, val)}
+                  showRemainderButton={isLastToFill}
+                  onFillRemainder={() => fillRemainder(plan.id)}
                 />
               );
             })}
