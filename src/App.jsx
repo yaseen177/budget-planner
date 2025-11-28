@@ -528,18 +528,32 @@ const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose
 
           <div>
             <h3 className="font-bold text-slate-800 border-b border-slate-200 pb-2 mb-3">Savings & Goals</h3>
-            <div className="space-y-3">
-              {allocations.map(plan => (
-                <div key={plan.id} className="flex justify-between items-center text-sm">
-                  <span className="text-slate-600">{plan.name} <span className="text-xs text-slate-400">({plan.percentage}%)</span></span>
-                  <span className="font-medium">{formatCurrency(remainder * (plan.percentage / 100), currency)}</span>
-                </div>
-              ))}
-              <div className="border-t border-slate-200 pt-3 flex justify-between font-bold text-slate-900 mt-2">
-                <span>Total Allocated</span>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-slate-400 uppercase text-right">
+                   <th className="text-left font-medium pb-2">Goal</th>
+                   <th className="font-medium pb-2">Target</th>
+                   <th className="font-medium pb-2">Actual</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+              {allocations.map(plan => {
+                const target = remainder * (plan.percentage / 100);
+                const actual = actuals && actuals[plan.id] ? parseFloat(actuals[plan.id]) : 0;
+                return (
+                  <tr key={plan.id}>
+                    <td className="py-2 text-slate-600">{plan.name} <span className="text-xs text-slate-400">({plan.percentage}%)</span></td>
+                    <td className="py-2 text-right font-medium text-slate-500">{formatCurrency(target, currency)}</td>
+                    <td className={`py-2 text-right font-bold ${actual >= target - 1 ? 'text-emerald-600' : 'text-orange-500'}`}>{formatCurrency(actual, currency)}</td>
+                  </tr>
+                );
+              })}
+              </tbody>
+            </table>
+             <div className="border-t border-slate-200 pt-3 flex justify-between font-bold text-slate-900 mt-2">
+                <span>Total Target</span>
                 <span>{formatCurrency(remainder, currency)}</span>
               </div>
-            </div>
           </div>
         </div>
 
