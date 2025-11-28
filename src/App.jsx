@@ -1637,7 +1637,7 @@ export default function App() {
                   <ShoppingCart className="w-6 h-6 text-slate-300" />
                 </div>
                 <p>No expenses yet.</p>
-                <p className="text-xs text-slate-400">Tap the + button to add one.</p>
+                <p className="text-xs text-slate-100">Tap the + button to add one.</p>
               </div>
             )}
              {expenses.length > 0 && filteredExpenses.length === 0 && (
