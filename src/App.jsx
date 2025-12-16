@@ -492,158 +492,6 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
   );
 };
 
-const DebtSnowballTool = ({ user, onClose, userSettings, onUpdateSettings, currency }) => {
-  const [debts, setDebts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  
-  // New Debt State
-  const [newName, setNewName] = useState('');
-  const [newBalance, setNewBalance] = useState('');
-  const [newApr, setNewApr] = useState('');
-  const [newMin, setNewMin] = useState('');
-
-  // Fetch Debts
-  useEffect(() => {
-    const fetchDebts = async () => {
-      try {
-        const colRef = collection(db, 'artifacts', appId, 'users', user.uid, 'debts');
-        const snapshot = await getDocs(colRef);
-        const loaded = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        // Sort by Balance (Snowball Method) - Smallest balance first
-        loaded.sort((a, b) => parseFloat(a.balance) - parseFloat(b.balance));
-        setDebts(loaded);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDebts();
-  }, [user]);
-
-  const addDebt = async () => {
-    if (!newName || !newBalance) return;
-    const debtObj = {
-      name: newName,
-      balance: parseFloat(safeCalculate(newBalance)) || 0,
-      apr: parseFloat(safeCalculate(newApr)) || 0,
-      minPayment: parseFloat(safeCalculate(newMin)) || 0,
-      createdAt: new Date()
-    };
-
-    try {
-      const docRef = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'debts'));
-      await setDoc(docRef, debtObj);
-      setDebts([...debts, { id: docRef.id, ...debtObj }].sort((a,b) => a.balance - b.balance));
-      setNewName(''); setNewBalance(''); setNewApr(''); setNewMin('');
-    } catch(e) { console.error("Error adding debt", e); }
-  };
-
-  const deleteDebt = async (id) => {
-    if(!confirm("Remove this debt?")) return;
-    await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'debts', id));
-    setDebts(debts.filter(d => d.id !== id));
-  };
-
-  const linkToBudget = (debt) => {
-    if(!confirm(`Add ${debt.name} to your monthly fixed expenses?`)) return;
-    
-    const existing = userSettings.defaultFixedExpenses || [];
-    const newExpense = {
-      id: `debt_${Date.now()}`,
-      name: debt.name,
-      amount: debt.minPayment,
-      type: 'fixed'
-    };
-    
-    onUpdateSettings({
-      ...userSettings,
-      defaultFixedExpenses: [...existing, newExpense]
-    });
-    alert("Added to Default Expenses! It will appear in your next new month.");
-  };
-
-  const totalDebt = debts.reduce((sum, d) => sum + d.balance, 0);
-  const totalMinPayment = debts.reduce((sum, d) => sum + d.minPayment, 0);
-
-  return (
-    <div className="fixed inset-0 bg-slate-50 z-[60] overflow-y-auto animate-in fade-in slide-in-from-bottom-8">
-      {/* Header */}
-      <div className="bg-slate-900 text-white p-4 sticky top-0 z-20 shadow-lg flex justify-between items-center">
-        <div>
-          <h2 className="font-bold text-lg flex items-center gap-2">
-            <TrendingDown className="w-5 h-5 text-rose-400" /> Debt Snowball
-          </h2>
-          <p className="text-xs text-slate-400">Total Liability: {formatCurrency(totalDebt, currency)}</p>
-        </div>
-        <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full"><X className="w-5 h-5" /></button>
-      </div>
-
-      <div className="max-w-3xl mx-auto p-4 space-y-6 pb-24">
-        
-        {/* Input Card */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-           <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
-             <Plus className="w-4 h-4 bg-emerald-100 text-emerald-600 rounded p-0.5" /> Add Liability
-           </h3>
-           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              <div className="col-span-2 md:col-span-2">
-                 <label className="text-xs font-bold text-slate-400">Debt Name</label>
-                 <input className="w-full bg-slate-50 p-2 rounded-lg border border-slate-200" placeholder="e.g. Amex" value={newName} onChange={e => setNewName(e.target.value)} />
-              </div>
-              <div>
-                 <label className="text-xs font-bold text-slate-400">Balance</label>
-                 <input className="w-full bg-slate-50 p-2 rounded-lg border border-slate-200" placeholder="0.00" type="text" inputMode="decimal" value={newBalance} onBlur={() => setNewBalance(safeCalculate(newBalance))} onChange={e => setNewBalance(e.target.value)} />
-              </div>
-              <div>
-                 <label className="text-xs font-bold text-slate-400">Min Pay</label>
-                 <input className="w-full bg-slate-50 p-2 rounded-lg border border-slate-200" placeholder="0.00" type="text" inputMode="decimal" value={newMin} onBlur={() => setNewMin(safeCalculate(newMin))} onChange={e => setNewMin(e.target.value)} />
-              </div>
-              <div className="flex items-end">
-                 <button onClick={addDebt} className="w-full bg-slate-900 text-white p-2 rounded-lg font-bold hover:bg-slate-800 transition">Add</button>
-              </div>
-           </div>
-        </div>
-
-        {/* Debt List */}
-        <div className="space-y-3">
-          {debts.map((debt, index) => (
-             <div key={debt.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
-                <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-rose-500"></div>
-                
-                <div className="flex items-center gap-4 w-full md:w-auto">
-                   <div className="bg-rose-50 w-10 h-10 rounded-full flex items-center justify-center text-rose-600 font-bold text-sm">#{index + 1}</div>
-                   <div>
-                      <h4 className="font-bold text-slate-800 text-lg">{debt.name}</h4>
-                      <p className="text-xs text-slate-500">Min Payment: {formatCurrency(debt.minPayment, currency)}</p>
-                   </div>
-                </div>
-
-                <div className="text-right w-full md:w-auto flex justify-between md:block">
-                   <p className="text-xs font-bold text-slate-400 uppercase">Balance</p>
-                   <p className="text-2xl font-bold text-slate-800">{formatCurrency(debt.balance, currency)}</p>
-                </div>
-
-                <div className="flex gap-2 w-full md:w-auto justify-end border-t md:border-t-0 pt-3 md:pt-0 border-slate-100">
-                   <button 
-                      onClick={() => linkToBudget(debt)}
-                      className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 flex items-center gap-1"
-                      title="Add to Monthly Budget"
-                    >
-                      <Copy className="w-3 h-3" /> Link to Budget
-                   </button>
-                   <button onClick={() => deleteDebt(debt.id)} className="p-2 text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
-                </div>
-             </div>
-          ))}
-          {debts.length === 0 && <div className="text-center text-slate-400 py-10">No debts tracked. Add one above.</div>}
-        </div>
-
-      </div>
-    </div>
-  );
-};
-
 // --- TOAST COMPONENT ---
 const Toast = ({ message, onClose }) => (
   <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl z-[100] animate-in slide-in-from-bottom-4 fade-in duration-300 flex items-center gap-3">
@@ -1373,7 +1221,6 @@ export default function App() {
   const [reportData, setReportData] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false); // New state for analytics dashboard
-  const [showDebtTool, setShowDebtTool] = useState(false);
   const [isSandbox, setIsSandbox] = useState(false); // New state for sandbox mode
   const [showSandboxInfo, setShowSandboxInfo] = useState(false);
 
@@ -1830,24 +1677,6 @@ export default function App() {
         />
       )}
 
-      {showDebtTool && (
-        <DebtSnowballTool 
-          user={user}
-          onClose={() => setShowDebtTool(false)}
-          userSettings={userSettings}
-          onUpdateSettings={saveSettings}
-          currency={userSettings.currency}
-        />
-      )}
-
-      {showSandboxInfo && (
-        <SandboxInfoModal
-          onClose={() => setShowSandboxInfo(false)}
-          onConfirm={confirmEnterSandbox}
-        />
-      )}
-
-
       {showSandboxInfo && (
         <SandboxInfoModal 
             onClose={() => setShowSandboxInfo(false)}
@@ -1897,9 +1726,6 @@ export default function App() {
             </button>
             <button onClick={() => setShowAnalytics(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} title="Trends">
               <BarChart3 className={`w-5 h-5 ${isSandbox ? 'text-indigo-200' : 'text-emerald-400'}`} />
-            </button>
-            <button onClick={() => setShowDebtTool(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} title="Debt Manager">
-              <TrendingDown className={`w-5 h-5 ${isSandbox ? 'text-indigo-200' : 'text-rose-400'}`} />
             </button>
             <button onClick={() => setShowReportSelector(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} title="Reports">
               <FileText className={`w-5 h-5 ${isSandbox ? 'text-indigo-200' : 'text-emerald-400'}`} />
