@@ -118,14 +118,9 @@ const DEFAULT_ALLOCATIONS = [
 
 const safeCalculate = (expression) => {
   try {
-    // 1. Remove any characters that aren't numbers or operators (security)
     const sanitized = String(expression).replace(/[^0-9+\-*/().\s]/g, '');
     if (!sanitized || sanitized === expression) return expression;
-    
-    // 2. Evaluate the math string safely
     const result = new Function('return ' + sanitized)();
-    
-    // 3. Return the result if it's a valid number, otherwise return original text
     return isFinite(result) ? result.toString() : expression;
   } catch (e) {
     return expression;
@@ -514,7 +509,11 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name || !amount) return;
-    onSave(name, amount);
+    
+    // CHANGE IS HERE: Wrap amount in safeCalculate()
+    // This turns "500+5" into "505" BEFORE passing it to the saver
+    onSave(name, safeCalculate(amount));
+    
     setName('');
     setAmount('');
   };
@@ -546,14 +545,14 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-400">£</span>
               <input 
-                /* CHANGE 1: type changed from "number" to "text" */
+                /* CHANGE: type="text" and inputMode="decimal" */
                 type="text" 
-                inputMode="decimal" /* Helps mobile, but text allows operators */
+                inputMode="decimal"
                 placeholder="0.00" 
                 className="w-full pl-10 p-4 rounded-xl bg-slate-50 border-none text-lg font-bold text-slate-800 placeholder-slate-300 focus:ring-2 focus:ring-emerald-500/20 outline-none"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                /* CHANGE 2: Add onBlur to calculate */
+                /* Add this just in case they tab away */
                 onBlur={() => setAmount(safeCalculate(amount))}
               />
             </div>
@@ -1762,19 +1761,21 @@ export default function App() {
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 print:hidden">
           <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Net Monthly Salary</label>
           <div className="relative">
-            <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-bold text-slate-300">
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-bold text-slate-300">
               {userSettings.currency === 'GBP' ? '£' : userSettings.currency === 'USD' ? '$' : '€'}
             </span>
             <input 
-              /* CHANGE 1: type changed from "number" to "text" */
+              /* CHANGE: type="text" and inputMode="decimal" */
               type="text" 
               inputMode="decimal"
               value={displaySalary}
               onChange={(e) => updateSalary(e.target.value)}
-              /* CHANGE 2: Add onBlur to calculate */
+              /* CHANGE: Calculate on Blur */
               onBlur={(e) => updateSalary(safeCalculate(e.target.value))}
+              /* CHANGE: Calculate on Enter */
               onKeyDown={(e) => {
                 if(e.key === 'Enter') {
+                  updateSalary(safeCalculate(e.currentTarget.value));
                   e.currentTarget.blur();
                 }
               }}
@@ -1926,14 +1927,22 @@ export default function App() {
                               {userSettings.currency === 'GBP' ? '£' : userSettings.currency === 'USD' ? '$' : '€'}
                             </span>
                             <input 
-                              autoFocus // Set autofocus only on the amount field when editing starts
-                              /* CHANGE 1: type changed from "number" to "text" */
+                              autoFocus
+                              /* CHANGE: type="text" and inputMode="decimal" */
                               type="text"
                               inputMode="decimal"
                               defaultValue={expense.amount}
-                              /* CHANGE 2: Wrap onBlur with safeCalculate */
+                              
+                              /* CHANGE: Force calculation on Blur */
                               onBlur={(e) => updateExpenseAmount(expense.id, safeCalculate(e.target.value))}
-                              onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
+                              
+                              /* CHANGE: Force calculation on Enter Key */
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                   updateExpenseAmount(expense.id, safeCalculate(e.target.value));
+                                   setEditingExpenseId(null);
+                                }
+                              }}
                               className="w-20 p-1 border rounded bg-white text-right font-bold text-slate-800"
                             />
                           </div>
