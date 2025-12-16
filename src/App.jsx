@@ -550,7 +550,7 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
   );
 };
 
-// --- SANDBOX INFO MODAL ---
+// --- SANDBOX INFO MODALd ---
 const SandboxInfoModal = ({ onClose, onConfirm }) => (
   <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex items-center justify-center p-4 animate-in fade-in">
     <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl scale-100 animate-in zoom-in-95 duration-200 p-6 text-center">
