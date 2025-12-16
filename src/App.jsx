@@ -506,6 +506,7 @@ const Toast = ({ message, onClose }) => (
 const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
+  const [logo, setLogo] = useState(null); // New state for Logo
 
   if (!isOpen) return null;
 
@@ -513,12 +514,12 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
     e.preventDefault();
     if (!name || !amount) return;
     
-    // CHANGE IS HERE: Wrap amount in safeCalculate()
-    // This turns "500+5" into "505" BEFORE passing it to the saver
-    onSave(name, safeCalculate(amount));
+    // Pass logo to the save function
+    onSave(name, safeCalculate(amount), logo);
     
     setName('');
     setAmount('');
+    setLogo(null);
   };
 
   return (
@@ -534,13 +535,17 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Bill Name</label>
-            <input 
-              autoFocus
-              type="text" 
-              placeholder="e.g. Netflix" 
+            {/* Replaced Input with BrandSearchInput */}
+            <BrandSearchInput 
+              autoFocus={true}
+              placeholder="e.g. Netflix, Tesco..." 
               className="w-full p-4 rounded-xl bg-slate-50 border-none text-lg font-medium text-slate-800 placeholder-slate-300 focus:ring-2 focus:ring-emerald-500/20 outline-none"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={setName}
+              onSelectBrand={(brandName, brandLogo) => {
+                setName(brandName);
+                setLogo(brandLogo);
+              }}
             />
           </div>
           <div>
@@ -594,6 +599,86 @@ const SandboxInfoModal = ({ onClose, onConfirm }) => (
     </div>
   </div>
 );
+
+const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, className, autoFocus }) => {
+  const [results, setResults] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  
+  // Use the keys provided
+  const SECRET_KEY = "sk_EYBVfqJ-SQm1aE9boQ7uzg"; 
+  const PUBLIC_KEY = "pk_IlDYZIBjQZOkL2hI7rtHmA";
+
+  useEffect(() => {
+    // Debounce search to save API calls
+    const timeoutId = setTimeout(async () => {
+      if (value.length < 2) {
+        setResults([]);
+        return;
+      }
+      
+      try {
+        const response = await fetch(`https://api.logo.dev/search?q=${encodeURIComponent(value)}`, {
+          headers: {
+            'Authorization': `Bearer ${SECRET_KEY}`
+          }
+        });
+        const data = await response.json();
+        setResults(data.slice(0, 5)); // Limit to 5 results
+        setShowDropdown(true);
+      } catch (e) {
+        console.error("Logo search failed", e);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [value]);
+
+  return (
+    <div className="relative">
+      <input 
+        autoFocus={autoFocus}
+        type="text" 
+        placeholder={placeholder} 
+        className={className}
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setShowDropdown(false); // Hide until debounce fires
+        }}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)} // Delay hide so click registers
+      />
+      
+      {showDropdown && results.length > 0 && (
+        <div className="absolute top-full left-0 right-0 bg-white shadow-xl rounded-xl border border-slate-100 mt-1 z-50 overflow-hidden max-h-60 overflow-y-auto">
+          {results.map((brand, i) => (
+            <button
+              key={i}
+              className="w-full text-left p-3 hover:bg-slate-50 flex items-center gap-3 transition border-b border-slate-50 last:border-0"
+              onClick={() => {
+                const logoUrl = `https://img.logo.dev/${brand.domain}?token=${PUBLIC_KEY}`;
+                onSelectBrand(brand.name, logoUrl);
+                setShowDropdown(false);
+              }}
+            >
+              <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 p-1 flex items-center justify-center bg-white">
+                 <img src={`https://img.logo.dev/${brand.domain}?token=${PUBLIC_KEY}`} className="w-full h-full object-contain" alt="" />
+              </div>
+              <div>
+                <div className="font-bold text-slate-800 text-sm">{brand.name}</div>
+                <div className="text-xs text-slate-400">{brand.domain}</div>
+              </div>
+            </button>
+          ))}
+          <div className="p-2 bg-slate-50 text-xs text-center text-slate-400">
+            Select a brand or keep typing to add manually
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 
 // --- OTHER COMPONENTS ---
 
@@ -998,6 +1083,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   const [newPlanPercent, setNewPlanPercent] = useState('');
   const [newDefExpName, setNewDefExpName] = useState('');
   const [newDefExpAmount, setNewDefExpAmount] = useState('');
+  const [newDefExpLogo, setNewDefExpLogo] = useState(null);
 
   const totalPercentage = allocations.reduce((sum, item) => sum + parseFloat(item.percentage), 0);
 
@@ -1037,10 +1123,12 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
       id: Date.now().toString(),
       name: newDefExpName,
       amount: amountVal,
-      type: 'fixed'
+      type: 'fixed',
+      logo: newDefExpLogo
     }]);
     setNewDefExpName('');
     setNewDefExpAmount('');
+    setNewDefExpLogo(null);
   };
 
   const removeDefaultExpense = (id) => setDefaultExpenses(defaultExpenses.filter(e => e.id !== id));
@@ -1147,9 +1235,13 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           <p className="text-xs text-slate-500">These automatically copy over when you start a new month.</p>
           
           <div className="space-y-2">
-            {defaultExpenses.map(exp => (
+          {defaultExpenses.map(exp => (
               <div key={exp.id} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                <span className="font-medium text-slate-700">{exp.name}</span>
+                <div className="flex items-center gap-3">
+                   {/* Show logo if it exists in list */}
+                   {exp.logo && <img src={exp.logo} className="w-6 h-6 object-contain rounded-full bg-slate-50" alt="" />}
+                   <span className="font-medium text-slate-700">{exp.name}</span>
+                </div>
                 <div className="flex items-center gap-3">
                   <span className={`font-medium text-sm ${exp.amount === 0 ? 'text-orange-500 bg-orange-50 px-2 py-0.5 rounded text-xs' : 'text-slate-600'}`}>
                     {exp.amount > 0 ? formatCurrency(exp.amount, currency) : 'Variable'}
@@ -1161,15 +1253,21 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
               </div>
             ))}
             
-            <div className="flex gap-2 pt-2">
-            <input 
-                placeholder="Bill Name (e.g. AMEX)"
-                value={newDefExpName}
-                onChange={(e) => setNewDefExpName(e.target.value)}
-                className="flex-1 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
-              />
+            <div className="flex gap-2 pt-2 items-start">
+              {/* Replaced Input with BrandSearchInput */}
+              <div className="flex-1">
+                <BrandSearchInput
+                  placeholder="Bill Name (e.g. Sky)"
+                  value={newDefExpName}
+                  onChange={setNewDefExpName}
+                  onSelectBrand={(brandName, brandLogo) => {
+                    setNewDefExpName(brandName);
+                    setNewDefExpLogo(brandLogo);
+                  }}
+                  className="w-full p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
+                />
+              </div>
               <input 
-                /* CHANGE 1: type changed from "number" to "text" */
                 type="text"
                 inputMode="decimal"
                 placeholder="£"
@@ -1479,13 +1577,14 @@ export default function App() {
      }
   };
 
-  const handleAddExpenseSave = (name, amount) => {
+  const handleAddExpenseSave = (name, amount, logo) => {
     triggerHaptic(); // Haptic
     const newExp = {
       id: Date.now().toString(),
       name: name,
       amount: parseFloat(amount),
-      type: 'variable'
+      type: 'variable',
+      logo: logo
     };
     if (isSandbox) {
         setSandboxExpenses([...sandboxExpenses, newExp]);
@@ -1895,9 +1994,15 @@ export default function App() {
                     return (
                     <div key={expense.id} className="p-4 flex justify-between items-center group hover:bg-slate-50 transition">
                       <div className="flex items-center gap-3 flex-1">
-                        <div className={`p-2 rounded-full bg-slate-100 text-slate-500`}>
-                          <Icon className="w-4 h-4" />
+                        {/* --- MODIFIED ICON SECTION --- */}
+                        <div className={`p-2 rounded-full bg-slate-100 text-slate-500 w-10 h-10 flex items-center justify-center`}>
+                           {expense.logo ? (
+                             <img src={expense.logo} alt={expense.name} className="w-full h-full object-contain mix-blend-multiply" />
+                           ) : (
+                             <Icon className="w-4 h-4" />
+                           )}
                         </div>
+                        {/* ----------------------------- */}
                         <div className="flex-1">
                           {isEditing ? (
                             <input 
