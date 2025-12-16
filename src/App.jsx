@@ -182,17 +182,19 @@ const DEFAULT_ALLOCATIONS = [
 
 const parseMath = (val) => {
   if (!val) return '';
+  // 1. Remove anything that isn't a number or math operator
+  const clean = String(val).replace(/[^0-9.\-+*/()]/g, '');
+  
+  // 2. If it's just a regular number, return it as is
+  if (!/[+\-*/]/.test(clean)) return clean;
+
   try {
-    // Only allow numbers and math operators
-    const clean = val.toString().replace(/[^0-9.\-+*/()]/g, '');
-    // If no operators, return original
-    if (!/[+\-*/]/.test(clean)) return val;
-    // Safely calculate
+    // 3. Calculate safely
     // eslint-disable-next-line no-new-func
     const result = new Function('return ' + clean)();
-    return isFinite(result) ? result.toString() : val;
+    return isFinite(result) ? String(result) : clean;
   } catch (e) {
-    return val;
+    return val; // If math fails, return original text
   }
 };
 
@@ -1316,9 +1318,14 @@ export default function App() {
               value={salary}
 
               onChange={(e) => setSalary(e.target.value)} // Just set value while typing
-              onBlur={(e) => updateSalary(parseMath(e.target.value))} // Calculate on click away
+              onBlur={(e) => {
+                const calc = parseMath(e.target.value);
+                updateSalary(calc);
+              }}
               onKeyDown={(e) => {
                 if(e.key === 'Enter') {
+                   const calc = parseMath(e.currentTarget.value);
+                   updateSalary(calc);
                    e.currentTarget.blur();
                 }
               }}
@@ -1459,8 +1466,32 @@ export default function App() {
                   value={newExpenseAmount}
 
                   onChange={(e) => setNewExpenseAmount(e.target.value)}
-                  onBlur={(e) => setNewExpenseAmount(parseMath(e.target.value))}
-                  onKeyDown={(e) => e.key === 'Enter' && addExpense()}
+                  onBlur={(e) => {
+                    const calc = parseMath(e.target.value);
+                    setNewExpenseAmount(calc);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const calc = parseMath(e.currentTarget.value);
+                      // We must update state AND call addExpense manually because 
+                      // React state updates are async
+                      setNewExpenseAmount(calc); 
+                      // We pass the calculated value directly to addExpense logic
+                      // Note: You might need to update addExpense to accept an argument or wait for render
+                      // A safer way for this specific inline event:
+                      const newExp = {
+                        id: Date.now().toString(),
+                        name: newExpenseName,
+                        amount: parseFloat(calc),
+                        type: 'variable'
+                      };
+                      setExpenses([...expenses, newExp]);
+                      saveData(salary, [...expenses, newExp]);
+                      setNewExpenseName('');
+                      setNewExpenseAmount('');
+                      setIsAddingExpense(false);
+                    }
+                  }}
 
                 />
 
@@ -1519,16 +1550,21 @@ export default function App() {
                       <span className="text-slate-400 text-sm">£</span>
 
                       <input 
-
+                        // CHANGE START
                         autoFocus
-
-                        type="text"
+                        type="text" // Allow symbols
                         inputMode="decimal"
-
                         defaultValue={expense.amount}
-
-                        onBlur={(e) => updateExpenseAmount(expense.id, parseMath(e.target.value))}
-                        onKeyDown={(e) => e.key === 'Enter' && updateExpenseAmount(expense.id, parseMath(e.currentTarget.value))}
+                        onBlur={(e) => {
+                          const calc = parseMath(e.target.value);
+                          updateExpenseAmount(expense.id, calc);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                             const calc = parseMath(e.currentTarget.value);
+                             updateExpenseAmount(expense.id, calc);
+                          }
+                        }}
                         className="w-20 p-1 border rounded bg-white text-right font-bold text-slate-800"
 
                       />
