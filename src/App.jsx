@@ -1830,6 +1830,16 @@ export default function App() {
         />
       )}
 
+      {showDebtTool && (
+        <DebtSnowballTool 
+          user={user}
+          onClose={() => setShowDebtTool(false)}
+          userSettings={userSettings}
+          onUpdateSettings={saveSettings}
+          currency={userSettings.currency}
+        />
+      )}
+
       {showSandboxInfo && (
         <SandboxInfoModal
           onClose={() => setShowSandboxInfo(false)}
