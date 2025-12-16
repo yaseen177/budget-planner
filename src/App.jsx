@@ -61,7 +61,8 @@ import {
   BarChart3,
   FlaskConical,
   TrendingUp,
-  Maximize2
+  Maximize2,
+  HelpCircle
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION AREA ---
@@ -1307,6 +1308,116 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   );
 };
 
+const HelpModal = ({ onClose }) => (
+  <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 overflow-y-auto animate-in slide-in-from-bottom-10">
+    <div className="bg-white border-b border-slate-100 p-4 sticky top-0 z-10 flex justify-between items-center shadow-sm">
+      <h2 className="text-lg font-bold flex items-center gap-2 text-slate-800">
+        <HelpCircle className="w-5 h-5 text-emerald-500" /> User Guide
+      </h2>
+      <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition">
+        <X className="w-6 h-6 text-slate-500" />
+      </button>
+    </div>
+
+    <div className="max-w-2xl mx-auto p-6 space-y-8 pb-20">
+      
+      {/* SECTION 1: BASICS */}
+      <section className="space-y-4">
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Getting Started</h3>
+        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+          <div className="flex gap-4">
+            <div className="bg-white p-2 rounded-lg border border-slate-200 h-fit"><Wallet className="w-5 h-5 text-slate-400" /></div>
+            <div>
+              <h4 className="font-bold text-slate-800">1. Set your Income</h4>
+              <p className="text-sm text-slate-500 mt-1">Enter your net monthly pay in the large input field at the top. This acts as the source for all your budget calculations.</p>
+            </div>
+          </div>
+          <div className="flex gap-4">
+             <div className="bg-white p-2 rounded-lg border border-slate-200 h-fit"><Settings className="w-5 h-5 text-slate-400" /></div>
+             <div>
+              <h4 className="font-bold text-slate-800">2. Configure Allocations</h4>
+              <p className="text-sm text-slate-500 mt-1">Go to <strong>Settings</strong> to define your savings pots (e.g., Savings, Holiday). Ensure your percentages add up to 100%.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 2: EXPENSES */}
+      <section className="space-y-4">
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Managing Expenses</h3>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <ul className="space-y-4">
+            <li className="flex gap-3">
+              <div className="mt-1"><Plus className="w-4 h-4 text-emerald-500" /></div>
+              <div>
+                <span className="font-bold text-slate-800 text-sm">Adding Bills:</span>
+                <p className="text-sm text-slate-500">Tap "New Expense". Type a brand name (e.g., "Netflix") to automatically find its logo, or type manually.</p>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <div className="mt-1"><Edit2 className="w-4 h-4 text-indigo-500" /></div>
+              <div>
+                <span className="font-bold text-slate-800 text-sm">Editing:</span>
+                <p className="text-sm text-slate-500">Tap any expense amount to quickly change it. Tap the name to rename it.</p>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <div className="mt-1"><Copy className="w-4 h-4 text-amber-500" /></div>
+              <div>
+                <span className="font-bold text-slate-800 text-sm">Copy Month:</span>
+                <p className="text-sm text-slate-500">Start a new month easily by clicking "Copy Last Month" to duplicate all your bills.</p>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      {/* SECTION 3: SAVINGS */}
+      <section className="space-y-4">
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Savings & Goals</h3>
+        <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 space-y-3">
+          <p className="text-sm text-indigo-900 font-medium">
+            Your "Remainder" (Income minus Expenses) is automatically split according to your rules.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+             <div className="bg-white p-3 rounded-xl border border-indigo-100">
+                <span className="text-xs font-bold text-slate-400 uppercase">Target</span>
+                <p className="text-xs text-slate-500 mt-1">What you <em>should</em> save based on your plan.</p>
+             </div>
+             <div className="bg-white p-3 rounded-xl border border-indigo-100">
+                <span className="text-xs font-bold text-emerald-500 uppercase">Actual</span>
+                <p className="text-xs text-slate-500 mt-1">Type in what you actually moved to your bank pot. Green means you met the goal!</p>
+             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 4: ADVANCED */}
+      <section className="space-y-4">
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Advanced Tools</h3>
+        <div className="grid grid-cols-1 gap-3">
+           <div className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 bg-white">
+              <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600"><FlaskConical className="w-5 h-5" /></div>
+              <div>
+                 <h4 className="font-bold text-slate-800 text-sm">Sandbox Mode</h4>
+                 <p className="text-xs text-slate-500">A safe space to test "What If" scenarios without affecting your real data.</p>
+              </div>
+           </div>
+           <div className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 bg-white">
+              <div className="bg-emerald-100 p-2 rounded-lg text-emerald-600"><BarChart3 className="w-5 h-5" /></div>
+              <div>
+                 <h4 className="font-bold text-slate-800 text-sm">Analytics</h4>
+                 <p className="text-xs text-slate-500">View 3, 6, or 12-month trends of your income, expenses, and savings consistency.</p>
+              </div>
+           </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+);
+
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1314,6 +1425,7 @@ export default function App() {
   
   // UI State
   const [showSettings, setShowSettings] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [showReportSelector, setShowReportSelector] = useState(false);
   const [activeReport, setActiveReport] = useState(null); // 'month' or 'history'
   const [reportData, setReportData] = useState([]);
@@ -1760,6 +1872,10 @@ export default function App() {
         />
       )}
 
+      {showHelp && (
+        <HelpModal onClose={() => setShowHelp(false)} />
+      )}
+
       {showReportSelector && (
         <ReportSelector 
           onClose={() => setShowReportSelector(false)}
@@ -1831,6 +1947,9 @@ export default function App() {
             </button>
             <button onClick={() => setShowSettings(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`}>
               <Settings className="w-5 h-5 text-slate-300" />
+            </button>
+            <button onClick={() => setShowHelp(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`}>
+              <HelpCircle className="w-5 h-5 text-slate-300" />
             </button>
             <button onClick={handleLogout} className={`p-2 rounded-xl hover:bg-red-900/50 hover:text-red-200 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`}>
               <LogOut className="w-5 h-5 text-slate-300" />
