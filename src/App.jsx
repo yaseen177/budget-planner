@@ -118,10 +118,13 @@ const DEFAULT_ALLOCATIONS = [
 
 const safeCalculate = (expression) => {
   try {
-    const sanitized = String(expression).replace(/[^0-9+\-*/().\s]/g, '');
-    if (!sanitized || sanitized === expression) return expression;
+    // 1. Remove characters that aren't numbers or math operators
+    const sanitized = String(expression).replace(/[^0-9+\-*/().]/g, '');
+    if (!sanitized) return expression;
+    // 2. Evaluate the math string
     const result = new Function('return ' + sanitized)();
-    return isFinite(result) ? result.toString() : expression;
+    // 3. Return result as string, or original if invalid
+    return isFinite(result) ? String(result) : expression;
   } catch (e) {
     return expression;
   }
@@ -547,13 +550,10 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
               <input 
                 /* CHANGE: type="text" and inputMode="decimal" */
                 type="text" 
-                inputMode="decimal"
                 placeholder="0.00" 
                 className="w-full pl-10 p-4 rounded-xl bg-slate-50 border-none text-lg font-bold text-slate-800 placeholder-slate-300 focus:ring-2 focus:ring-emerald-500/20 outline-none"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                /* Add this just in case they tab away */
-                onBlur={() => setAmount(safeCalculate(amount))}
               />
             </div>
           </div>
@@ -763,7 +763,6 @@ const AllocationCard = ({ title, targetAmount, actualAmount, percentage, color, 
              <input 
                 /* CHANGE 1: type changed from "number" to "text" */
                 type="text"
-                inputMode="decimal"
                 value={actualAmount || ''}
                 onChange={(e) => onUpdateActual(e.target.value)}
                 /* CHANGE 2: Add onBlur to calculate */
@@ -1765,17 +1764,12 @@ export default function App() {
               {userSettings.currency === 'GBP' ? '£' : userSettings.currency === 'USD' ? '$' : '€'}
             </span>
             <input 
-              /* CHANGE: type="text" and inputMode="decimal" */
               type="text" 
-              inputMode="decimal"
               value={displaySalary}
               onChange={(e) => updateSalary(e.target.value)}
-              /* CHANGE: Calculate on Blur */
               onBlur={(e) => updateSalary(safeCalculate(e.target.value))}
-              /* CHANGE: Calculate on Enter */
               onKeyDown={(e) => {
-                if(e.key === 'Enter') {
-                  updateSalary(safeCalculate(e.currentTarget.value));
+                if (e.key === 'Enter') {
                   e.currentTarget.blur();
                 }
               }}
@@ -1930,7 +1924,6 @@ export default function App() {
                               autoFocus
                               /* CHANGE: type="text" and inputMode="decimal" */
                               type="text"
-                              inputMode="decimal"
                               defaultValue={expense.amount}
                               
                               /* CHANGE: Force calculation on Blur */
@@ -1939,7 +1932,7 @@ export default function App() {
                               /* CHANGE: Force calculation on Enter Key */
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
-                                   updateExpenseAmount(expense.id, safeCalculate(e.target.value));
+                                   updateExpenseAmount(expense.id, safeCalculate(e.currentTarget.value));
                                    setEditingExpenseId(null);
                                 }
                               }}
