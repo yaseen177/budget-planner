@@ -180,6 +180,22 @@ const DEFAULT_ALLOCATIONS = [
 
 // --- HELPER FUNCTIONS ---
 
+const parseMath = (val) => {
+  if (!val) return '';
+  try {
+    // Only allow numbers and math operators
+    const clean = val.toString().replace(/[^0-9.\-+*/()]/g, '');
+    // If no operators, return original
+    if (!/[+\-*/]/.test(clean)) return val;
+    // Safely calculate
+    // eslint-disable-next-line no-new-func
+    const result = new Function('return ' + clean)();
+    return isFinite(result) ? result.toString() : val;
+  } catch (e) {
+    return val;
+  }
+};
+
 const formatCurrency = (amount) => {
 
   return new Intl.NumberFormat('en-GB', {
@@ -1294,11 +1310,18 @@ export default function App() {
 
             <input 
 
-              type="number" 
+              type="text" 
+              inputMode="decimal"
 
               value={salary}
 
-              onChange={(e) => updateSalary(e.target.value)}
+              onChange={(e) => setSalary(e.target.value)} // Just set value while typing
+              onBlur={(e) => updateSalary(parseMath(e.target.value))} // Calculate on click away
+              onKeyDown={(e) => {
+                if(e.key === 'Enter') {
+                   e.currentTarget.blur();
+                }
+              }}
 
               placeholder="0.00"
 
@@ -1426,7 +1449,8 @@ export default function App() {
 
                 <input 
 
-                  type="number" 
+                  type="text"
+                  inputMode="decimal"
 
                   placeholder="£" 
 
@@ -1435,6 +1459,8 @@ export default function App() {
                   value={newExpenseAmount}
 
                   onChange={(e) => setNewExpenseAmount(e.target.value)}
+                  onBlur={(e) => setNewExpenseAmount(parseMath(e.target.value))}
+                  onKeyDown={(e) => e.key === 'Enter' && addExpense()}
 
                 />
 
@@ -1496,14 +1522,13 @@ export default function App() {
 
                         autoFocus
 
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
 
                         defaultValue={expense.amount}
 
-                        onBlur={(e) => updateExpenseAmount(expense.id, e.target.value)}
-
-                        onKeyDown={(e) => e.key === 'Enter' && updateExpenseAmount(expense.id, e.currentTarget.value)}
-
+                        onBlur={(e) => updateExpenseAmount(expense.id, parseMath(e.target.value))}
+                        onKeyDown={(e) => e.key === 'Enter' && updateExpenseAmount(expense.id, parseMath(e.currentTarget.value))}
                         className="w-20 p-1 border rounded bg-white text-right font-bold text-slate-800"
 
                       />
