@@ -115,6 +115,23 @@ const DEFAULT_ALLOCATIONS = [
 ];
 
 // --- HELPER FUNCTIONS ---
+
+const safeCalculate = (expression) => {
+  try {
+    // 1. Remove any characters that aren't numbers or operators (security)
+    const sanitized = String(expression).replace(/[^0-9+\-*/().\s]/g, '');
+    if (!sanitized || sanitized === expression) return expression;
+    
+    // 2. Evaluate the math string safely
+    const result = new Function('return ' + sanitized)();
+    
+    // 3. Return the result if it's a valid number, otherwise return original text
+    return isFinite(result) ? result.toString() : expression;
+  } catch (e) {
+    return expression;
+  }
+};
+
 const formatCurrency = (amount, currency = 'GBP') => {
   const localeMap = { 'GBP': 'en-GB', 'USD': 'en-US', 'EUR': 'de-DE' };
   return new Intl.NumberFormat(localeMap[currency] || 'en-GB', {
@@ -529,11 +546,15 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-400">£</span>
               <input 
-                type="number" 
+                /* CHANGE 1: type changed from "number" to "text" */
+                type="text" 
+                inputMode="decimal" /* Helps mobile, but text allows operators */
                 placeholder="0.00" 
                 className="w-full pl-10 p-4 rounded-xl bg-slate-50 border-none text-lg font-bold text-slate-800 placeholder-slate-300 focus:ring-2 focus:ring-emerald-500/20 outline-none"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                /* CHANGE 2: Add onBlur to calculate */
+                onBlur={() => setAmount(safeCalculate(amount))}
               />
             </div>
           </div>
@@ -741,9 +762,18 @@ const AllocationCard = ({ title, targetAmount, actualAmount, percentage, color, 
                 {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}
              </span>
              <input 
-                type="number"
+                /* CHANGE 1: type changed from "number" to "text" */
+                type="text"
+                inputMode="decimal"
                 value={actualAmount || ''}
                 onChange={(e) => onUpdateActual(e.target.value)}
+                /* CHANGE 2: Add onBlur to calculate */
+                onBlur={(e) => onUpdateActual(safeCalculate(e.target.value))}
+                onKeyDown={(e) => {
+                  if(e.key === 'Enter') {
+                    e.currentTarget.blur();
+                  }
+                }}
                 placeholder="0"
                 className="w-24 text-right bg-white border border-slate-200 rounded-lg py-1 pr-2 pl-6 text-sm font-bold text-slate-800 focus:border-emerald-500 outline-none print:bg-transparent print:border-none"
              />
@@ -1134,17 +1164,21 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
             ))}
             
             <div className="flex gap-2 pt-2">
-              <input 
+            <input 
                 placeholder="Bill Name (e.g. AMEX)"
                 value={newDefExpName}
                 onChange={(e) => setNewDefExpName(e.target.value)}
                 className="flex-1 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
               />
               <input 
-                type="number"
+                /* CHANGE 1: type changed from "number" to "text" */
+                type="text"
+                inputMode="decimal"
                 placeholder="£"
                 value={newDefExpAmount}
                 onChange={(e) => setNewDefExpAmount(e.target.value)}
+                /* CHANGE 2: Add onBlur to calculate */
+                onBlur={() => setNewDefExpAmount(safeCalculate(newDefExpAmount))}
                 className="w-24 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
               />
               <button onClick={addDefaultExpense} className="bg-slate-900 text-white p-3 rounded-xl">
@@ -1732,9 +1766,18 @@ export default function App() {
               {userSettings.currency === 'GBP' ? '£' : userSettings.currency === 'USD' ? '$' : '€'}
             </span>
             <input 
-              type="number" 
+              /* CHANGE 1: type changed from "number" to "text" */
+              type="text" 
+              inputMode="decimal"
               value={displaySalary}
               onChange={(e) => updateSalary(e.target.value)}
+              /* CHANGE 2: Add onBlur to calculate */
+              onBlur={(e) => updateSalary(safeCalculate(e.target.value))}
+              onKeyDown={(e) => {
+                if(e.key === 'Enter') {
+                  e.currentTarget.blur();
+                }
+              }}
               placeholder="0.00"
               className="w-full pl-6 text-4xl font-bold text-slate-800 placeholder-slate-200 outline-none bg-transparent py-1"
             />
@@ -1877,16 +1920,19 @@ export default function App() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {isEditing ? (
+                      {isEditing ? (
                           <div className="flex items-center gap-1">
                             <span className="text-slate-400 text-sm">
                               {userSettings.currency === 'GBP' ? '£' : userSettings.currency === 'USD' ? '$' : '€'}
                             </span>
                             <input 
                               autoFocus // Set autofocus only on the amount field when editing starts
-                              type="number"
+                              /* CHANGE 1: type changed from "number" to "text" */
+                              type="text"
+                              inputMode="decimal"
                               defaultValue={expense.amount}
-                              onBlur={(e) => updateExpenseAmount(expense.id, e.target.value)}
+                              /* CHANGE 2: Wrap onBlur with safeCalculate */
+                              onBlur={(e) => updateExpenseAmount(expense.id, safeCalculate(e.target.value))}
                               onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
                               className="w-20 p-1 border rounded bg-white text-right font-bold text-slate-800"
                             />
