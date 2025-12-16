@@ -181,20 +181,20 @@ const DEFAULT_ALLOCATIONS = [
 // --- HELPER FUNCTIONS ---
 
 const parseMath = (val) => {
-  if (!val) return '';
-  // 1. Remove anything that isn't a number or math operator
+  // 1. Clean the string (allow numbers, +, -, *, /)
   const clean = String(val).replace(/[^0-9.\-+*/()]/g, '');
   
-  // 2. If it's just a regular number, return it as is
-  if (!/[+\-*/]/.test(clean)) return clean;
+  // 2. If it is just a number, return it
+  if (!/[+\-*/]/.test(clean)) return val;
 
+  // 3. Calculate safely
   try {
-    // 3. Calculate safely
     // eslint-disable-next-line no-new-func
     const result = new Function('return ' + clean)();
-    return isFinite(result) ? String(result) : clean;
+    // Return the calculated number, or the original if it fails
+    return isFinite(result) ? String(result) : val;
   } catch (e) {
-    return val; // If math fails, return original text
+    return val;
   }
 };
 
@@ -1100,9 +1100,11 @@ export default function App() {
 
   const updateExpenseAmount = (id, newAmount) => {
 
+    const calculatedAmount = parseMath(newAmount);
+    
     const updatedExpenses = expenses.map(e => 
 
-      e.id === id ? { ...e, amount: parseFloat(newAmount) || 0 } : e
+      e.id === id ? { ...e, amount: parseFloat(calculatedAmount) || 0 } : e
 
     );
 
@@ -1311,29 +1313,26 @@ export default function App() {
             {/* Screen Only Version */}
 
             <input 
-
               type="text" 
               inputMode="decimal"
-
               value={salary}
-
-              onChange={(e) => setSalary(e.target.value)} // Just set value while typing
+              // 1. On Change: Just update the text on screen so you can type "+"
+              onChange={(e) => setSalary(e.target.value)} 
+              // 2. On Blur: Calculate the math, then save to Database
               onBlur={(e) => {
-                const calc = parseMath(e.target.value);
-                updateSalary(calc);
+                const calculated = parseMath(e.target.value);
+                updateSalary(calculated);
               }}
+              // 3. On Enter: Same as Blur
               onKeyDown={(e) => {
                 if(e.key === 'Enter') {
-                   const calc = parseMath(e.currentTarget.value);
-                   updateSalary(calc);
+                   const calculated = parseMath(e.currentTarget.value);
+                   updateSalary(calculated);
                    e.currentTarget.blur();
                 }
               }}
-
               placeholder="0.00"
-
               className="w-full pl-6 text-4xl font-bold text-slate-800 placeholder-slate-200 outline-none bg-transparent py-1 print:hidden"
-
             />
 
           </div>
@@ -1543,34 +1542,26 @@ export default function App() {
 
                 <div className="flex items-center gap-2">
 
-                  {editingExpenseId === expense.id ? (
-
+                {editingExpenseId === expense.id ? (
                     <div className="flex items-center gap-1 print:hidden">
-
                       <span className="text-slate-400 text-sm">£</span>
-
+                      {/* REPLACE THE <input> BELOW */}
                       <input 
-                        // CHANGE START
                         autoFocus
-                        type="text" // Allow symbols
+                        type="text" 
                         inputMode="decimal"
                         defaultValue={expense.amount}
-                        onBlur={(e) => {
-                          const calc = parseMath(e.target.value);
-                          updateExpenseAmount(expense.id, calc);
-                        }}
+                        // Use onBlur to trigger the update with the MATH calculated
+                        onBlur={(e) => updateExpenseAmount(expense.id, e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
-                             const calc = parseMath(e.currentTarget.value);
-                             updateExpenseAmount(expense.id, calc);
+                             updateExpenseAmount(expense.id, e.currentTarget.value);
                           }
                         }}
                         className="w-20 p-1 border rounded bg-white text-right font-bold text-slate-800"
-
                       />
-
+                      {/* END REPLACEMENT */}
                     </div>
-
                   ) : (
 
                     <button 
