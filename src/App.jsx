@@ -181,23 +181,21 @@ const DEFAULT_ALLOCATIONS = [
 // --- HELPER FUNCTIONS ---
 
 const parseMath = (val) => {
-  // 1. Clean the string (allow numbers, +, -, *, /)
+  // 1. Remove dangerous characters, allow math symbols
   const clean = String(val).replace(/[^0-9.\-+*/()]/g, '');
   
-  // 2. If it is just a number, return it
-  if (!/[+\-*/]/.test(clean)) return val;
+  // 2. If it's just a number, return it
+  if (!/[+\-*/]/.test(clean)) return clean;
 
-  // 3. Calculate safely
+  // 3. Calculate
   try {
     // eslint-disable-next-line no-new-func
     const result = new Function('return ' + clean)();
-    // Return the calculated number, or the original if it fails
     return isFinite(result) ? String(result) : val;
   } catch (e) {
     return val;
   }
 };
-
 const formatCurrency = (amount) => {
 
   return new Intl.NumberFormat('en-GB', {
@@ -1099,21 +1097,15 @@ export default function App() {
 
 
   const updateExpenseAmount = (id, newAmount) => {
-
-    const calculatedAmount = parseMath(newAmount);
+    // FIX: Calculate math (e.g. "500+2" becomes "502") BEFORE parsing to number
+    const calculatedString = parseMath(newAmount);
     
     const updatedExpenses = expenses.map(e => 
-
-      e.id === id ? { ...e, amount: parseFloat(calculatedAmount) || 0 } : e
-
+      e.id === id ? { ...e, amount: parseFloat(calculatedString) || 0 } : e
     );
-
     setExpenses(updatedExpenses);
-
     saveData(salary, updatedExpenses);
-
     setEditingExpenseId(null);
-
   };
 
 
@@ -1295,82 +1287,49 @@ export default function App() {
         {/* Salary Input Card */}
 
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 print:shadow-none print:border-slate-300 print:bg-slate-50">
-
           <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 print:text-slate-600">Net Monthly Salary</label>
-
           <div className="relative">
-
             <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-bold text-slate-300 print:hidden">£</span>
-
             {/* Print Only Version */}
-
             <div className="hidden print:block text-4xl font-bold text-slate-900">
-
               {salary ? formatCurrency(parseFloat(salary)) : '£0.00'}
-
             </div>
-
             {/* Screen Only Version */}
-
             <input 
               type="text" 
               inputMode="decimal"
               value={salary}
-              // 1. On Change: Just update the text on screen so you can type "+"
-              onChange={(e) => setSalary(e.target.value)} 
-              // 2. On Blur: Calculate the math, then save to Database
-              onBlur={(e) => {
-                const calculated = parseMath(e.target.value);
-                updateSalary(calculated);
-              }}
-              // 3. On Enter: Same as Blur
+              onChange={(e) => setSalary(e.target.value)}
+              onBlur={(e) => updateSalary(parseMath(e.target.value))}
               onKeyDown={(e) => {
                 if(e.key === 'Enter') {
-                   const calculated = parseMath(e.currentTarget.value);
-                   updateSalary(calculated);
+                   updateSalary(parseMath(e.currentTarget.value));
                    e.currentTarget.blur();
                 }
               }}
               placeholder="0.00"
               className="w-full pl-6 text-4xl font-bold text-slate-800 placeholder-slate-200 outline-none bg-transparent py-1 print:hidden"
             />
-
           </div>
-
         </div>
 
 
 
         {/* Overview Stats */}
-
         <div className="grid grid-cols-2 gap-4">
-
           <StatCard 
-
             label="Total Expenses" 
-
             amount={totalExpenses} 
-
             icon={TrendingDown} 
-
             colorClass="bg-rose-50 text-rose-500"
-
           />
-
           <StatCard 
-
             label="Remainder" 
-
             amount={remainder} 
-
-            icon={PieChart} 
-
+            icon={PieChart}  // <--- This is the Wheel Icon
             colorClass="bg-blue-50 text-blue-600"
-
             subText="Available for Goals"
-
           />
-
         </div>
 
 
@@ -1539,28 +1498,21 @@ export default function App() {
                 
 
                 {/* Editable Amount Section */}
-
                 <div className="flex items-center gap-2">
-
-                {editingExpenseId === expense.id ? (
+                  {editingExpenseId === expense.id ? (
                     <div className="flex items-center gap-1 print:hidden">
                       <span className="text-slate-400 text-sm">£</span>
-                      {/* REPLACE THE <input> BELOW */}
                       <input 
                         autoFocus
-                        type="text" 
+                        type="text"
                         inputMode="decimal"
                         defaultValue={expense.amount}
-                        // Use onBlur to trigger the update with the MATH calculated
+                        // We pass the raw text (e.g. "500+2") to updateExpenseAmount
+                        // The function we fixed in Step 2 handles the math now.
                         onBlur={(e) => updateExpenseAmount(expense.id, e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                             updateExpenseAmount(expense.id, e.currentTarget.value);
-                          }
-                        }}
+                        onKeyDown={(e) => e.key === 'Enter' && updateExpenseAmount(expense.id, e.currentTarget.value)}
                         className="w-20 p-1 border rounded bg-white text-right font-bold text-slate-800"
                       />
-                      {/* END REPLACEMENT */}
                     </div>
                   ) : (
 
