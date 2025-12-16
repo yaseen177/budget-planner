@@ -1418,6 +1418,232 @@ const HelpModal = ({ onClose }) => (
 );
 
 
+// --- NEW COMPONENT: ONBOARDING WIZARD ---
+const OnboardingWizard = ({ user, onComplete }) => {
+  const [step, setStep] = useState(0); // 0:Intro, 1:Currency, 2:Pots, 3:Bills
+  const [currency, setCurrency] = useState('GBP');
+  
+  // Pots State
+  const [pots, setPots] = useState([
+    { id: '1', name: 'Savings', percentage: 20, color: 'bg-emerald-100 text-emerald-700 bar-emerald' },
+    { id: '2', name: 'Expenses', percentage: 80, color: 'bg-indigo-100 text-indigo-700 bar-indigo' }
+  ]);
+  const [newPotName, setNewPotName] = useState('');
+  const [newPotPercent, setNewPotPercent] = useState('');
+
+  // Bills State
+  const [bills, setBills] = useState([]);
+  const [newBillName, setNewBillName] = useState('');
+  const [newBillAmount, setNewBillAmount] = useState('');
+  const [newBillLogo, setNewBillLogo] = useState(null);
+
+  const totalPercent = pots.reduce((sum, p) => sum + p.percentage, 0);
+
+  const addPot = () => {
+    if (!newPotName || !newPotPercent) return;
+    const colors = [
+      'bg-sky-100 text-sky-700 bar-sky',
+      'bg-amber-100 text-amber-700 bar-amber', 
+      'bg-rose-100 text-rose-700 bar-rose',
+      'bg-purple-100 text-purple-700 bar-purple'
+    ];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    
+    setPots([...pots, { 
+      id: Date.now().toString(), 
+      name: newPotName, 
+      percentage: parseFloat(newPotPercent), 
+      color: randomColor 
+    }]);
+    setNewPotName('');
+    setNewPotPercent('');
+  };
+
+  const addBill = () => {
+    if (!newBillName) return;
+    setBills([...bills, {
+      id: Date.now().toString(),
+      name: newBillName,
+      amount: parseFloat(newBillAmount) || 0,
+      type: 'fixed',
+      logo: newBillLogo
+    }]);
+    setNewBillName('');
+    setNewBillAmount('');
+    setNewBillLogo(null);
+  };
+
+  const handleFinish = () => {
+    const settings = {
+      displayName: user.displayName || 'Friend',
+      currency,
+      allocationRules: pots,
+      defaultFixedExpenses: bills
+    };
+    onComplete(settings);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center p-6 animate-in fade-in duration-500">
+      <div className="max-w-md w-full space-y-8">
+        
+        {/* Progress Dots */}
+        <div className="flex justify-center gap-2 mb-8">
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} className={`w-3 h-3 rounded-full transition-all ${step === i ? 'bg-slate-900 scale-125' : 'bg-slate-200'}`} />
+          ))}
+        </div>
+
+        {/* STEP 0: WELCOME */}
+        {step === 0 && (
+          <div className="text-center space-y-6 animate-in slide-in-from-bottom-8">
+            <div className="bg-emerald-100 w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl rotate-3">
+               <Wallet className="w-12 h-12 text-emerald-600" />
+            </div>
+            <h1 className="text-4xl font-bold text-slate-800">Welcome to<br/>Budget Planner</h1>
+            <p className="text-slate-500 text-lg">Let's build a financial system that works for you, not against you.</p>
+            <button onClick={() => setStep(1)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition">
+              Get Started
+            </button>
+          </div>
+        )}
+
+        {/* STEP 1: CURRENCY */}
+        {step === 1 && (
+          <div className="space-y-6 animate-in slide-in-from-right-8">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-800">First things first</h2>
+              <p className="text-slate-500">Select your primary currency.</p>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {['GBP', 'USD', 'EUR'].map(c => (
+                <button 
+                  key={c}
+                  onClick={() => setCurrency(c)}
+                  className={`py-6 rounded-2xl font-bold text-xl border-2 transition ${currency === c ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-100 hover:border-slate-200 text-slate-600'}`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setStep(2)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
+              Next Step
+            </button>
+          </div>
+        )}
+
+        {/* STEP 2: POTS */}
+        {step === 2 && (
+          <div className="space-y-6 animate-in slide-in-from-right-8">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-800">The 100% Rule</h2>
+              <p className="text-slate-500">Every penny needs a job. Assign percentages to your savings pots.</p>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 max-h-60 overflow-y-auto">
+              {pots.map(p => (
+                <div key={p.id} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm">
+                  <span className="font-bold text-slate-700">{p.name}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="bg-slate-100 px-2 py-1 rounded text-sm font-bold">{p.percentage}%</span>
+                    <button onClick={() => setPots(pots.filter(x => x.id !== p.id))}><X className="w-4 h-4 text-slate-300 hover:text-red-500" /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Add Pot Form */}
+            <div className="flex gap-2">
+               <input 
+                 className="flex-1 p-3 rounded-xl border border-slate-200 bg-white" 
+                 placeholder="New Pot (e.g. Holiday)" 
+                 value={newPotName} 
+                 onChange={e => setNewPotName(e.target.value)} 
+               />
+               <input 
+                 type="number" 
+                 className="w-20 p-3 rounded-xl border border-slate-200 bg-white" 
+                 placeholder="%" 
+                 value={newPotPercent} 
+                 onChange={e => setNewPotPercent(e.target.value)} 
+               />
+               <button onClick={addPot} className="bg-slate-900 text-white p-3 rounded-xl"><Plus className="w-5 h-5" /></button>
+            </div>
+
+            <div className={`p-4 rounded-xl flex justify-between items-center ${totalPercent === 100 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+               <span className="font-bold text-sm">Total Allocation</span>
+               <span className="font-bold text-xl">{totalPercent}%</span>
+            </div>
+
+            <button 
+              disabled={totalPercent !== 100}
+              onClick={() => setStep(3)} 
+              className="w-full bg-slate-900 disabled:bg-slate-300 disabled:text-slate-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition"
+            >
+              Continue
+            </button>
+          </div>
+        )}
+
+        {/* STEP 3: BILLS */}
+        {step === 3 && (
+          <div className="space-y-6 animate-in slide-in-from-right-8">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-800">Monthly Commitments</h2>
+              <p className="text-slate-500">Add bills that stay the same every month (Rent, Netflix, Gym).</p>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 max-h-60 overflow-y-auto">
+              {bills.length === 0 && <p className="text-center text-sm text-slate-400 py-4">No bills added yet.</p>}
+              {bills.map(b => (
+                <div key={b.id} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm">
+                   <div className="flex items-center gap-2">
+                     {b.logo && <img src={b.logo} className="w-6 h-6 object-contain" alt="" />}
+                     <span className="font-bold text-slate-700">{b.name}</span>
+                   </div>
+                   <div className="flex items-center gap-3">
+                     <span className="text-sm font-bold text-slate-500">{b.amount > 0 ? b.amount : 'Var'}</span>
+                     <button onClick={() => setBills(bills.filter(x => x.id !== b.id))}><X className="w-4 h-4 text-slate-300 hover:text-red-500" /></button>
+                   </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2 items-start">
+               <div className="flex-1">
+                 <BrandSearchInput
+                    placeholder="Search (e.g. Spotify)"
+                    value={newBillName}
+                    onChange={setNewBillName}
+                    onSelectBrand={(name, logo) => {
+                       setNewBillName(name);
+                       setNewBillLogo(logo);
+                    }}
+                    className="w-full p-3 rounded-xl border border-slate-200 bg-white"
+                 />
+               </div>
+               <input 
+                 type="number"
+                 className="w-20 p-3 rounded-xl border border-slate-200 bg-white" 
+                 placeholder="0.00" 
+                 value={newBillAmount} 
+                 onChange={e => setNewBillAmount(e.target.value)} 
+               />
+               <button onClick={addBill} className="bg-slate-900 text-white p-3 rounded-xl"><Plus className="w-5 h-5" /></button>
+            </div>
+
+            <button onClick={handleFinish} className="w-full bg-emerald-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-600 transition mt-4">
+              Finish Setup
+            </button>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+};
+
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1427,6 +1653,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showReportSelector, setShowReportSelector] = useState(false);
+  const [onboardingComplete, setOnboardingComplete] = useState(true);
   const [activeReport, setActiveReport] = useState(null); // 'month' or 'history'
   const [reportData, setReportData] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
@@ -1499,15 +1726,18 @@ export default function App() {
     const unsub = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) {
         setUserSettings(docSnap.data());
+        // User has settings, so they are NOT new (or have finished onboarding)
+        setOnboardingComplete(true);
       } else {
-        const defaults = {
+        // User has NO settings. Do NOT save defaults yet.
+        // This triggers the Onboarding Wizard to appear.
+        setOnboardingComplete(false);
+        setUserSettings({
           displayName: user.displayName || '',
           currency: 'GBP',
-          allocationRules: DEFAULT_ALLOCATIONS,
-          defaultFixedExpenses: DEFAULT_FIXED_EXPENSES
-        };
-        setDoc(settingsRef, defaults);
-        setUserSettings(defaults);
+          allocationRules: [], // Start empty
+          defaultFixedExpenses: [] // Start empty
+        });
       }
     });
     return () => unsub();
@@ -1883,6 +2113,25 @@ export default function App() {
         />
       )}
       
+      {/* --- NEW RENDER: ONBOARDING WIZARD --- */}
+      {!loading && !onboardingComplete && user && (
+        <OnboardingWizard 
+          user={user}
+          onComplete={async (newSettings) => {
+             // 1. Save the settings to Firestore
+             const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
+             await setDoc(settingsRef, newSettings);
+             
+             // 2. Refresh local state immediately to close wizard
+             setUserSettings(newSettings);
+             setOnboardingComplete(true);
+             
+             // 3. Trigger the Help Tutorial for a nice follow-up
+             setShowHelp(true); 
+          }}
+        />
+      )}
+
       {showAnalytics && (
         <AnalyticsDashboard 
           user={user} 
