@@ -692,6 +692,27 @@ const BudgetWheel = ({ salary, expenses, allocations, currency }) => {
   const expensesPercent = Math.min(100, (totalExpenses / salaryNum) * 100);
   const remainderPercentOfTotal = 100 - expensesPercent;
   
+  // Robust Color Mapping
+  const getColorHex = (colorString) => {
+    if (!colorString) return '#64748b'; // Default Slate
+    const str = colorString.toLowerCase();
+    if (str.includes('indigo')) return '#6366f1';
+    if (str.includes('emerald')) return '#10b981';
+    if (str.includes('sky')) return '#0ea5e9';
+    if (str.includes('amber')) return '#f59e0b';
+    if (str.includes('rose')) return '#f43f5e';
+    if (str.includes('purple')) return '#a855f7';
+    if (str.includes('blue')) return '#3b82f6';
+    if (str.includes('teal')) return '#14b8a6';
+    if (str.includes('cyan')) return '#06b6d4';
+    if (str.includes('lime')) return '#84cc16';
+    if (str.includes('orange')) return '#f97316';
+    if (str.includes('fuchsia')) return '#d946ef';
+    if (str.includes('pink')) return '#ec4899';
+    if (str.includes('violet')) return '#8b5cf6';
+    return '#64748b'; // Fallback
+  };
+
   let currentDegree = 0;
   const segments = [];
 
@@ -701,26 +722,29 @@ const BudgetWheel = ({ salary, expenses, allocations, currency }) => {
     currentDegree += degrees;
   };
 
-  addSegment(expensesPercent, '#f43f5e'); // rose-500
+  // 1. Add Expenses Segment (Always Red/Rose)
+  addSegment(expensesPercent, '#f43f5e'); 
 
+  // 2. Add Allocation Segments
   allocations.forEach(plan => {
     const planPercentOfTotal = (plan.percentage / 100) * remainderPercentOfTotal;
-    let hex = '#64748b'; 
-    if (plan.color.includes('indigo')) hex = '#6366f1';
-    if (plan.color.includes('emerald')) hex = '#10b981';
-    if (plan.color.includes('sky')) hex = '#0ea5e9';
-    if (plan.color.includes('amber')) hex = '#f59e0b';
-    
-    addSegment(planPercentOfTotal, hex);
+    addSegment(planPercentOfTotal, getColorHex(plan.color));
   });
+
+  // 3. Add Empty/Unallocated Segment (Grey) if needed
+  if (currentDegree < 360) {
+      segments.push(`#f1f5f9 ${currentDegree}deg 360deg`);
+  }
 
   const gradient = `conic-gradient(${segments.join(', ')})`;
 
   return (
     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden print:hidden">
       <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 w-full text-left">Where your money goes</h3>
+      
+      {/* The Wheel */}
       <div className="relative w-48 h-48">
-        <div className="w-full h-full rounded-full" style={{ background: gradient }}></div>
+        <div className="w-full h-full rounded-full transition-all duration-1000 ease-out" style={{ background: gradient }}></div>
         <div className="absolute inset-2 bg-white rounded-full flex flex-col items-center justify-center">
            <div className="absolute inset-0 bg-white rounded-full flex flex-col items-center justify-center z-10">
               <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">Net Salary</span>
@@ -729,24 +753,22 @@ const BudgetWheel = ({ salary, expenses, allocations, currency }) => {
         </div>
       </div>
       
+      {/* The Legend */}
       <div className="flex flex-wrap justify-center gap-3 mt-6 w-full">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-full bg-rose-500"></div>
           <span className="text-xs font-medium text-slate-600">Expenses</span>
         </div>
-        {allocations.map(plan => {
-           let bgClass = 'bg-slate-500';
-           if (plan.color.includes('indigo')) bgClass = 'bg-indigo-500';
-           if (plan.color.includes('emerald')) bgClass = 'bg-emerald-500';
-           if (plan.color.includes('sky')) bgClass = 'bg-sky-500';
-           if (plan.color.includes('amber')) bgClass = 'bg-amber-500';
-           return (
+        {allocations.map(plan => (
             <div key={plan.id} className="flex items-center gap-1.5">
-              <div className={`w-3 h-3 rounded-full ${bgClass}`}></div>
+              {/* Use inline style to ensure legend color matches wheel exactly */}
+              <div 
+                className="w-3 h-3 rounded-full shadow-sm" 
+                style={{ backgroundColor: getColorHex(plan.color) }}
+              ></div>
               <span className="text-xs font-medium text-slate-600">{plan.name.split(' ')[0]}</span>
             </div>
-           );
-        })}
+        ))}
       </div>
     </div>
   );
