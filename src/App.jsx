@@ -1190,7 +1190,7 @@ const HistoryReportView = ({ data, allocations, onClose, currency }) => {
   );
 };
 
-const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onResetMonth, isTutorial }) => { // <--- ADD isTutorial prop here
+const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onResetMonth, isTutorial, onExitTutorial }) => {
   const [displayName, setDisplayName] = useState(currentSettings.displayName || user.displayName || '');
   const [allocations, setAllocations] = useState(currentSettings.allocationRules || []);
   const [defaultExpenses, setDefaultExpenses] = useState(currentSettings.defaultFixedExpenses || []);
@@ -1256,7 +1256,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
         <h2 className="text-lg font-bold flex items-center gap-2 text-slate-800">
           <Settings className="w-5 h-5 text-slate-500" /> {isTutorial ? 'Settings Demo' : 'Settings'}
         </h2>
-        <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition">
+        <button onClick={isTutorial ? onExitTutorial : onClose} className="p-2 hover:bg-slate-100 rounded-full transition">
           <X className="w-6 h-6 text-slate-500" />
         </button>
       </div>
@@ -1274,7 +1274,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                 onChange={(e) => setDisplayName(e.target.value)}
                 className="w-full p-2 rounded-lg border border-slate-300 focus:border-emerald-500 outline-none transition"
                 placeholder="Your Name"
-                disabled={isTutorial} // Disable editing in tutorial
+                disabled={isTutorial}
               />
             </div>
             <div>
@@ -1331,26 +1331,25 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
               </div>
             ))}
             
-            {!isTutorial && (
-              <div className="flex gap-2 pt-2">
-                <input 
-                  placeholder="New Pot Name"
-                  value={newPlanName}
-                  onChange={(e) => setNewPlanName(e.target.value)}
-                  className="flex-1 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
-                />
-                <input 
-                  type="number"
-                  placeholder="%"
-                  value={newPlanPercent}
-                  onChange={(e) => setNewPlanPercent(e.target.value)}
-                  className="w-16 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
-                />
-                <button onClick={addAllocation} className="bg-slate-900 text-white p-3 rounded-xl">
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-            )}
+            {/* Show Add Row (Disabled in Tutorial, but Visible for ID targeting) */}
+            <div className={`flex gap-2 pt-2 ${isTutorial ? 'opacity-50 pointer-events-none' : ''}`}>
+              <input 
+                placeholder="New Pot Name"
+                value={newPlanName}
+                onChange={(e) => setNewPlanName(e.target.value)}
+                className="flex-1 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
+              />
+              <input 
+                type="number"
+                placeholder="%"
+                value={newPlanPercent}
+                onChange={(e) => setNewPlanPercent(e.target.value)}
+                className="w-16 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
+              />
+              <button onClick={addAllocation} className="bg-slate-900 text-white p-3 rounded-xl">
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </section>
 
@@ -1379,37 +1378,37 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
               </div>
             ))}
             
-            {!isTutorial && (
-              <div className="flex gap-2 pt-2 items-start">
-                <div className="flex-1">
-                  <BrandSearchInput
-                    placeholder="Bill Name (e.g. AMEX)"
-                    value={newDefExpName}
-                    onChange={setNewDefExpName}
-                    onSelectBrand={(brandName, brandLogo) => {
-                      setNewDefExpName(brandName);
-                      setNewDefExpLogo(brandLogo);
-                    }}
-                    className="w-full p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
-                  />
-                </div>
-                
-                <div id="settings-new-expense-amount">
-                  <input 
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="£"
-                      value={newDefExpAmount}
-                      onChange={(e) => setNewDefExpAmount(e.target.value)}
-                      onBlur={() => setNewDefExpAmount(safeCalculate(newDefExpAmount))}
-                      className="w-24 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
-                  />
-                </div>
-                <button onClick={addDefaultExpense} className="bg-slate-900 text-white p-3 rounded-xl">
-                  <Plus className="w-4 h-4" />
-                </button>
+            {/* Show Add Row (Disabled in Tutorial, but Visible for ID targeting) */}
+            <div className={`flex gap-2 pt-2 items-start ${isTutorial ? 'opacity-50 pointer-events-none' : ''}`}>
+              <div className="flex-1">
+                <BrandSearchInput
+                  placeholder="Bill Name (e.g. AMEX)"
+                  value={newDefExpName}
+                  onChange={setNewDefExpName}
+                  onSelectBrand={(brandName, brandLogo) => {
+                    setNewDefExpName(brandName);
+                    setNewDefExpLogo(brandLogo);
+                  }}
+                  className="w-full p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
+                />
               </div>
-            )}
+              
+              {/* TARGET ID IS HERE */}
+              <div id="settings-new-expense-amount">
+                <input 
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="£"
+                    value={newDefExpAmount}
+                    onChange={(e) => setNewDefExpAmount(e.target.value)}
+                    onBlur={() => setNewDefExpAmount(safeCalculate(newDefExpAmount))}
+                    className="w-24 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
+                />
+              </div>
+              <button onClick={addDefaultExpense} className="bg-slate-900 text-white p-3 rounded-xl">
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </section>
 
@@ -1427,10 +1426,10 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </section>
         )}
 
-        {/* --- DYNAMIC FOOTER BUTTON --- */}
+        {/* DYNAMIC FOOTER BUTTON */}
         {isTutorial ? (
           <button 
-            onClick={onClose}
+            onClick={onExitTutorial} // Uses the special exit handler
             className="w-full bg-rose-500 text-white py-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 hover:bg-rose-600 transition transform active:scale-95 animate-pulse"
           >
             <LogOut className="w-5 h-5" /> Exit Tutorial
@@ -2509,7 +2508,7 @@ export default function App() {
       {/* Toast Notification */}
       {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
 
-      {/* --- MODALS (Keep exactly same functionality) --- */}
+      {/* MODALS */}
       <AddExpenseModal 
         isOpen={isAddingExpense} 
         onClose={() => setIsAddingExpense(false)}
@@ -2527,7 +2526,15 @@ export default function App() {
           onClose={() => setShowSettings(false)}
           onSaveSettings={saveSettings}
           onResetMonth={resetCurrentMonth}
-          isTutorial={isTutorialMode} // <--- ADD THIS LINE
+          isTutorial={isTutorialMode}
+          // --- FIX: EXIT TUTORIAL HANDLER ---
+          onExitTutorial={() => {
+             setActiveTutorial(null);
+             setShowSettings(false);
+             setMobileMenuOpen(false);
+             setShowHelp(true); // Redirect to Help
+          }}
+          // ----------------------------------
         />
       )}
 
@@ -2548,6 +2555,8 @@ export default function App() {
             setActiveTutorial(null);
             setIsAddingExpense(false);
             setMobileMenuOpen(false);
+            setShowSettings(false); // Close Settings if open
+            setShowHelp(true); // Redirect to Help
           }}
         />
       )}
@@ -2708,19 +2717,21 @@ export default function App() {
 
         {/* Budget Wheel & Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-           {/* Wheel Container */}
-           <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100/50 print:hidden relative overflow-hidden">
-             <div className="absolute top-0 right-0 p-4 opacity-10"><PieChart className="w-24 h-24 text-slate-300" /></div>
-             <BudgetWheel 
-              salary={displaySalary} 
-              expenses={displayExpenses} 
-              allocations={displayAllocations}
-              currency={userSettings.currency}
-            />
-           </div>
-
-           {/* Stats Container */}
-           <div className="flex flex-col gap-4">
+           {/* Wheel Container - FIX: DYNAMICALLY HIDE IF NO SALARY */}
+           {parseFloat(displaySalary) > 0 && (
+             <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100/50 print:hidden relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-4 opacity-10"><PieChart className="w-24 h-24 text-slate-300" /></div>
+               <BudgetWheel 
+                salary={displaySalary} 
+                expenses={displayExpenses} 
+                allocations={displayAllocations}
+                currency={userSettings.currency}
+              />
+             </div>
+           )}
+           
+           {/* Stats Container (This expands if wheel is hidden) */}
+           <div className={`flex flex-col gap-4 ${parseFloat(displaySalary) <= 0 ? 'col-span-1 md:col-span-2' : ''}`}>
               <StatCard 
                 label="Total Expenses" 
                 amount={totalExpenses} 
