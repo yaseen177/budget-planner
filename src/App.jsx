@@ -1673,22 +1673,23 @@ const OnboardingWizard = ({ user, onComplete }) => {
 };
 
 
-// --- FINAL FIXED TUTORIAL OVERLAY ---
+// --- FINAL FIXED TUTORIAL OVERLAY (ABSOLUTE POSITIONING) ---
 const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
   const [targetRect, setTargetRect] = useState(null);
   const step = steps[currentStep];
   const isMobile = window.innerWidth < 768;
 
-  // 1. Calculate Position (Stable function)
   const updatePosition = useCallback(() => {
     const element = document.querySelector(step.target);
     if (element) {
       const rect = element.getBoundingClientRect();
       setTargetRect({
+        // Document-relative coordinates (Constant even when scrolling)
         top: rect.top + window.scrollY,
         left: rect.left + window.scrollX,
         width: rect.width,
         height: rect.height,
+        // Viewport-relative (Changes when scrolling - used for flip logic)
         viewportTop: rect.top,
         viewportBottom: rect.bottom
       });
@@ -1697,15 +1698,11 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
     }
   }, [step.target]);
 
-  // 2. Effect to handle Scrolling and Resizing
   useEffect(() => {
     const element = document.querySelector(step.target);
-    
-    // Initial Scroll to element
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
       
-      // Mobile tweak: ensure space at bottom
       if (isMobile) {
         setTimeout(() => {
            const rect = element.getBoundingClientRect();
@@ -1716,28 +1713,23 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
       }
     }
 
-    // Run calculation
     updatePosition();
-
-    // Add Listeners
     window.addEventListener('resize', updatePosition);
-    
-    // IMPORTANT FIX: Added 'true' to capture scroll events inside Modals/Divs
     window.addEventListener('scroll', updatePosition, true);
 
-    // Cleanup
     return () => {
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
   }, [step.target, currentStep, isMobile, updatePosition]);
 
-  // 3. Collision Logic (Desktop only)
+  // Collision Logic
   const CARD_HEIGHT = 280;
   let showAbove = false;
+  
   if (targetRect && !isMobile) {
     const spaceBelow = window.innerHeight - targetRect.viewportBottom;
-    // Flip if tight on space below but plenty above
+    // Only flip if we are truly cramped at the bottom of the VIEWPORT
     if (spaceBelow < CARD_HEIGHT && targetRect.viewportTop > CARD_HEIGHT) {
       showAbove = true;
     }
@@ -1767,13 +1759,13 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
 
       {/* Instruction Card */}
       <div 
-        className={`fixed transition-all duration-300 ease-out px-4 md:px-0 pointer-events-auto
-          ${isMobile ? 'bottom-6 left-0 right-0 mx-auto w-full max-w-sm' : 'w-80'}`}
+        className={`transition-all duration-300 ease-out px-4 md:px-0 pointer-events-auto
+          ${isMobile ? 'fixed bottom-6 left-0 right-0 mx-auto w-full max-w-sm' : 'absolute w-80'}`}
         style={!isMobile && targetRect ? {
-           position: 'fixed',
+           // DESKTOP: ABSOLUTE POSITIONING
            top: showAbove 
-              ? targetRect.viewportTop - 20 
-              : targetRect.viewportBottom + 20,
+              ? targetRect.top - 20 
+              : targetRect.top + targetRect.height + 20,
            left: targetRect.left > window.innerWidth - 350 ? 'auto' : Math.max(20, targetRect.left),
            right: targetRect.left > window.innerWidth - 350 ? 20 : 'auto',
            transform: showAbove ? 'translateY(-100%)' : 'none' 
@@ -2337,7 +2329,7 @@ export default function App() {
   if (!user) return <LoginScreen onLogin={handleLogin} />;
 
   return (
-    <div className={`min-h-screen pb-24 font-sans transition-colors duration-500 ${isSandbox ? 'bg-indigo-50' : 'bg-slate-50'} print:bg-white print:pb-0`}>
+    <div className={`relative min-h-screen pb-24 font-sans transition-colors duration-500 ${isSandbox ? 'bg-indigo-50' : 'bg-slate-50'} print:bg-white print:pb-0`}>
       <style>{`
         @media print {
           @page { margin: 10mm; size: A4 landscape; }
