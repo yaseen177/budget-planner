@@ -2443,38 +2443,50 @@ export default function App() {
   if (!user) return <LoginScreen onLogin={handleLogin} />;
 
   return (
-    <div className={`relative min-h-screen pb-24 font-sans transition-colors duration-500 ${isSandbox ? 'bg-indigo-50' : 'bg-slate-50'} print:bg-white print:pb-0`}>
+    <div className={`relative min-h-screen pb-24 font-sans transition-colors duration-500 ${isSandbox ? 'bg-slate-50' : 'bg-slate-50'} print:bg-white print:pb-0`}>
       <style>{`
         @media print {
           @page { margin: 10mm; size: A4 landscape; }
           body { -webkit-print-color-adjust: exact; background-color: white !important; }
         }
+        /* Hide scrollbar for clean UI */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
+
+      {/* --- 1. SUBTLE BACKGROUND GRADIENT --- */}
+      {!isSandbox && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-emerald-50/80 to-transparent"></div>
+          <div className="absolute top-[-100px] right-[-100px] w-96 h-96 bg-indigo-100/40 rounded-full blur-3xl"></div>
+          <div className="absolute top-[200px] left-[-100px] w-72 h-72 bg-emerald-100/40 rounded-full blur-3xl"></div>
+        </div>
+      )}
 
       {/* Sandbox Banner */}
       {isSandbox && (
-        <div className="bg-indigo-600 text-white px-4 py-2 text-center text-sm font-bold sticky top-0 z-50 shadow-md flex justify-between items-center">
-            <span>🧪 Sandbox Mode Active - Changes are NOT saved</span>
-            <button onClick={toggleSandbox} className="bg-white/20 p-1 rounded hover:bg-white/30"><X className="w-4 h-4" /></button>
+        <div className="bg-indigo-600 text-white px-4 py-2 text-center text-sm font-bold sticky top-0 z-50 shadow-md flex justify-between items-center animate-in slide-in-from-top-full">
+            <span className="flex items-center gap-2"><FlaskConical className="w-4 h-4" /> Sandbox Mode Active - Changes are NOT saved</span>
+            <button onClick={toggleSandbox} className="bg-white/20 p-1 rounded hover:bg-white/30 transition"><X className="w-4 h-4" /></button>
         </div>
       )}
 
       {/* Floating Action Button (FAB) */}
-      <button
+      <button 
         id="fab-add-expense"
         onClick={() => {
           triggerHaptic();
           setIsAddingExpense(true);
         }}
-        className={`fixed bottom-6 right-6 text-white px-6 py-4 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition z-40 print:hidden flex items-center gap-2 font-bold ${isSandbox ? 'bg-indigo-600' : 'bg-slate-900'}`}
+        className={`fixed bottom-6 right-6 text-white px-6 py-4 rounded-full shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 z-40 print:hidden flex items-center gap-2 font-bold ${isSandbox ? 'bg-indigo-600' : 'bg-slate-900'}`}
       >
-        <Plus className="w-5 h-5" /> New Expense
+        <Plus className="w-5 h-5" /> <span className="hidden sm:inline">New Expense</span>
       </button>
 
       {/* Toast Notification */}
       {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
 
-      {/* MODALS */}
+      {/* --- MODALS (Keep exactly same functionality) --- */}
       <AddExpenseModal 
         isOpen={isAddingExpense} 
         onClose={() => setIsAddingExpense(false)}
@@ -2484,14 +2496,11 @@ export default function App() {
       {showSettings && (
         <SettingsScreen 
           user={user} 
-          // --- UPDATED PROP ---
-          // We construct a "Fake" settings object if in tutorial mode
           currentSettings={isTutorialMode ? {
             ...userSettings,
             allocationRules: displayAllocations,
             defaultFixedExpenses: displayDefaultExpenses
           } : userSettings}
-          // --------------------
           onClose={() => setShowSettings(false)}
           onSaveSettings={saveSettings}
           onResetMonth={resetCurrentMonth}
@@ -2499,13 +2508,12 @@ export default function App() {
       )}
 
       {showHelp && (
-        <HelpModal
-          onClose={() => setShowHelp(false)}
+        <HelpModal 
+          onClose={() => setShowHelp(false)} 
           onStartTutorial={startTutorial} 
         />
       )}
 
-      {/* ADD NEW TUTORIAL OVERLAY HERE */}
       {activeTutorial && (
         <TutorialOverlay 
           steps={getTutorialSteps(activeTutorial)}
@@ -2514,7 +2522,8 @@ export default function App() {
           onPrev={() => setTutorialStep(s => Math.max(0, s - 1))}
           onClose={() => {
             setActiveTutorial(null);
-            setIsAddingExpense(false); // Cleanup modals if open
+            setIsAddingExpense(false);
+            setMobileMenuOpen(false);
           }}
         />
       )}
@@ -2576,20 +2585,20 @@ export default function App() {
         />
       )}
 
-      {/* MAIN APP HEADER - MENU BUTTON IS HERE, DROPDOWN IS GONE */}
-      <header className={`text-white pt-6 pb-24 px-6 rounded-b-[2.5rem] shadow-xl relative z-0 print:hidden transition-all duration-500 ease-in-out ${isSandbox ? 'bg-indigo-900' : 'bg-slate-900'}`}>
-        <div className="max-w-2xl mx-auto flex justify-between items-center mb-6 relative">
+      {/* --- 2. PREMIUM HEADER --- */}
+      <header className={`pt-8 pb-32 px-6 rounded-b-[3rem] shadow-xl relative z-10 print:hidden transition-all duration-500 ease-in-out ${isSandbox ? 'bg-gradient-to-br from-indigo-900 to-indigo-800' : 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'}`}>
+        <div className="max-w-3xl mx-auto flex justify-between items-center mb-6 relative">
           
           {/* Logo & Title */}
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl shadow-lg ${isSandbox ? 'bg-indigo-500 text-white' : 'bg-emerald-500 text-slate-900'}`}>
+          <div className="flex items-center gap-4">
+            <div className={`p-3 rounded-2xl shadow-inner border border-white/10 ${isSandbox ? 'bg-indigo-500 text-white' : 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white'}`}>
               {isSandbox ? <FlaskConical className="w-6 h-6" /> : <Wallet className="w-6 h-6" />}
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight leading-tight">
+              <h1 className="text-xl font-bold tracking-tight text-white leading-tight">
                 {userSettings.displayName || (user.displayName ? user.displayName.split(' ')[0] : 'Guest')}
               </h1>
-              <p className={`text-xs font-bold tracking-wide uppercase ${isSandbox ? 'text-indigo-300' : 'text-emerald-400'}`}>
+              <p className={`text-xs font-bold tracking-wide uppercase opacity-80 ${isSandbox ? 'text-indigo-200' : 'text-emerald-200'}`}>
                 {isSandbox ? 'Simulation Mode' : 'Wealth Planner'}
               </p>
             </div>
@@ -2597,39 +2606,23 @@ export default function App() {
 
           {/* DESKTOP ACTIONS */}
           <div className="hidden md:flex gap-2">
-            
-            {/* 1. NEEDS ID */}
-             <button 
-               id="btn-sandbox" 
-               onClick={toggleSandbox} 
-               className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} 
-               title="Sandbox Mode"
-             >
-              <FlaskConical className={`w-5 h-5 ${isSandbox ? 'text-white' : 'text-purple-400'}`} />
+             <button id="btn-sandbox" onClick={toggleSandbox} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white" title="Sandbox Mode">
+              <FlaskConical className={`w-5 h-5`} />
             </button>
-            
-            {/* 2. NEEDS ID */}
-            <button 
-              id="btn-analytics" 
-              onClick={() => setShowAnalytics(true)} 
-              className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} 
-              title="Trends"
-            >
-              <BarChart3 className={`w-5 h-5 ${isSandbox ? 'text-indigo-200' : 'text-emerald-400'}`} />
+            <button id="btn-analytics" onClick={() => setShowAnalytics(true)} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white" title="Trends">
+              <BarChart3 className={`w-5 h-5`} />
             </button>
-
-            {/* The rest DO NOT need IDs right now */}
-            <button onClick={() => setShowReportSelector(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} title="Reports">
-              <FileText className={`w-5 h-5 ${isSandbox ? 'text-indigo-200' : 'text-emerald-400'}`} />
+            <button onClick={() => setShowReportSelector(true)} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white" title="Reports">
+              <FileText className={`w-5 h-5`} />
             </button>
-            <button id="btn-settings" onClick={() => setShowSettings(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`}>
-              <Settings className="w-5 h-5 text-slate-300" />
+            <button id="btn-settings" onClick={() => setShowSettings(true)} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white">
+              <Settings className="w-5 h-5" />
             </button>
-            <button onClick={() => setShowHelp(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`}>
-              <HelpCircle className="w-5 h-5 text-slate-300" />
+            <button onClick={() => setShowHelp(true)} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white">
+              <HelpCircle className="w-5 h-5" />
             </button>
-            <button onClick={handleLogout} className={`p-2 rounded-xl hover:bg-red-900/50 hover:text-red-200 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`}>
-              <LogOut className="w-5 h-5 text-slate-300" />
+            <button onClick={handleLogout} className="p-2.5 rounded-xl hover:bg-red-500/20 text-white/70 hover:text-red-200 transition border border-transparent hover:border-red-500/20">
+              <LogOut className="w-5 h-5" />
             </button>
           </div>
 
@@ -2639,7 +2632,7 @@ export default function App() {
               triggerHaptic();
               setMobileMenuOpen(!mobileMenuOpen);
             }}
-            className="md:hidden p-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition active:scale-95"
+            className="md:hidden p-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition active:scale-95 border border-white/5"
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -2648,69 +2641,78 @@ export default function App() {
       </header>
 
       {/* MAIN CONTENT */}
-      <div className="px-4 -mt-12 max-w-2xl mx-auto space-y-5 relative z-10 print:mt-0 print:px-0">
+      <div className="px-4 -mt-24 max-w-3xl mx-auto space-y-6 relative z-10 print:mt-0 print:px-0">
         
-        {/* Month Selector */}
-        <div className="flex items-center justify-between bg-white p-2 rounded-2xl shadow-lg border border-slate-100 max-w-xs mx-auto mb-2 print:hidden">
-          <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-50 rounded-xl transition">
-            <ChevronLeft className="w-5 h-5 text-slate-400" />
+        {/* Month Selector Pill */}
+        <div className="flex items-center justify-between bg-white/90 backdrop-blur-md p-1.5 rounded-full shadow-lg border border-white/50 max-w-[280px] mx-auto mb-4 print:hidden ring-1 ring-slate-100">
+          <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-500">
+            <ChevronLeft className="w-5 h-5" />
           </button>
-          <span className="font-bold text-sm text-slate-800 uppercase tracking-wide">
+          <span className="font-bold text-sm text-slate-800 uppercase tracking-wider px-4">
             {MONTH_NAMES[currentDate.getMonth()]} {currentDate.getFullYear()}
           </span>
-          <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-50 rounded-xl transition">
-            <ChevronRight className="w-5 h-5 text-slate-400" />
+          <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-500">
+            <ChevronRight className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Salary Input */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 print:hidden">
-          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Net Monthly Salary</label>
-          <div className="relative">
-          <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-bold text-slate-300">
-              {userSettings.currency === 'GBP' ? '£' : userSettings.currency === 'USD' ? '$' : '€'}
-            </span>
-            <input 
-              type="text" 
-              value={displaySalary}
-              onChange={(e) => updateSalary(e.target.value)}
-              onBlur={(e) => updateSalary(safeCalculate(e.target.value))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.currentTarget.blur();
-                }
-              }}
-              placeholder="0.00"
-              className="w-full pl-6 text-4xl font-bold text-slate-800 placeholder-slate-200 outline-none bg-transparent py-1"
-            />
+        {/* --- 3. PREMIUM SALARY CARD --- */}
+        <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-8 rounded-[2rem] shadow-2xl text-white relative overflow-hidden group border border-slate-700 print:hidden">
+          {/* Decorative background elements */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-emerald-500/20 transition duration-700"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl -ml-10 -mb-10 group-hover:bg-indigo-500/20 transition duration-700"></div>
+          
+          <div className="relative z-10">
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Net Monthly Salary</label>
+            <div className="flex items-baseline gap-1">
+              <span className="text-3xl font-medium text-slate-400 opacity-50">
+                  {userSettings.currency === 'GBP' ? '£' : userSettings.currency === 'USD' ? '$' : '€'}
+              </span>
+              <input 
+                type="text" 
+                value={displaySalary}
+                onChange={(e) => updateSalary(e.target.value)}
+                onBlur={(e) => updateSalary(safeCalculate(e.target.value))}
+                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                placeholder="0.00"
+                className="w-full bg-transparent border-none text-5xl font-bold text-white placeholder-slate-600 outline-none p-0 tracking-tight"
+              />
+            </div>
+            <p className="text-slate-500 text-xs mt-2 font-medium">Tap to edit income</p>
           </div>
         </div>
 
-        {/* Budget Wheel */}
-        <BudgetWheel 
-          salary={displaySalary} 
-          expenses={displayExpenses} 
-          allocations={displayAllocations} // <--- Ensure this says displayAllocations
-          currency={userSettings.currency}
-        />
+        {/* Budget Wheel & Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+           {/* Wheel Container */}
+           <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100/50 print:hidden relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-4 opacity-10"><PieChart className="w-24 h-24 text-slate-300" /></div>
+             <BudgetWheel 
+              salary={displaySalary} 
+              expenses={displayExpenses} 
+              allocations={displayAllocations}
+              currency={userSettings.currency}
+            />
+           </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-4 print:hidden">
-          <StatCard 
-            label="Total Expenses" 
-            amount={totalExpenses} 
-            icon={TrendingDown} 
-            colorClass="bg-rose-50 text-rose-500"
-            currency={userSettings.currency}
-          />
-          <StatCard 
-            label="Remainder" 
-            amount={remainder} 
-            icon={PieChart} 
-            colorClass="bg-blue-50 text-blue-600"
-            subText="Available for Goals"
-            currency={userSettings.currency}
-          />
+           {/* Stats Container */}
+           <div className="flex flex-col gap-4">
+              <StatCard 
+                label="Total Expenses" 
+                amount={totalExpenses} 
+                icon={TrendingDown} 
+                colorClass="bg-rose-50 text-rose-500"
+                currency={userSettings.currency}
+              />
+              <StatCard 
+                label="Remainder" 
+                amount={remainder} 
+                icon={Target} 
+                colorClass="bg-emerald-50 text-emerald-600"
+                subText="Available for Goals"
+                currency={userSettings.currency}
+              />
+           </div>
         </div>
 
         {/* Allocations */}
@@ -2719,9 +2721,8 @@ export default function App() {
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider px-2">Financial Goals</h3>
             {displayAllocations.map(plan => {
               const target = remainder * (plan.percentage / 100);
-              
               const isFilled = displayActualSavings[plan.id] !== undefined && displayActualSavings[plan.id] !== '';
-              const isLastToFill = !isFilled && (userSettings.allocationRules.length - filledPlansCount === 1);
+              const isLastToFill = !isFilled && (displayAllocations.length - filledPlansCount === 1);
 
               return (
                 <AllocationCard 
@@ -2741,36 +2742,36 @@ export default function App() {
           </div>
         )}
 
-        {/* Expenses */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden print:hidden">
-          <div className="p-5 border-b border-slate-100 flex flex-col gap-3 bg-white">
+        {/* --- 4. REFINED EXPENSES LIST --- */}
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200/60 overflow-hidden print:hidden">
+          <div className="p-6 border-b border-slate-100 flex flex-col gap-4 bg-white/50 backdrop-blur-sm">
             <div className="flex justify-between items-center">
-               <h3 className="font-bold text-slate-800">Monthly Expenses</h3>
+               <h3 className="font-bold text-slate-800 text-lg">Monthly Expenses</h3>
                <div className="flex gap-2">
                  <button 
                    onClick={copyFromPreviousMonth}
-                   className="text-xs bg-slate-100 text-slate-600 px-3 py-2 rounded-xl font-bold hover:bg-slate-200 transition flex items-center gap-2"
+                   className="text-xs bg-slate-100 text-slate-600 px-4 py-2 rounded-xl font-bold hover:bg-slate-200 transition flex items-center gap-2 group"
                  >
-                   <Copy className="w-4 h-4" /> <span className="hidden sm:inline">Copy Last Month</span>
+                   <Copy className="w-4 h-4 text-slate-400 group-hover:text-slate-600" /> <span className="hidden sm:inline">Copy Previous</span>
                  </button>
                </div>
             </div>
             
             {/* Search Bar and Sort */}
-            <div className="relative w-full flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <div className="relative w-full flex gap-3">
+              <div className="relative flex-1 group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-500 transition" />
                 <input 
                   type="text" 
                   placeholder="Search expenses..." 
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 rounded-xl border-none text-sm text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-slate-100"
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-2xl border border-transparent focus:bg-white focus:border-emerald-100 focus:ring-4 focus:ring-emerald-500/10 text-sm font-medium transition outline-none"
                 />
               </div>
               <button 
                 onClick={toggleSort}
-                className={`p-2 rounded-xl transition ${sortMode !== 'date' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                className={`px-4 rounded-2xl transition font-medium flex items-center gap-2 ${sortMode !== 'date' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                 title="Sort Expenses"
               >
                 <ArrowUpDown className="w-4 h-4" />
@@ -2778,18 +2779,16 @@ export default function App() {
             </div>
           </div>
 
-          <div className="divide-y divide-slate-100">
-            {/* Render Groups */}
+          <div className="divide-y divide-slate-50">
             {[
               { title: 'Fixed Bills', items: fixedExpenses },
               { title: 'Variable Spending', items: variableExpenses }
             ].map(group => (
               group.items.length > 0 && (
                 <React.Fragment key={group.title}>
-                  {/* Group Header */}
                   {(searchTerm || (fixedExpenses.length > 0 && variableExpenses.length > 0)) && (
-                    <div className="bg-slate-50/50 px-5 py-2 border-y border-slate-100">
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{group.title}</h4>
+                    <div className="bg-slate-50/80 px-6 py-3 border-y border-slate-100">
+                      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{group.title}</h4>
                     </div>
                   )}
                   
@@ -2798,37 +2797,37 @@ export default function App() {
                     const isEditing = editingExpenseId === expense.id;
                     
                     return (
-                    <div key={expense.id} className="p-4 flex justify-between items-center group hover:bg-slate-50 transition">
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className={`p-2 rounded-full bg-slate-100 text-slate-500 w-10 h-10 flex items-center justify-center`}>
+                    <div key={expense.id} className="p-4 sm:px-6 flex justify-between items-center group hover:bg-slate-50/80 transition-all duration-200">
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className={`p-2.5 rounded-2xl bg-slate-50 text-slate-400 w-12 h-12 flex items-center justify-center border border-slate-100 shadow-sm group-hover:scale-110 transition duration-300`}>
                            {expense.logo ? (
                              <img src={expense.logo} alt={expense.name} className="w-full h-full object-contain mix-blend-multiply" />
                            ) : (
-                             <Icon className="w-4 h-4" />
+                             <Icon className="w-5 h-5" />
                            )}
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           {isEditing ? (
                             <input 
                               autoFocus
                               type="text"
                               defaultValue={expense.name}
-                              className="font-medium text-slate-800 w-full bg-slate-50 border-b border-slate-300 outline-none pb-1"
+                              className="font-medium text-slate-800 w-full bg-white border border-emerald-200 rounded px-2 py-1 outline-none ring-2 ring-emerald-100"
                               onBlur={(e) => updateExpenseName(expense.id, e.target.value)}
                               onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
                             />
                           ) : (
-                            <p className="font-medium text-slate-800">{expense.name}</p>
+                            <p className="font-bold text-slate-700 truncate">{expense.name}</p>
                           )}
-                          <p className="text-xs text-slate-400 capitalize">{expense.type}</p>
+                          <p className="text-xs text-slate-400 capitalize flex items-center gap-1">
+                             <span className={`w-1.5 h-1.5 rounded-full ${expense.type === 'fixed' ? 'bg-indigo-400' : 'bg-emerald-400'}`}></span>
+                             {expense.type}
+                          </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
                       {isEditing ? (
                           <div className="flex items-center gap-1">
-                            <span className="text-slate-400 text-sm">
-                              {userSettings.currency === 'GBP' ? '£' : userSettings.currency === 'USD' ? '$' : '€'}
-                            </span>
                             <input 
                               autoFocus
                               type="text"
@@ -2840,7 +2839,7 @@ export default function App() {
                                    setEditingExpenseId(null);
                                 }
                               }}
-                              className="w-20 p-1 border rounded bg-white text-right font-bold text-slate-800"
+                              className="w-24 p-2 border border-emerald-200 rounded-lg bg-white text-right font-bold text-slate-800 ring-2 ring-emerald-100 outline-none"
                             />
                           </div>
                         ) : (
@@ -2849,34 +2848,24 @@ export default function App() {
                               triggerHaptic();
                               setEditingExpenseId(expense.id);
                             }}
-                            className={`flex items-center gap-2 hover:bg-slate-50 px-2 py-1 rounded-lg transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200' : ''} print:hover:bg-transparent print:p-0 print:ring-0`}
+                            className={`flex items-center gap-2 hover:bg-white px-3 py-1.5 rounded-xl transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200 text-orange-600' : 'text-slate-700'} print:hover:bg-transparent print:p-0 print:ring-0`}
                           >
                             {expense.amount === 0 ? (
-                              <span className="text-orange-600 text-sm font-bold flex items-center gap-1 px-1 print:text-slate-400 print:italic">
-                                Set Amount <Edit2 className="w-3 h-3 print:hidden" />
+                              <span className="text-sm font-bold flex items-center gap-1">
+                                Set Amount <Edit2 className="w-3 h-3" />
                               </span>
                             ) : (
-                              <span className="font-bold text-slate-700 print:text-black">{formatCurrency(expense.amount, userSettings.currency)}</span>
-                            )}
-                            
-                            {expense.amount > 0 && (
-                              <PenLine className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 print:hidden" />
+                              <span className="font-bold text-lg">{formatCurrency(expense.amount, userSettings.currency)}</span>
                             )}
                           </button>
                         )}
                         
                         {isEditing ? (
-                           <button 
-                             onClick={() => setEditingExpenseId(null)}
-                             className="bg-emerald-100 text-emerald-600 p-2 rounded-full hover:bg-emerald-200 transition"
-                           >
+                           <button onClick={() => setEditingExpenseId(null)} className="bg-emerald-500 text-white p-2 rounded-full hover:bg-emerald-600 transition shadow-lg shadow-emerald-200">
                              <Check className="w-4 h-4" />
                            </button>
                         ) : (
-                          <button 
-                            onClick={() => removeExpense(expense.id)}
-                            className="text-slate-300 hover:text-red-500 transition p-2 ml-1 rounded-full hover:bg-red-50 print:hidden"
-                          >
+                          <button onClick={() => removeExpense(expense.id)} className="text-slate-300 hover:text-red-500 transition p-2 rounded-xl hover:bg-red-50 opacity-0 group-hover:opacity-100 print:hidden">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         )}
@@ -2888,45 +2877,42 @@ export default function App() {
             ))}
             
             {expenses.length === 0 && (
-              <div className="p-8 text-center text-slate-400 flex flex-col items-center gap-2">
-                <div className="bg-slate-50 p-4 rounded-full">
-                  <ShoppingCart className="w-6 h-6 text-slate-300" />
+              <div className="py-16 text-center text-slate-400 flex flex-col items-center gap-4">
+                <div className="bg-slate-50 p-6 rounded-full border border-slate-100">
+                  <ShoppingCart className="w-8 h-8 text-slate-300" />
                 </div>
-                <p>No expenses yet.</p>
-                <p className="text-xs text-slate-400">Tap the + button to add one.</p>
+                <div>
+                  <p className="font-medium">No expenses yet</p>
+                  <p className="text-xs text-slate-400 mt-1">Tap the <span className="font-bold text-slate-600">+ New Expense</span> button to start.</p>
+                </div>
               </div>
             )}
              {expenses.length > 0 && filteredExpenses.length === 0 && (
-              <div className="p-8 text-center text-slate-400">
-                <p>No expenses match "{searchTerm}"</p>
+              <div className="p-12 text-center text-slate-400">
+                <Search className="w-8 h-8 mx-auto mb-2 text-slate-200" />
+                <p>No matches for "{searchTerm}"</p>
               </div>
             )}
           </div>
-          <div className="p-4 bg-slate-50 text-right">
-             <span className="text-sm text-slate-500 mr-2">Total Outgoings:</span>
-             <span className="font-bold text-slate-800">{formatCurrency(totalExpenses, userSettings.currency)}</span>
+          <div className="p-6 bg-slate-50/50 text-right border-t border-slate-100">
+             <span className="text-sm font-medium text-slate-500 mr-3">Total Outgoings:</span>
+             <span className="text-xl font-bold text-slate-800 tracking-tight">{formatCurrency(totalExpenses, userSettings.currency)}</span>
           </div>
         </div>
-
-        {/* --- NEW CODE: CREATOR FOOTER --- */}
-        <div className="text-center py-10 text-slate-400 text-xs font-medium print:hidden">
+        
+        {/* Creator Footer */}
+        <div className="text-center py-12 text-slate-400 text-xs font-medium print:hidden">
           <p>Designed & Built by <span className="text-slate-600 font-bold">Yaseen Hussain</span></p>
           <p className="opacity-50 mt-1">© {new Date().getFullYear()} Budget Planner • All Rights Reserved</p>
         </div>
 
       </div>
 
-      {/* --- NEW LOCATION: MOBILE MENU OVERLAY (OUTSIDE HEADER) --- */}
-      {/* This ensures it sits on top of absolutely everything in the app */}
+      {/* --- MOBILE MENU OVERLAY --- */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-[100] md:hidden">
-            {/* Backdrop */}
-            <div 
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in"
-              onClick={() => setMobileMenuOpen(false)}
-            />
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in" onClick={() => setMobileMenuOpen(false)} />
             
-            {/* Menu Grid */}
             <div className="absolute top-20 right-6 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 grid grid-cols-2 gap-2 animate-in slide-in-from-top-4 fade-in">
                 {[
                   { id: 'btn-sandbox-mobile', label: 'Sandbox', icon: FlaskConical, action: toggleSandbox, color: 'text-purple-600', bg: 'bg-purple-50' },
@@ -2938,7 +2924,7 @@ export default function App() {
                 ].map((item, i) => (
                   <button 
                     key={i}
-                    id={item.id} // <--- IMPORTANT: Adding ID here
+                    id={item.id}
                     onClick={() => {
                       setMobileMenuOpen(false);
                       item.action();
@@ -2952,7 +2938,6 @@ export default function App() {
             </div>
         </div>
       )}
-      {/* ---------------------------------------------------------- */}
     </div>
   );
 }
