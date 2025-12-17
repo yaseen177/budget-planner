@@ -1,5 +1,5 @@
 //REVERT BACK TO THIS IF ANY ERROR
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
@@ -1679,72 +1679,64 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
   const step = steps[currentStep];
   const isMobile = window.innerWidth < 768;
 
-  // Function to calculate position and handle scrolling
+  // 1. Calculate Position (Stable function)
   const updatePosition = useCallback(() => {
     const element = document.querySelector(step.target);
     if (element) {
       const rect = element.getBoundingClientRect();
-      
-      // Update the highlighter box
       setTargetRect({
-        top: rect.top + window.scrollY, // Absolute position relative to document
+        top: rect.top + window.scrollY,
         left: rect.left + window.scrollX,
         width: rect.width,
         height: rect.height,
-        // Store viewport relative top for collision logic
-        viewportTop: rect.top, 
+        viewportTop: rect.top,
         viewportBottom: rect.bottom
       });
     } else {
+      // Element not found (e.g. menu closed or page scrolled away)
       setTargetRect(null);
     }
   }, [step.target]);
 
-  // Handle Scrolling to the target on Step Change
+  // 2. Effect to handle Scrolling and Resizing
   useEffect(() => {
     const element = document.querySelector(step.target);
+    
+    // Initial Scroll to element
     if (element) {
-      // 1. Force the scroll
-      element.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center',
-        inline: 'center'
-      });
-
-      // 2. Mobile Specific: Add extra padding at bottom if we are at the end
-      // This ensures the Fixed Card doesn't cover the highlighted element
+      element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      
+      // Mobile tweak: if element is at the very bottom, scroll a bit more so card fits
       if (isMobile) {
         setTimeout(() => {
            const rect = element.getBoundingClientRect();
-           const bottomSpace = window.innerHeight - rect.bottom;
-           // If element is covered by the bottom card (approx 200px)
-           if (bottomSpace < 200) {
-             window.scrollBy({ top: 200, behavior: 'smooth' });
+           if (window.innerHeight - rect.bottom < 250) {
+             window.scrollBy({ top: 250, behavior: 'smooth' });
            }
-        }, 500);
+        }, 400);
       }
     }
-    
-    // Initial calculate
-    updatePosition();
-    
-    // Listeners
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition); // No 'true' capture needed
 
+    // Run calculation
+    updatePosition();
+
+    // Add Listeners
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition);
+
+    // Cleanup
     return () => {
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition);
     };
-  }, [currentStep, step.target, isMobile, updatePosition]);
+  }, [step.target, currentStep, isMobile, updatePosition]);
 
-  // --- COLLISION LOGIC FOR DESKTOP ---
-  const CARD_HEIGHT = 280; // Approximate max height of card
+  // 3. Collision Logic (Desktop only)
+  const CARD_HEIGHT = 280;
   let showAbove = false;
-  
   if (targetRect && !isMobile) {
     const spaceBelow = window.innerHeight - targetRect.viewportBottom;
-    // If less than 280px space below, and plenty of space above, FLIP IT.
+    // Flip if tight on space below but plenty above
     if (spaceBelow < CARD_HEIGHT && targetRect.viewportTop > CARD_HEIGHT) {
       showAbove = true;
     }
@@ -1753,13 +1745,13 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
   return (
     <div className="absolute top-0 left-0 w-full h-full z-[200] pointer-events-none">
       
-      {/* 1. Backdrop (Document Height) */}
+      {/* Backdrop */}
       <div 
         className="fixed inset-0 bg-black/60 mix-blend-hard-light transition-opacity duration-500 pointer-events-auto"
-        onClick={onClose} // Allow clicking background to close if stuck
+        onClick={onClose}
       />
 
-      {/* 2. Spotlight (Absolute to Document) */}
+      {/* Spotlight */}
       {targetRect && (
         <div 
           className="absolute transition-all duration-200 ease-out border-2 border-white/50 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]"
@@ -1772,12 +1764,11 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
         />
       )}
 
-      {/* 3. Instruction Card */}
+      {/* Instruction Card */}
       <div 
         className={`fixed transition-all duration-300 ease-out px-4 md:px-0 pointer-events-auto
           ${isMobile ? 'bottom-6 left-0 right-0 mx-auto w-full max-w-sm' : 'w-80'}`}
         style={!isMobile && targetRect ? {
-           // Desktop: Use Fixed positioning based on viewport coordinates
            position: 'fixed',
            top: showAbove 
               ? targetRect.viewportTop - 20 
@@ -1803,17 +1794,9 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
             <span className="text-xs font-bold text-slate-300">Step {currentStep + 1} / {steps.length}</span>
             <div className="flex gap-2">
               {currentStep > 0 && (
-                <button 
-                    onClick={onPrev} 
-                    className="px-3 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition"
-                >
-                    Back
-                </button>
+                <button onClick={onPrev} className="px-3 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition">Back</button>
               )}
-              <button 
-                onClick={onNext} 
-                className="px-5 py-2 text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 rounded-lg shadow-lg active:scale-95 transition"
-              >
+              <button onClick={onNext} className="px-5 py-2 text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 rounded-lg shadow-lg active:scale-95 transition">
                 {currentStep === steps.length - 1 ? 'Finish' : 'Next'}
               </button>
             </div>
