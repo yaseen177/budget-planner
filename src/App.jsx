@@ -1693,7 +1693,6 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
         viewportBottom: rect.bottom
       });
     } else {
-      // Element not found (e.g. menu closed or page scrolled away)
       setTargetRect(null);
     }
   }, [step.target]);
@@ -1706,7 +1705,7 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
       
-      // Mobile tweak: if element is at the very bottom, scroll a bit more so card fits
+      // Mobile tweak: ensure space at bottom
       if (isMobile) {
         setTimeout(() => {
            const rect = element.getBoundingClientRect();
@@ -1722,12 +1721,14 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
 
     // Add Listeners
     window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition);
+    
+    // IMPORTANT FIX: Added 'true' to capture scroll events inside Modals/Divs
+    window.addEventListener('scroll', updatePosition, true);
 
     // Cleanup
     return () => {
       window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
     };
   }, [step.target, currentStep, isMobile, updatePosition]);
 
@@ -1754,7 +1755,7 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
       {/* Spotlight */}
       {targetRect && (
         <div 
-          className="absolute transition-all duration-200 ease-out border-2 border-white/50 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]"
+          className="absolute transition-all duration-75 ease-out border-2 border-white/50 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]"
           style={{
             top: targetRect.top - 5,
             left: targetRect.left - 5,
