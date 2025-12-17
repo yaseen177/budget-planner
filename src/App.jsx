@@ -62,7 +62,8 @@ import {
   FlaskConical,
   TrendingUp,
   Maximize2,
-  HelpCircle
+  HelpCircle,
+  Menu
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION AREA ---
@@ -1692,6 +1693,7 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [showReportSelector, setShowReportSelector] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeReport, setActiveReport] = useState(null); // 'month' or 'history'
   const [reportData, setReportData] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
@@ -2208,21 +2210,26 @@ export default function App() {
       )}
 
       {/* MAIN APP HEADER */}
-      <header className={`text-white pt-6 pb-20 px-6 rounded-b-[2rem] shadow-xl relative z-0 print:hidden transition-colors duration-500 ${isSandbox ? 'bg-indigo-900' : 'bg-slate-900'}`}>
-        <div className="max-w-2xl mx-auto flex justify-between items-center mb-4">
+      <header className={`text-white pt-6 pb-24 px-6 rounded-b-[2.5rem] shadow-xl relative z-0 print:hidden transition-all duration-500 ease-in-out ${isSandbox ? 'bg-indigo-900' : 'bg-slate-900'}`}>
+        <div className="max-w-2xl mx-auto flex justify-between items-center mb-6 relative">
+          
+          {/* Logo & Title */}
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl text-slate-900 ${isSandbox ? 'bg-indigo-400' : 'bg-emerald-500'}`}>
-              {isSandbox ? <FlaskConical className="w-5 h-5 text-white" /> : <Wallet className="w-5 h-5" />}
+            <div className={`p-2.5 rounded-xl shadow-lg ${isSandbox ? 'bg-indigo-500 text-white' : 'bg-emerald-500 text-slate-900'}`}>
+              {isSandbox ? <FlaskConical className="w-6 h-6" /> : <Wallet className="w-6 h-6" />}
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">
+              <h1 className="text-xl font-bold tracking-tight leading-tight">
                 {userSettings.displayName || (user.displayName ? user.displayName.split(' ')[0] : 'Guest')}
-                's Budget
               </h1>
-              <p className="text-slate-400 text-xs font-medium">{isSandbox ? 'Simulation Mode' : 'Wealth Planner'}</p>
+              <p className={`text-xs font-bold tracking-wide uppercase ${isSandbox ? 'text-indigo-300' : 'text-emerald-400'}`}>
+                {isSandbox ? 'Simulation Mode' : 'Wealth Planner'}
+              </p>
             </div>
           </div>
-          <div className="flex gap-2">
+
+          {/* DESKTOP ACTIONS (Hidden on Mobile) */}
+          <div className="hidden md:flex gap-2">
              <button onClick={toggleSandbox} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} title="Sandbox Mode">
               <FlaskConical className={`w-5 h-5 ${isSandbox ? 'text-white' : 'text-purple-400'}`} />
             </button>
@@ -2242,6 +2249,43 @@ export default function App() {
               <LogOut className="w-5 h-5 text-slate-300" />
             </button>
           </div>
+
+          {/* MOBILE MENU TRIGGER (Visible only on Mobile) */}
+          <button 
+            onClick={() => {
+              triggerHaptic();
+              setMobileMenuOpen(!mobileMenuOpen);
+            }}
+            className="md:hidden p-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition active:scale-95"
+          >
+            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+
+          {/* MOBILE MENU DROPDOWN */}
+          {mobileMenuOpen && (
+            <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 grid grid-cols-2 gap-2 animate-in slide-in-from-top-4 fade-in z-50 md:hidden">
+               {[
+                 { label: 'Sandbox', icon: FlaskConical, action: toggleSandbox, color: 'text-purple-600', bg: 'bg-purple-50' },
+                 { label: 'Analytics', icon: BarChart3, action: () => setShowAnalytics(true), color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                 { label: 'Reports', icon: FileText, action: () => setShowReportSelector(true), color: 'text-blue-600', bg: 'bg-blue-50' },
+                 { label: 'Settings', icon: Settings, action: () => setShowSettings(true), color: 'text-slate-600', bg: 'bg-slate-100' },
+                 { label: 'Help', icon: HelpCircle, action: () => setShowHelp(true), color: 'text-amber-600', bg: 'bg-amber-50' },
+                 { label: 'Logout', icon: LogOut, action: handleLogout, color: 'text-red-600', bg: 'bg-red-50' },
+               ].map((item, i) => (
+                 <button 
+                   key={i} 
+                   onClick={() => {
+                     setMobileMenuOpen(false);
+                     item.action();
+                   }}
+                   className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl hover:scale-95 transition ${item.bg}`}
+                 >
+                   <item.icon className={`w-6 h-6 ${item.color}`} />
+                   <span className={`text-xs font-bold ${item.color}`}>{item.label}</span>
+                 </button>
+               ))}
+            </div>
+          )}
         </div>
       </header>
 
