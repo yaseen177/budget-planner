@@ -1917,6 +1917,65 @@ const TUTORIAL_EXPENSES = [
   { id: 'e3', name: 'Groceries', amount: 250, type: 'variable', logo: null }
 ];
 
+
+// --- SKELETON LOADING COMPONENTS ---
+const Skeleton = ({ className }) => (
+  <div className={`animate-pulse bg-slate-200/80 rounded-2xl ${className}`} />
+);
+
+const DashboardSkeleton = () => (
+  <div className="min-h-screen bg-slate-50 p-6 pt-12 max-w-5xl mx-auto space-y-6">
+    {/* Header Skeleton */}
+    <div className="flex justify-between items-center mb-8">
+      <div className="flex items-center gap-4">
+        <Skeleton className="w-12 h-12 rounded-2xl" />
+        <div className="space-y-2">
+          <Skeleton className="w-32 h-6" />
+          <Skeleton className="w-20 h-4" />
+        </div>
+      </div>
+      <Skeleton className="w-10 h-10 rounded-xl" />
+    </div>
+
+    {/* Bento Grid Skeleton */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Big Square (Wheel) */}
+      <div className="md:col-span-2 h-[350px] bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100/50">
+        <Skeleton className="w-48 h-8 mb-6" />
+        <div className="flex justify-center items-center h-full pb-10">
+           <Skeleton className="w-48 h-48 rounded-full" />
+        </div>
+      </div>
+
+      {/* Side Stack (Stats) */}
+      <div className="flex flex-col gap-6">
+        <Skeleton className="h-40 w-full rounded-[2rem] bg-white shadow-sm" />
+        <Skeleton className="h-40 w-full rounded-[2rem] bg-white shadow-sm" />
+      </div>
+    </div>
+
+    {/* Expense List Skeleton */}
+    <div className="h-96 bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100/50 space-y-4">
+       <div className="flex justify-between items-center mb-6">
+         <Skeleton className="w-32 h-8" />
+         <Skeleton className="w-24 h-10 rounded-xl" />
+       </div>
+       {[1, 2, 3, 4].map(i => (
+         <div key={i} className="flex justify-between items-center py-2">
+           <div className="flex gap-4 items-center">
+             <Skeleton className="w-12 h-12 rounded-2xl" />
+             <div className="space-y-2">
+               <Skeleton className="w-24 h-5" />
+               <Skeleton className="w-16 h-3" />
+             </div>
+           </div>
+           <Skeleton className="w-16 h-8 rounded-lg" />
+         </div>
+       ))}
+    </div>
+  </div>
+);
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1932,6 +1991,20 @@ export default function App() {
   const [tutorialStep, setTutorialStep] = useState(0);
 
   const isMobile = window.innerWidth < 768;
+
+  // --- DAYS LEFT CALCULATION ---
+  const getDaysLeft = () => {
+    const now = new Date();
+    // Only calculate "remaining" if we are looking at the current month
+    if (currentDate.getMonth() === now.getMonth() && currentDate.getFullYear() === now.getFullYear()) {
+       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+       const diffTime = Math.abs(lastDay - now);
+       return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+    }
+    // Otherwise show total days in that month
+    return new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+  };
+  const daysLeftLabel = (currentDate.getMonth() === new Date().getMonth()) ? 'Days Left' : 'Total Days';
 
   const getTutorialSteps = (id) => {
     switch(id) {
@@ -2461,7 +2534,7 @@ export default function App() {
   const fixedExpenses = filteredExpenses.filter(e => e.type === 'fixed');
   const variableExpenses = filteredExpenses.filter(e => e.type === 'variable');
 
-  if (loading) return <div className="h-screen flex items-center justify-center text-emerald-600">Loading Planner...</div>;
+  if (loading) return <DashboardSkeleton />;
   if (!user) return <LoginScreen onLogin={handleLogin} />;
 
   return (
@@ -2673,11 +2746,11 @@ export default function App() {
         </div>
       </header>
 
-      {/* MAIN CONTENT */}
-      <div className="px-4 -mt-24 max-w-3xl mx-auto space-y-6 relative z-10 print:mt-0 print:px-0">
+      {/* MAIN CONTENT (BENTO GRID) */}
+      <div className="px-4 -mt-24 max-w-5xl mx-auto pb-12 relative z-10 print:mt-0 print:px-0">
         
         {/* Month Selector Pill */}
-        <div className="flex items-center justify-between bg-white/90 backdrop-blur-md p-1.5 rounded-full shadow-lg border border-white/50 max-w-[280px] mx-auto mb-4 print:hidden ring-1 ring-slate-100">
+        <div className="flex items-center justify-between bg-white/90 backdrop-blur-md p-1.5 rounded-full shadow-lg border border-white/50 max-w-[280px] mx-auto mb-8 print:hidden ring-1 ring-slate-100/50">
           <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-500">
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -2689,132 +2762,154 @@ export default function App() {
           </button>
         </div>
 
-        {/* --- 3. PREMIUM SALARY CARD --- */}
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-8 rounded-[2rem] shadow-2xl text-white relative overflow-hidden group border border-slate-700 print:hidden">
-          {/* Decorative background elements */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-emerald-500/20 transition duration-700"></div>
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl -ml-10 -mb-10 group-hover:bg-indigo-500/20 transition duration-700"></div>
+        {/* --- BENTO GRID LAYOUT --- */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
           
-          <div className="relative z-10">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Net Monthly Salary</label>
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-medium text-slate-400 opacity-50">
-                  {userSettings.currency === 'GBP' ? '£' : userSettings.currency === 'USD' ? '$' : '€'}
-              </span>
-              <input 
-                type="text" 
-                value={displaySalary}
-                onChange={(e) => updateSalary(e.target.value)}
-                onBlur={(e) => updateSalary(safeCalculate(e.target.value))}
-                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                placeholder="0.00"
-                className="w-full bg-transparent border-none text-5xl font-bold text-white placeholder-slate-600 outline-none p-0 tracking-tight"
-              />
-            </div>
-            <p className="text-slate-500 text-xs mt-2 font-medium">Tap to edit income</p>
+          {/* TILE 1: THE COCKPIT (Salary + Wheel) - Spans 2 Columns */}
+          <div className="md:col-span-2 bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60 relative overflow-hidden group">
+             {/* Subtle background mesh for the "Cockpit" feel */}
+             <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 rounded-full -mr-16 -mt-16 group-hover:bg-emerald-50/50 transition duration-700"></div>
+             
+             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between h-full gap-8">
+               {/* Left: Salary Input */}
+               <div className="w-full md:w-1/2 space-y-2">
+                 <div className="flex items-center gap-2 mb-4">
+                   <div className="bg-slate-900 text-white p-2 rounded-xl"><Wallet className="w-4 h-4" /></div>
+                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Monthly Income</span>
+                 </div>
+                 
+                 <div className="relative">
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 text-3xl font-medium text-slate-300">
+                        {userSettings.currency === 'GBP' ? '£' : userSettings.currency === 'USD' ? '$' : '€'}
+                    </span>
+                    <input 
+                      type="text" 
+                      value={displaySalary}
+                      onChange={(e) => updateSalary(e.target.value)}
+                      onBlur={(e) => updateSalary(safeCalculate(e.target.value))}
+                      placeholder="0.00"
+                      className="w-full bg-transparent border-none text-5xl font-bold text-slate-800 placeholder-slate-200 outline-none pl-8 tracking-tight"
+                    />
+                 </div>
+                 <p className="text-sm text-slate-400 font-medium pl-1">
+                   Tap to edit your budget limit
+                 </p>
+               </div>
+
+               {/* Right: The Wheel */}
+               <div className="w-full md:w-1/2 flex justify-center scale-110">
+                 {parseFloat(displaySalary) > 0 ? (
+                    <BudgetWheel 
+                      salary={displaySalary} 
+                      expenses={displayExpenses} 
+                      allocations={displayAllocations}
+                      currency={userSettings.currency}
+                    />
+                 ) : (
+                   <div className="h-48 flex items-center justify-center text-slate-300 font-bold border-2 border-dashed border-slate-100 rounded-full w-48 aspect-square">
+                     No Budget Set
+                   </div>
+                 )}
+               </div>
+             </div>
+          </div>
+
+          {/* TILE 2 & 3: STATS STACK - Spans 1 Column */}
+          <div className="flex flex-col gap-5">
+             {/* Stat 1: Total Spent */}
+             <div className="flex-1 bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200/60 flex flex-col justify-center relative overflow-hidden group">
+                <div className="absolute bottom-0 right-0 w-32 h-32 bg-rose-50 rounded-full -mr-8 -mb-8 group-hover:scale-110 transition duration-500"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-2 bg-rose-100 text-rose-600 rounded-lg"><TrendingDown className="w-4 h-4" /></div>
+                    <span className="text-xs font-bold text-slate-400 uppercase">Total Spent</span>
+                  </div>
+                  <span className="text-3xl font-bold text-slate-800 tracking-tight">
+                    {formatCurrency(totalExpenses, userSettings.currency)}
+                  </span>
+                </div>
+             </div>
+
+             {/* Stat 2: Days Left (Dynamic) */}
+             <div className="flex-1 bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200/60 flex flex-col justify-center relative overflow-hidden group">
+                <div className="absolute bottom-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-8 -mb-8 group-hover:scale-110 transition duration-500"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><Calendar className="w-4 h-4" /></div>
+                    <span className="text-xs font-bold text-slate-400 uppercase">{daysLeftLabel}</span>
+                  </div>
+                  <span className="text-3xl font-bold text-slate-800 tracking-tight">
+                    {getDaysLeft()}
+                  </span>
+                  <span className="text-xs text-slate-400 ml-2 font-medium">
+                     {currentDate.getMonth() === new Date().getMonth() ? 'in this month' : 'days total'}
+                  </span>
+                </div>
+             </div>
           </div>
         </div>
 
-        {/* Budget Wheel & Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-           {/* Wheel Container - FIX: DYNAMICALLY HIDE IF NO SALARY */}
-           {parseFloat(displaySalary) > 0 && (
-             <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100/50 print:hidden relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-4 opacity-10"><PieChart className="w-24 h-24 text-slate-300" /></div>
-               <BudgetWheel 
-                salary={displaySalary} 
-                expenses={displayExpenses} 
-                allocations={displayAllocations}
-                currency={userSettings.currency}
-              />
-             </div>
-           )}
-           
-           {/* Stats Container (This expands if wheel is hidden) */}
-           <div className={`flex flex-col gap-4 ${parseFloat(displaySalary) <= 0 ? 'col-span-1 md:col-span-2' : ''}`}>
-              <StatCard 
-                label="Total Expenses" 
-                amount={totalExpenses} 
-                icon={TrendingDown} 
-                colorClass="bg-rose-50 text-rose-500"
-                currency={userSettings.currency}
-              />
-              <StatCard 
-                label="Remainder" 
-                amount={remainder} 
-                icon={Target} 
-                colorClass="bg-emerald-50 text-emerald-600"
-                subText="Available for Goals"
-                currency={userSettings.currency}
-              />
-           </div>
-        </div>
-
-        {/* Allocations */}
+        {/* TILE 3: ALLOCATIONS STRIP (If visible) */}
         {salaryNum > 0 && (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 print:hidden">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider px-2">Financial Goals</h3>
-            {displayAllocations.map(plan => {
-              const target = remainder * (plan.percentage / 100);
-              const isFilled = displayActualSavings[plan.id] !== undefined && displayActualSavings[plan.id] !== '';
-              const isLastToFill = !isFilled && (displayAllocations.length - filledPlansCount === 1);
-
-              return (
-                <AllocationCard 
-                  key={plan.id}
-                  title={plan.name} 
-                  targetAmount={target}
-                  actualAmount={displayActualSavings[plan.id]}
-                  percentage={plan.percentage} 
-                  color={plan.color || 'bg-slate-100 text-slate-700'}
-                  currency={userSettings.currency}
-                  onUpdateActual={(val) => updateActualSavings(plan.id, val)}
-                  showRemainderButton={isLastToFill}
-                  onFillRemainder={() => fillRemainder(plan.id)}
-                />
-              );
-            })}
+          <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-200/60 mb-6">
+             <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-amber-100 text-amber-600 rounded-xl"><Target className="w-4 h-4" /></div>
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Your Pots</h3>
+                <span className="ml-auto text-xs font-bold bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full">
+                  {formatCurrency(remainder, userSettings.currency)} Available
+                </span>
+             </div>
+             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {displayAllocations.map(plan => {
+                  const target = remainder * (plan.percentage / 100);
+                  const isLastToFill = (displayAllocations.length - filledPlansCount === 1);
+                  return (
+                    <AllocationCard 
+                      key={plan.id}
+                      title={plan.name} 
+                      targetAmount={target}
+                      actualAmount={displayActualSavings[plan.id]}
+                      percentage={plan.percentage} 
+                      color={plan.color || 'bg-slate-100 text-slate-700'}
+                      currency={userSettings.currency}
+                      onUpdateActual={(val) => updateActualSavings(plan.id, val)}
+                      showRemainderButton={isLastToFill}
+                      onFillRemainder={() => fillRemainder(plan.id)}
+                    />
+                  );
+                })}
+             </div>
           </div>
         )}
 
-        {/* --- 4. REFINED EXPENSES LIST --- */}
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200/60 overflow-hidden print:hidden">
-          <div className="p-6 border-b border-slate-100 flex flex-col gap-4 bg-white/50 backdrop-blur-sm">
-            <div className="flex justify-between items-center">
-               <h3 className="font-bold text-slate-800 text-lg">Monthly Expenses</h3>
-               <div className="flex gap-2">
-                 <button 
-                   onClick={copyFromPreviousMonth}
-                   className="text-xs bg-slate-100 text-slate-600 px-4 py-2 rounded-xl font-bold hover:bg-slate-200 transition flex items-center gap-2 group"
-                 >
-                   <Copy className="w-4 h-4 text-slate-400 group-hover:text-slate-600" /> <span className="hidden sm:inline">Copy Previous</span>
-                 </button>
-               </div>
-            </div>
-            
-            {/* Search Bar and Sort */}
-            <div className="relative w-full flex gap-3">
-              <div className="relative flex-1 group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-500 transition" />
-                <input 
-                  type="text" 
-                  placeholder="Search expenses..." 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-2xl border border-transparent focus:bg-white focus:border-emerald-100 focus:ring-4 focus:ring-emerald-500/10 text-sm font-medium transition outline-none"
-                />
-              </div>
-              <button 
-                onClick={toggleSort}
-                className={`px-4 rounded-2xl transition font-medium flex items-center gap-2 ${sortMode !== 'date' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                title="Sort Expenses"
-              >
-                <ArrowUpDown className="w-4 h-4" />
-              </button>
-            </div>
+        {/* TILE 4: EXPENSES LIST (The Wide Rectangle) */}
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200/60 overflow-hidden min-h-[400px]">
+          {/* Header */}
+          <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-white/50 backdrop-blur-sm sticky top-0 z-20">
+             <div className="flex items-center gap-3 w-full md:w-auto">
+               <div className="bg-slate-900 text-white p-2.5 rounded-xl shadow-lg shadow-slate-200"><TrendingUp className="w-5 h-5" /></div>
+               <h3 className="font-bold text-slate-800 text-lg">Expenses</h3>
+             </div>
+             
+             {/* Search & Actions */}
+             <div className="flex gap-2 w-full md:w-auto">
+                <div className="relative flex-1 md:w-64 group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-500 transition" />
+                  <input 
+                    type="text" 
+                    placeholder="Find a bill..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-2xl border border-transparent focus:bg-white focus:border-emerald-100 focus:ring-4 focus:ring-emerald-500/10 text-sm font-medium transition outline-none"
+                  />
+                </div>
+                <button onClick={toggleSort} className="bg-slate-50 hover:bg-slate-100 text-slate-600 p-3 rounded-2xl transition border border-transparent hover:border-slate-200"><ArrowUpDown className="w-5 h-5" /></button>
+                <button onClick={copyFromPreviousMonth} className="bg-slate-50 hover:bg-slate-100 text-slate-600 p-3 rounded-2xl transition border border-transparent hover:border-slate-200" title="Copy Previous"><Copy className="w-5 h-5" /></button>
+             </div>
           </div>
 
           <div className="divide-y divide-slate-50">
+             {/* ... (Keep existing Expense List mapping logic exactly as before) ... */}
             {[
               { title: 'Fixed Bills', items: fixedExpenses },
               { title: 'Variable Spending', items: variableExpenses }
@@ -2833,6 +2928,7 @@ export default function App() {
                     
                     return (
                     <div key={expense.id} className="p-4 sm:px-6 flex justify-between items-center group hover:bg-slate-50/80 transition-all duration-200">
+                      {/* ... (Keep existing expense item render logic) ... */}
                       <div className="flex items-center gap-4 flex-1">
                         <div className={`p-2.5 rounded-2xl bg-slate-50 text-slate-400 w-12 h-12 flex items-center justify-center border border-slate-100 shadow-sm group-hover:scale-110 transition duration-300`}>
                            {expense.logo ? (
@@ -2910,26 +3006,21 @@ export default function App() {
                 </React.Fragment>
               )
             ))}
-            
-            {expenses.length === 0 && (
-              <div className="py-16 text-center text-slate-400 flex flex-col items-center gap-4">
+             {expenses.length === 0 && (
+              <div className="py-24 text-center text-slate-400 flex flex-col items-center gap-4">
                 <div className="bg-slate-50 p-6 rounded-full border border-slate-100">
-                  <ShoppingCart className="w-8 h-8 text-slate-300" />
+                  <ShoppingCart className="w-10 h-10 text-slate-300" />
                 </div>
                 <div>
-                  <p className="font-medium">No expenses yet</p>
-                  <p className="text-xs text-slate-400 mt-1">Tap the <span className="font-bold text-slate-600">+ New Expense</span> button to start.</p>
+                  <p className="font-bold text-slate-600 text-lg">No expenses yet</p>
+                  <p className="text-sm text-slate-400 mt-1 max-w-xs mx-auto">Tap the <span className="font-bold text-slate-600">+ New Expense</span> button to start building your month.</p>
                 </div>
-              </div>
-            )}
-             {expenses.length > 0 && filteredExpenses.length === 0 && (
-              <div className="p-12 text-center text-slate-400">
-                <Search className="w-8 h-8 mx-auto mb-2 text-slate-200" />
-                <p>No matches for "{searchTerm}"</p>
               </div>
             )}
           </div>
-          <div className="p-6 bg-slate-50/50 text-right border-t border-slate-100">
+          
+           {/* Footer Summary */}
+           <div className="p-6 bg-slate-50/50 text-right border-t border-slate-100">
              <span className="text-sm font-medium text-slate-500 mr-3">Total Outgoings:</span>
              <span className="text-xl font-bold text-slate-800 tracking-tight">{formatCurrency(totalExpenses, userSettings.currency)}</span>
           </div>
