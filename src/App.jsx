@@ -778,7 +778,7 @@ const BudgetWheel = ({ salary, expenses, allocations, currency }) => {
 const LoginScreen = ({ onLogin }) => {
   // Typewriter Effect State
   const [textIndex, setTextIndex] = useState(0);
-  const phrases = ["Expenses", "Savings", "Future", "Freedom"];
+  const phrases = ["Expenses", "Savings", "Freedom", "Future"];
   
   useEffect(() => {
     const interval = setInterval(() => {
@@ -788,9 +788,9 @@ const LoginScreen = ({ onLogin }) => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
       
-      {/* 1. ANIMATED BACKGROUND ORBS */}
+      {/* 1. ANIMATED BACKGROUND ORBS (Slightly darker for better contrast) */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
         <style>{`
           @keyframes float {
@@ -799,60 +799,80 @@ const LoginScreen = ({ onLogin }) => {
             66% { transform: translate(-20px, 20px) scale(0.9); }
             100% { transform: translate(0px, 0px) scale(1); }
           }
-          .animate-float-slow { animation: float 7s infinite ease-in-out; }
-          .animate-float-medium { animation: float 5s infinite ease-in-out reverse; }
-          .animate-float-fast { animation: float 4s infinite ease-in-out; }
+          .animate-float-slow { animation: float 10s infinite ease-in-out; }
+          .animate-float-medium { animation: float 8s infinite ease-in-out reverse; }
+          .animate-float-fast { animation: float 6s infinite ease-in-out; }
         `}</style>
         
-        {/* Orb 1: Emerald */}
-        <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-emerald-500/30 rounded-full blur-3xl animate-float-slow mix-blend-screen"></div>
-        {/* Orb 2: Indigo */}
-        <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-indigo-500/30 rounded-full blur-3xl animate-float-medium mix-blend-screen"></div>
-        {/* Orb 3: Purple (Center) */}
-        <div className="absolute top-[40%] left-[30%] w-72 h-72 bg-purple-500/20 rounded-full blur-3xl animate-float-fast mix-blend-screen"></div>
+        <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-emerald-500/20 rounded-full blur-[100px] animate-float-slow"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px] animate-float-medium"></div>
+        <div className="absolute top-[30%] left-[30%] w-64 h-64 bg-cyan-500/10 rounded-full blur-[80px] animate-float-fast"></div>
       </div>
 
-      {/* 2. GLASSMORPHISM CARD */}
-      <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-8 rounded-3xl shadow-2xl w-full max-w-md text-center relative z-10 animate-in fade-in zoom-in-95 duration-700">
+      {/* 2. THE CARD (With Glowing Gradient Border) */}
+      <div className="relative group z-10 w-full max-w-md animate-in fade-in zoom-in-95 duration-700">
         
-        <div className="bg-emerald-500/20 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 rotate-3 shadow-inner border border-white/10">
-          <Wallet className="w-10 h-10 text-emerald-300" />
-        </div>
+        {/* The Glow Effect behind the card */}
+        <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-indigo-500 rounded-[2rem] blur opacity-30 group-hover:opacity-60 transition duration-1000"></div>
         
-        <h1 className="text-4xl font-bold text-white mb-2 tracking-tight drop-shadow-sm">Budget Planner</h1>
-        
-        {/* 3. DYNAMIC TYPEWRITER TEXT */}
-        <div className="h-8 mb-8 flex items-center justify-center gap-2 text-slate-300">
-          <span>Track your</span>
-          <span 
-            key={textIndex} 
-            className="font-bold text-emerald-300 animate-in slide-in-from-bottom-2 fade-in duration-300"
+        <div className="relative bg-slate-900/80 backdrop-blur-xl border border-white/10 p-8 rounded-[1.8rem] shadow-2xl text-center">
+          
+          {/* Logo */}
+          <div className="bg-slate-800/50 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner border border-white/5 ring-1 ring-white/10 rotate-3 group-hover:rotate-6 transition duration-500">
+            <Wallet className="w-9 h-9 text-emerald-400" />
+          </div>
+          
+          {/* Gradient Text Title */}
+          <h1 className="text-4xl font-extrabold mb-3 tracking-tight">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-teal-400 to-indigo-400">
+              Budget Planner
+            </span>
+          </h1>
+          
+          {/* Typewriter Subtitle */}
+          <div className="h-6 mb-10 flex items-center justify-center gap-1.5 text-slate-400 font-medium">
+            <span>Master your</span>
+            <span 
+              key={textIndex} 
+              className="text-white font-bold animate-in slide-in-from-bottom-2 fade-in duration-300"
+            >
+              {phrases[textIndex]}
+            </span>
+          </div>
+          
+          {/* Main Action Button */}
+          <button 
+            onClick={onLogin}
+            className="w-full bg-white hover:bg-emerald-50 text-slate-900 p-4 rounded-xl font-bold text-lg transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(16,185,129,0.2)] active:scale-[0.98] flex items-center justify-center gap-3 group/btn"
           >
-            {phrases[textIndex]}
-          </span>
-        </div>
-        
-        <button 
-          onClick={onLogin}
-          className="w-full bg-white text-slate-900 p-4 rounded-xl font-bold text-lg hover:bg-slate-50 transition shadow-lg hover:shadow-xl active:scale-95 flex items-center justify-center gap-3 group"
-        >
-          <div className="bg-slate-100 p-1 rounded-full group-hover:scale-110 transition">
-             <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-          </div>
-          Sign in with Google
-        </button>
+            <div className="bg-slate-50 p-1.5 rounded-full border border-slate-200 group-hover/btn:scale-110 transition">
+               <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            </div>
+            Sign in with Google
+          </button>
 
-        <div className="mt-6 pt-6 border-t border-white/10">
-          <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#34d399]"></div>
-             <span>Secure & Private</span>
+          {/* 3. FEATURE MICRO-GRID (Shows what's inside) */}
+          <div className="grid grid-cols-3 gap-2 mt-8 pt-8 border-t border-white/5">
+             <div className="flex flex-col items-center gap-2">
+                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400"><TrendingUp className="w-4 h-4" /></div>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Trends</span>
+             </div>
+             <div className="flex flex-col items-center gap-2">
+                <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400"><FlaskConical className="w-4 h-4" /></div>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Sandbox</span>
+             </div>
+             <div className="flex flex-col items-center gap-2">
+                <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400"><Target className="w-4 h-4" /></div>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Goals</span>
+             </div>
           </div>
+
         </div>
       </div>
       
-      {/* FOOTER */}
-      <div className="mt-8 text-center text-slate-500 text-xs font-medium animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300 relative z-10">
-        <p>Designed & Built by <span className="text-slate-300 font-bold">Yaseen Hussain</span></p>
+      {/* Footer */}
+      <div className="mt-8 text-center text-slate-600 text-xs font-medium animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300 relative z-10">
+        <p>Designed & Built by <span className="text-slate-400 font-bold">Yaseen Hussain</span></p>
         <p className="opacity-50 mt-1">© {new Date().getFullYear()} Budget Planner • All Rights Reserved</p>
       </div>
     </div>
