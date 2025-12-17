@@ -2256,35 +2256,44 @@ export default function App() {
               triggerHaptic();
               setMobileMenuOpen(!mobileMenuOpen);
             }}
-            className="md:hidden p-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition active:scale-95"
+            className="md:hidden p-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition active:scale-95 z-50 relative"
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
 
-          {/* MOBILE MENU DROPDOWN */}
+          {/* MOBILE MENU DROPDOWN & BACKDROP */}
           {mobileMenuOpen && (
-            <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 grid grid-cols-2 gap-2 animate-in slide-in-from-top-4 fade-in z-50 md:hidden">
-               {[
-                 { label: 'Sandbox', icon: FlaskConical, action: toggleSandbox, color: 'text-purple-600', bg: 'bg-purple-50' },
-                 { label: 'Analytics', icon: BarChart3, action: () => setShowAnalytics(true), color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                 { label: 'Reports', icon: FileText, action: () => setShowReportSelector(true), color: 'text-blue-600', bg: 'bg-blue-50' },
-                 { label: 'Settings', icon: Settings, action: () => setShowSettings(true), color: 'text-slate-600', bg: 'bg-slate-100' },
-                 { label: 'Help', icon: HelpCircle, action: () => setShowHelp(true), color: 'text-amber-600', bg: 'bg-amber-50' },
-                 { label: 'Logout', icon: LogOut, action: handleLogout, color: 'text-red-600', bg: 'bg-red-50' },
-               ].map((item, i) => (
-                 <button 
-                   key={i} 
-                   onClick={() => {
-                     setMobileMenuOpen(false);
-                     item.action();
-                   }}
-                   className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl hover:scale-95 transition ${item.bg}`}
-                 >
-                   <item.icon className={`w-6 h-6 ${item.color}`} />
-                   <span className={`text-xs font-bold ${item.color}`}>{item.label}</span>
-                 </button>
-               ))}
-            </div>
+            <>
+              {/* Invisible Backdrop to close menu when clicking outside */}
+              <div 
+                className="fixed inset-0 bg-black/20 z-[60] backdrop-blur-[2px] md:hidden animate-in fade-in"
+                onClick={() => setMobileMenuOpen(false)}
+              />
+              
+              {/* Dropdown Menu - Now using FIXED positioning to sit above everything */}
+              <div className="fixed top-24 right-6 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 grid grid-cols-2 gap-2 animate-in slide-in-from-top-4 fade-in z-[70] md:hidden">
+                 {[
+                   { label: 'Sandbox', icon: FlaskConical, action: toggleSandbox, color: 'text-purple-600', bg: 'bg-purple-50' },
+                   { label: 'Analytics', icon: BarChart3, action: () => setShowAnalytics(true), color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                   { label: 'Reports', icon: FileText, action: () => setShowReportSelector(true), color: 'text-blue-600', bg: 'bg-blue-50' },
+                   { label: 'Settings', icon: Settings, action: () => setShowSettings(true), color: 'text-slate-600', bg: 'bg-slate-100' },
+                   { label: 'Help', icon: HelpCircle, action: () => setShowHelp(true), color: 'text-amber-600', bg: 'bg-amber-50' },
+                   { label: 'Logout', icon: LogOut, action: handleLogout, color: 'text-red-600', bg: 'bg-red-50' },
+                 ].map((item, i) => (
+                   <button 
+                     key={i} 
+                     onClick={() => {
+                       setMobileMenuOpen(false);
+                       item.action();
+                     }}
+                     className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl hover:scale-95 transition ${item.bg}`}
+                   >
+                     <item.icon className={`w-6 h-6 ${item.color}`} />
+                     <span className={`text-xs font-bold ${item.color}`}>{item.label}</span>
+                   </button>
+                 ))}
+              </div>
+            </>
           )}
         </div>
       </header>
