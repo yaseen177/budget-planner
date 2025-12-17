@@ -509,17 +509,14 @@ const Toast = ({ message, onClose }) => (
 const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
-  const [logo, setLogo] = useState(null); // New state for Logo
+  const [logo, setLogo] = useState(null); 
 
   if (!isOpen) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name || !amount) return;
-    
-    // Pass logo to the save function
     onSave(name, safeCalculate(amount), logo);
-    
     setName('');
     setAmount('');
     setLogo(null);
@@ -527,7 +524,8 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4 animate-in fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
+      {/* 1. ADD ID HERE: Used for 'The Form' step */}
+      <div id="modal-add-expense" className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
         <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
           <h3 className="font-bold text-lg text-slate-800">New Expense</h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition">
@@ -538,25 +536,29 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Bill Name</label>
-            {/* Replaced Input with BrandSearchInput */}
-            <BrandSearchInput 
-              autoFocus={true}
-              placeholder="e.g. Netflix, Tesco..." 
-              className="w-full p-4 rounded-xl bg-slate-50 border-none text-lg font-medium text-slate-800 placeholder-slate-300 focus:ring-2 focus:ring-emerald-500/20 outline-none"
-              value={name}
-              onChange={setName}
-              onSelectBrand={(brandName, brandLogo) => {
-                setName(brandName);
-                setLogo(brandLogo);
-              }}
-            />
+            
+            {/* 2. ADD ID HERE: Used for 'Smart Search' step */}
+            <div id="input-expense-name">
+              <BrandSearchInput 
+                autoFocus={true}
+                placeholder="e.g. Netflix, Tesco..." 
+                className="w-full p-4 rounded-xl bg-slate-50 border-none text-lg font-medium text-slate-800 placeholder-slate-300 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                value={name}
+                onChange={setName}
+                onSelectBrand={(brandName, brandLogo) => {
+                  setName(brandName);
+                  setLogo(brandLogo);
+                }}
+              />
+            </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Amount</label>
-            <div className="relative">
+            
+            {/* 3. ADD ID HERE: Used for 'The Cost' step */}
+            <div className="relative" id="input-expense-amount">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-400">£</span>
               <input 
-                /* CHANGE: type="text" and inputMode="decimal" */
                 type="text" 
                 placeholder="0.00" 
                 className="w-full pl-10 p-4 rounded-xl bg-slate-50 border-none text-lg font-bold text-slate-800 placeholder-slate-300 focus:ring-2 focus:ring-emerald-500/20 outline-none"
@@ -1341,7 +1343,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   );
 };
 
-const HelpModal = ({ onClose }) => (
+const HelpModal = ({ onClose, onStartTutorial }) => (
   <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 overflow-y-auto animate-in slide-in-from-bottom-10">
     <div className="bg-white border-b border-slate-100 p-4 sticky top-0 z-10 flex justify-between items-center shadow-sm">
       <h2 className="text-lg font-bold flex items-center gap-2 text-slate-800">
@@ -1354,95 +1356,57 @@ const HelpModal = ({ onClose }) => (
 
     <div className="max-w-2xl mx-auto p-6 space-y-8 pb-20">
       
-      {/* SECTION 1: BASICS */}
-      <section className="space-y-4">
-        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Getting Started</h3>
-        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
-          <div className="flex gap-4">
-            <div className="bg-white p-2 rounded-lg border border-slate-200 h-fit"><Wallet className="w-5 h-5 text-slate-400" /></div>
-            <div>
-              <h4 className="font-bold text-slate-800">1. Set your Income</h4>
-              <p className="text-sm text-slate-500 mt-1">Enter your net monthly pay in the large input field at the top. This acts as the source for all your budget calculations.</p>
-            </div>
-          </div>
-          <div className="flex gap-4">
-             <div className="bg-white p-2 rounded-lg border border-slate-200 h-fit"><Settings className="w-5 h-5 text-slate-400" /></div>
-             <div>
-              <h4 className="font-bold text-slate-800">2. Configure Allocations</h4>
-              <p className="text-sm text-slate-500 mt-1">Go to <strong>Settings</strong> to define your savings pots (e.g., Savings, Holiday). Ensure your percentages add up to 100%.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* SECTION 2: EXPENSES */}
       <section className="space-y-4">
-        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Managing Expenses</h3>
+        <div className="flex justify-between items-center">
+           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Managing Expenses</h3>
+           <button 
+             onClick={() => onStartTutorial('add_expense')}
+             className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-200 transition flex items-center gap-1"
+           >
+             <Zap className="w-3 h-3" /> Show me how
+           </button>
+        </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <ul className="space-y-4">
             <li className="flex gap-3">
               <div className="mt-1"><Plus className="w-4 h-4 text-emerald-500" /></div>
               <div>
                 <span className="font-bold text-slate-800 text-sm">Adding Bills:</span>
-                <p className="text-sm text-slate-500">Tap "New Expense". Type a brand name (e.g., "Netflix") to automatically find its logo, or type manually.</p>
+                <p className="text-sm text-slate-500">Tap "New Expense". Type a brand name to find its logo.</p>
               </div>
             </li>
             <li className="flex gap-3">
               <div className="mt-1"><Edit2 className="w-4 h-4 text-indigo-500" /></div>
               <div>
                 <span className="font-bold text-slate-800 text-sm">Editing:</span>
-                <p className="text-sm text-slate-500">Tap any expense amount to quickly change it. Tap the name to rename it.</p>
-              </div>
-            </li>
-            <li className="flex gap-3">
-              <div className="mt-1"><Copy className="w-4 h-4 text-amber-500" /></div>
-              <div>
-                <span className="font-bold text-slate-800 text-sm">Copy Month:</span>
-                <p className="text-sm text-slate-500">Start a new month easily by clicking "Copy Last Month" to duplicate all your bills.</p>
+                <p className="text-sm text-slate-500">Tap any expense amount to change it instantly.</p>
               </div>
             </li>
           </ul>
         </div>
       </section>
 
-      {/* SECTION 3: SAVINGS */}
-      <section className="space-y-4">
-        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Savings & Goals</h3>
-        <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 space-y-3">
-          <p className="text-sm text-indigo-900 font-medium">
-            Your "Remainder" (Income minus Expenses) is automatically split according to your rules.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-             <div className="bg-white p-3 rounded-xl border border-indigo-100">
-                <span className="text-xs font-bold text-slate-400 uppercase">Target</span>
-                <p className="text-xs text-slate-500 mt-1">What you <em>should</em> save based on your plan.</p>
-             </div>
-             <div className="bg-white p-3 rounded-xl border border-indigo-100">
-                <span className="text-xs font-bold text-emerald-500 uppercase">Actual</span>
-                <p className="text-xs text-slate-500 mt-1">Type in what you actually moved to your bank pot. Green means you met the goal!</p>
-             </div>
-          </div>
-        </div>
-      </section>
-
       {/* SECTION 4: ADVANCED */}
       <section className="space-y-4">
-        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Advanced Tools</h3>
+        <div className="flex justify-between items-center">
+           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Advanced Tools</h3>
+           <button 
+             onClick={() => onStartTutorial('advanced_features')}
+             className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-200 transition flex items-center gap-1"
+           >
+             <Zap className="w-3 h-3" /> Show me how
+           </button>
+        </div>
         <div className="grid grid-cols-1 gap-3">
-           <div className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 bg-white">
-              <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600"><FlaskConical className="w-5 h-5" /></div>
-              <div>
-                 <h4 className="font-bold text-slate-800 text-sm">Sandbox Mode</h4>
-                 <p className="text-xs text-slate-500">A safe space to test "What If" scenarios without affecting your real data.</p>
-              </div>
-           </div>
            <div className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 bg-white">
               <div className="bg-emerald-100 p-2 rounded-lg text-emerald-600"><BarChart3 className="w-5 h-5" /></div>
               <div>
                  <h4 className="font-bold text-slate-800 text-sm">Analytics</h4>
-                 <p className="text-xs text-slate-500">View 3, 6, or 12-month trends of your income, expenses, and savings consistency.</p>
+                 <p className="text-xs text-slate-500">View trends and history.</p>
               </div>
            </div>
+           {/* ... sandbox item ... */}
         </div>
       </section>
 
@@ -1684,6 +1648,98 @@ const OnboardingWizard = ({ user, onComplete }) => {
 };
 
 
+const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
+  const [targetRect, setTargetRect] = useState(null);
+  const step = steps[currentStep];
+
+  // Update position when step changes or window resizes
+  useEffect(() => {
+    const updatePosition = () => {
+      const element = document.querySelector(step.target);
+      if (element) {
+        const rect = element.getBoundingClientRect();
+        setTargetRect({
+          top: rect.top,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+        });
+        // Scroll element into view if needed
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    };
+
+    // Run immediately and on resize
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    
+    // Slight delay to allow modals to open before finding target
+    const timer = setTimeout(updatePosition, 300); 
+
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      clearTimeout(timer);
+    };
+  }, [currentStep, step.target]);
+
+  if (!targetRect) return null;
+
+  // Determine if tooltip should be above or below
+  const showBelow = targetRect.top < 300; 
+
+  return (
+    <div className="fixed inset-0 z-[200] overflow-hidden">
+      {/* Dark Backdrop */}
+      <div className="absolute inset-0 bg-black/60 mix-blend-hard-light transition-opacity duration-500" />
+
+      {/* The Spotlight (Cutout effect using box-shadow) */}
+      <div 
+        className="absolute transition-all duration-500 ease-in-out border-2 border-white rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]"
+        style={{
+          top: targetRect.top - 5,
+          left: targetRect.left - 5,
+          width: targetRect.width + 10,
+          height: targetRect.height + 10,
+        }}
+      />
+
+      {/* The Instruction Card */}
+      <div 
+        className="absolute left-0 right-0 mx-auto w-full max-w-xs transition-all duration-500 ease-in-out px-4 md:px-0"
+        style={{
+          top: showBelow ? targetRect.top + targetRect.height + 20 : targetRect.top - 180,
+          left: targetRect.left > window.innerWidth - 320 ? 'auto' : targetRect.left, // Prevent overflow right
+          right: targetRect.left > window.innerWidth - 320 ? 20 : 'auto',
+        }}
+      >
+        <div className="bg-white p-5 rounded-2xl shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-2">
+          <div className="flex justify-between items-start mb-2">
+            <h3 className="font-bold text-lg text-slate-800">{step.title}</h3>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+          </div>
+          <p className="text-sm text-slate-500 mb-6 leading-relaxed">{step.content}</p>
+          
+          <div className="flex justify-between items-center">
+            <span className="text-xs font-bold text-slate-300">Step {currentStep + 1} of {steps.length}</span>
+            <div className="flex gap-2">
+              {currentStep > 0 && (
+                <button onClick={onPrev} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Back</button>
+              )}
+              <button 
+                onClick={onNext} 
+                className="px-6 py-2 text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 rounded-lg shadow-lg"
+              >
+                {currentStep === steps.length - 1 ? 'Finish' : 'Next'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1695,6 +1751,78 @@ export default function App() {
   const [showReportSelector, setShowReportSelector] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeTutorial, setActiveTutorial] = useState(null); // 'add_expense' or 'advanced_features'
+  const [tutorialStep, setTutorialStep] = useState(0);
+
+  // Define the Tutorials and their "Actions" (e.g. opening modals)
+  const getTutorialSteps = (id) => {
+    switch(id) {
+      case 'add_expense': return [
+        { 
+          target: '#fab-add-expense', 
+          title: 'Start Here', 
+          content: 'Tap this button to open the "New Expense" form.',
+          action: () => setIsAddingExpense(false) // Ensure it's closed initially
+        },
+        { 
+          target: '#modal-add-expense', // We need to add this ID to the modal
+          title: 'The Form', 
+          content: 'This is where you add your details.',
+          action: () => setIsAddingExpense(true) // AUTO-OPEN the modal for the user
+        },
+        { 
+          target: '#input-expense-name', // We need to add this ID
+          title: 'Smart Search', 
+          content: 'Type a brand name like "Netflix" or "Tesco" here. We will automatically find the official logo for you.',
+          action: () => {}
+        },
+        { 
+          target: '#input-expense-amount', // We need to add this ID
+          title: 'The Cost', 
+          content: 'Enter the monthly cost here. You can use math too! (e.g. "12.50 + 5").',
+          action: () => {}
+        }
+      ];
+      case 'advanced_features': return [
+        {
+          target: '#btn-analytics', // We need to add this ID
+          title: 'Analytics Dashboard',
+          content: 'Tap here to see graphs of your spending and savings over the last 6 months.',
+          action: () => { setShowAnalytics(false); setMobileMenuOpen(false); }
+        },
+        {
+          target: '#btn-sandbox', // We need to add this ID
+          title: 'Sandbox Mode',
+          content: 'This toggle activates "Simulation Mode". You can delete bills or change salaries safely—nothing is saved to your real database.',
+          action: () => {}
+        }
+      ];
+      default: return [];
+    }
+  };
+
+  const startTutorial = (id) => {
+    setShowHelp(false); // Close help menu
+    setActiveTutorial(id);
+    setTutorialStep(0);
+    // Execute the action for the first step immediately
+    const steps = getTutorialSteps(id);
+    if(steps[0] && steps[0].action) steps[0].action();
+  };
+
+  const handleTutorialNext = () => {
+    const steps = getTutorialSteps(activeTutorial);
+    if (tutorialStep < steps.length - 1) {
+      const nextStep = tutorialStep + 1;
+      setTutorialStep(nextStep);
+      // Run the action for the next step (e.g. opening a modal)
+      if (steps[nextStep].action) steps[nextStep].action();
+    } else {
+      // Finish
+      setActiveTutorial(null);
+      setIsAddingExpense(false); // Cleanup
+    }
+  };
   const [activeReport, setActiveReport] = useState(null); // 'month' or 'history'
   const [reportData, setReportData] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
@@ -2113,7 +2241,8 @@ export default function App() {
       )}
 
       {/* Floating Action Button (FAB) */}
-      <button 
+      <button
+        id="fab-add-expense"
         onClick={() => {
           triggerHaptic();
           setIsAddingExpense(true);
@@ -2144,7 +2273,24 @@ export default function App() {
       )}
 
       {showHelp && (
-        <HelpModal onClose={() => setShowHelp(false)} />
+        <HelpModal
+          onClose={() => setShowHelp(false)}
+          onStartTutorial={startTutorial} 
+        />
+      )}
+
+      {/* ADD NEW TUTORIAL OVERLAY HERE */}
+      {activeTutorial && (
+        <TutorialOverlay 
+          steps={getTutorialSteps(activeTutorial)}
+          currentStep={tutorialStep}
+          onNext={handleTutorialNext}
+          onPrev={() => setTutorialStep(s => Math.max(0, s - 1))}
+          onClose={() => {
+            setActiveTutorial(null);
+            setIsAddingExpense(false); // Cleanup modals if open
+          }}
+        />
       )}
 
       {showReportSelector && (
@@ -2225,12 +2371,28 @@ export default function App() {
 
           {/* DESKTOP ACTIONS */}
           <div className="hidden md:flex gap-2">
-             <button onClick={toggleSandbox} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} title="Sandbox Mode">
+            
+            {/* 1. NEEDS ID */}
+             <button 
+               id="btn-sandbox" 
+               onClick={toggleSandbox} 
+               className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} 
+               title="Sandbox Mode"
+             >
               <FlaskConical className={`w-5 h-5 ${isSandbox ? 'text-white' : 'text-purple-400'}`} />
             </button>
-            <button onClick={() => setShowAnalytics(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} title="Trends">
+            
+            {/* 2. NEEDS ID */}
+            <button 
+              id="btn-analytics" 
+              onClick={() => setShowAnalytics(true)} 
+              className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} 
+              title="Trends"
+            >
               <BarChart3 className={`w-5 h-5 ${isSandbox ? 'text-indigo-200' : 'text-emerald-400'}`} />
             </button>
+
+            {/* The rest DO NOT need IDs right now */}
             <button onClick={() => setShowReportSelector(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} title="Reports">
               <FileText className={`w-5 h-5 ${isSandbox ? 'text-indigo-200' : 'text-emerald-400'}`} />
             </button>
