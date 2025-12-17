@@ -1800,6 +1800,19 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
   );
 };
 
+// --- MOCK DATA FOR TUTORIALS ---
+const TUTORIAL_POTS = [
+  { id: 't1', name: 'Needs', percentage: 50, color: 'bg-indigo-100 text-indigo-600' },
+  { id: 't2', name: 'Wants', percentage: 30, color: 'bg-emerald-100 text-emerald-600' },
+  { id: 't3', name: 'Savings', percentage: 20, color: 'bg-amber-100 text-amber-600' }
+];
+
+const TUTORIAL_EXPENSES = [
+  { id: 'e1', name: 'Rent', amount: 800, type: 'fixed', logo: null },
+  { id: 'e2', name: 'Netflix', amount: 15, type: 'fixed', logo: null },
+  { id: 'e3', name: 'Groceries', amount: 250, type: 'variable', logo: null }
+];
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1959,10 +1972,29 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState(''); // Added search state
   const [sortMode, setSortMode] = useState('date');
 
-  // Derived state variables to toggle between real and sandbox data
+  // Derived state variables
   const displaySalary = isSandbox ? sandboxSalary : salary;
-  const displayExpenses = isSandbox ? sandboxExpenses : expenses;
-  const displayActualSavings = isSandbox ? sandboxActualSavings : actualSavings;
+  
+  // --- TUTORIAL DATA SWITCH LOGIC ---
+  // If a tutorial is active, we OVERRIDE the data with short, generic lists.
+  // This ensures the screen isn't cluttered and the tutorial box fits perfectly.
+  const isTutorialMode = activeTutorial !== null;
+
+  const displayExpenses = isTutorialMode 
+      ? TUTORIAL_EXPENSES 
+      : (isSandbox ? sandboxExpenses : expenses);
+
+  const displayAllocations = isTutorialMode 
+      ? TUTORIAL_POTS 
+      : userSettings.allocationRules;
+
+  const displayDefaultExpenses = isTutorialMode
+      ? TUTORIAL_EXPENSES.filter(e => e.type === 'fixed') // Reuse fixed expenses for settings demo
+      : userSettings.defaultFixedExpenses;
+      
+  const displayActualSavings = isTutorialMode
+      ? { t1: 400, t2: 240 } // Mock savings so bars look partially full
+      : (isSandbox ? sandboxActualSavings : actualSavings);
 
   // Toast Helper
   const showToast = (msg) => {
@@ -2370,7 +2402,14 @@ export default function App() {
       {showSettings && (
         <SettingsScreen 
           user={user} 
-          currentSettings={userSettings} 
+          // --- UPDATED PROP ---
+          // We construct a "Fake" settings object if in tutorial mode
+          currentSettings={isTutorialMode ? {
+            ...userSettings,
+            allocationRules: displayAllocations,
+            defaultFixedExpenses: displayDefaultExpenses
+          } : userSettings}
+          // --------------------
           onClose={() => setShowSettings(false)}
           onSaveSettings={saveSettings}
           onResetMonth={resetCurrentMonth}
@@ -2569,7 +2608,7 @@ export default function App() {
         <BudgetWheel 
           salary={displaySalary} 
           expenses={displayExpenses} 
-          allocations={userSettings.allocationRules}
+          allocations={displayAllocations} // <--- Ensure this says displayAllocations
           currency={userSettings.currency}
         />
 
@@ -2596,7 +2635,7 @@ export default function App() {
         {salaryNum > 0 && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 print:hidden">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider px-2">Financial Goals</h3>
-            {userSettings.allocationRules.map(plan => {
+            {displayAllocations.map(plan => {
               const target = remainder * (plan.percentage / 100);
               
               const isFilled = displayActualSavings[plan.id] !== undefined && displayActualSavings[plan.id] !== '';
