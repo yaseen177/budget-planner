@@ -1114,7 +1114,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   const [defaultExpenses, setDefaultExpenses] = useState(currentSettings.defaultFixedExpenses || DEFAULT_FIXED_EXPENSES);
   const [currency, setCurrency] = useState(currentSettings.currency || 'GBP');
   
-  // State for new items
   const [newPlanName, setNewPlanName] = useState('');
   const [newPlanPercent, setNewPlanPercent] = useState('');
   const [newDefExpName, setNewDefExpName] = useState('');
@@ -1212,8 +1211,8 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
         </section>
 
-        {/* Allocation Rules */}
-        <section className="space-y-3">
+        {/* 1. ADD ID: Settings Spending Plan */}
+        <section className="space-y-3" id="settings-spending-plan">
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Spending Plan</h3>
             <span className={`px-2 py-0.5 rounded text-xs font-bold ${totalPercentage === 100 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -1265,16 +1264,15 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
         </section>
 
-        {/* Default Fixed Expenses */}
-        <section className="space-y-3">
+        {/* 2. ADD ID: Settings Fixed Expenses */}
+        <section className="space-y-3" id="settings-fixed-expenses">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Default Monthly Bills</h3>
           <p className="text-xs text-slate-500">These automatically copy over when you start a new month.</p>
           
           <div className="space-y-2">
-          {defaultExpenses.map(exp => (
+            {defaultExpenses.map(exp => (
               <div key={exp.id} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-3">
-                   {/* Show logo if it exists in list */}
                    {exp.logo && <img src={exp.logo} className="w-6 h-6 object-contain rounded-full bg-slate-50" alt="" />}
                    <span className="font-medium text-slate-700">{exp.name}</span>
                 </div>
@@ -1290,10 +1288,9 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
             ))}
             
             <div className="flex gap-2 pt-2 items-start">
-              {/* Replaced Input with BrandSearchInput */}
               <div className="flex-1">
                 <BrandSearchInput
-                  placeholder="Bill Name (e.g. Sky)"
+                  placeholder="Bill Name (e.g. AMEX)"
                   value={newDefExpName}
                   onChange={setNewDefExpName}
                   onSelectBrand={(brandName, brandLogo) => {
@@ -1303,16 +1300,19 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                   className="w-full p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
                 />
               </div>
-              <input 
-                type="text"
-                inputMode="decimal"
-                placeholder="£"
-                value={newDefExpAmount}
-                onChange={(e) => setNewDefExpAmount(e.target.value)}
-                /* CHANGE 2: Add onBlur to calculate */
-                onBlur={() => setNewDefExpAmount(safeCalculate(newDefExpAmount))}
-                className="w-24 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
-              />
+              
+              {/* 3. ADD ID: Specific Input for Variable Amount Tutorial */}
+              <div id="settings-new-expense-amount">
+                <input 
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="£"
+                    value={newDefExpAmount}
+                    onChange={(e) => setNewDefExpAmount(e.target.value)}
+                    onBlur={() => setNewDefExpAmount(safeCalculate(newDefExpAmount))}
+                    className="w-24 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
+                />
+              </div>
               <button onClick={addDefaultExpense} className="bg-slate-900 text-white p-3 rounded-xl">
                 <Plus className="w-4 h-4" />
               </button>
@@ -1343,6 +1343,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   );
 };
 
+// --- UPDATED HELP MODAL ---
 const HelpModal = ({ onClose, onStartTutorial }) => (
   <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 overflow-y-auto animate-in slide-in-from-bottom-10">
     <div className="bg-white border-b border-slate-100 p-4 sticky top-0 z-10 flex justify-between items-center shadow-sm">
@@ -1355,6 +1356,30 @@ const HelpModal = ({ onClose, onStartTutorial }) => (
     </div>
 
     <div className="max-w-2xl mx-auto p-6 space-y-8 pb-20">
+      
+      {/* SECTION 1: BASICS & SETTINGS */}
+      <section className="space-y-4">
+        <div className="flex justify-between items-center">
+           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Configuration</h3>
+           {/* --- NEW BUTTON --- */}
+           <button 
+             onClick={() => onStartTutorial('settings')}
+             className="text-xs bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-200 transition flex items-center gap-1"
+           >
+             <Settings className="w-3 h-3" /> Show me how
+           </button>
+           {/* ------------------ */}
+        </div>
+        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+          <div className="flex gap-4">
+             <div className="bg-white p-2 rounded-lg border border-slate-200 h-fit"><Settings className="w-5 h-5 text-slate-400" /></div>
+             <div>
+              <h4 className="font-bold text-slate-800">Allocations & Fixed Bills</h4>
+              <p className="text-sm text-slate-500 mt-1">Configure your savings pots and recurring monthly commitments.</p>
+            </div>
+          </div>
+        </div>
+      </section>
       
       {/* SECTION 2: EXPENSES */}
       <section className="space-y-4">
@@ -1797,6 +1822,34 @@ export default function App() {
           action: () => {}
         }
       ];
+
+      case 'settings': return [
+        {
+          target: '#btn-settings',
+          title: 'Global Settings',
+          content: 'Tap here to configure your profile, currency, and recurring budget rules.',
+          action: () => setShowSettings(true) // Open modal
+        },
+        {
+          target: '#settings-spending-plan',
+          title: 'Spending Plan',
+          content: 'Adjust your savings pots here. You can rename them or change the percentages. Remember: the total must always equal 100%.',
+          action: () => {}
+        },
+        {
+          target: '#settings-fixed-expenses',
+          title: 'Recurring Bills',
+          content: 'Add bills here that you pay every single month. They will automatically copy over when you start a new month so you don\'t have to type them again.',
+          action: () => {}
+        },
+        {
+          target: '#settings-new-expense-amount',
+          title: 'Variable Bills',
+          content: 'Pro Tip: Leave this amount blank (or 0) for things like Credit Cards where the bill changes every month. We will mark it as "Variable" so you remember to fill it in later!',
+          action: () => {}
+        }
+      ];
+
       default: return [];
     }
   };
@@ -2396,7 +2449,7 @@ export default function App() {
             <button onClick={() => setShowReportSelector(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} title="Reports">
               <FileText className={`w-5 h-5 ${isSandbox ? 'text-indigo-200' : 'text-emerald-400'}`} />
             </button>
-            <button onClick={() => setShowSettings(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`}>
+            <button id="btn-settings" onClick={() => setShowSettings(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`}>
               <Settings className="w-5 h-5 text-slate-300" />
             </button>
             <button onClick={() => setShowHelp(true)} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`}>
