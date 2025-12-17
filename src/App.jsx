@@ -1673,12 +1673,17 @@ const OnboardingWizard = ({ user, onComplete }) => {
 };
 
 
+// --- IMPROVED TUTORIAL OVERLAY ---
 const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
   const [targetRect, setTargetRect] = useState(null);
   const step = steps[currentStep];
+  const isMobile = window.innerWidth < 768;
 
-  // Update position when step changes or window resizes
+  // 1. Scroll Lock & Position Calculation
   useEffect(() => {
+    // Lock body scroll
+    document.body.style.overflow = 'hidden';
+
     const updatePosition = () => {
       const element = document.querySelector(step.target);
       if (element) {
@@ -1689,70 +1694,92 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
           width: rect.width,
           height: rect.height,
         });
-        // Scroll element into view if needed
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Only scroll if element is out of view
+        const isInViewport = (
+          rect.top >= 0 &&
+          rect.left >= 0 &&
+          rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+          rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+        );
+
+        if (!isInViewport) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      } else {
+        // If target not found (e.g. menu closed), fallback to center
+        setTargetRect(null);
       }
     };
 
-    // Run immediately and on resize
     updatePosition();
     window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true); // Capture scroll events
     
-    // Slight delay to allow modals to open before finding target
-    const timer = setTimeout(updatePosition, 300); 
+    // Retry finding element after a short delay (allows menus to open)
+    const timer = setTimeout(updatePosition, 100); 
 
     return () => {
+      document.body.style.overflow = 'unset'; // Unlock scroll
       window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
       clearTimeout(timer);
     };
   }, [currentStep, step.target]);
 
-  if (!targetRect) return null;
-
-  // Determine if tooltip should be above or below
-  const showBelow = targetRect.top < 300; 
-
   return (
-    <div className="fixed inset-0 z-[200] overflow-hidden">
-      {/* Dark Backdrop */}
+    <div className="fixed inset-0 z-[200]">
+      {/* 1. The Backdrop (Darkness) */}
       <div className="absolute inset-0 bg-black/60 mix-blend-hard-light transition-opacity duration-500" />
 
-      {/* The Spotlight (Cutout effect using box-shadow) */}
-      <div 
-        className="absolute transition-all duration-500 ease-in-out border-2 border-white rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]"
-        style={{
-          top: targetRect.top - 5,
-          left: targetRect.left - 5,
-          width: targetRect.width + 10,
-          height: targetRect.height + 10,
-        }}
-      />
+      {/* 2. The Spotlight (Hole in the darkness) */}
+      {targetRect && (
+        <div 
+          className="absolute transition-all duration-300 ease-out border-2 border-white/50 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] pointer-events-none"
+          style={{
+            top: targetRect.top - 5,
+            left: targetRect.left - 5,
+            width: targetRect.width + 10,
+            height: targetRect.height + 10,
+          }}
+        />
+      )}
 
-      {/* The Instruction Card */}
+      {/* 3. The Instruction Card */}
+      {/* ON DESKTOP: Floats near element. ON MOBILE: Fixed at bottom */}
       <div 
-        className="absolute left-0 right-0 mx-auto w-full max-w-xs transition-all duration-500 ease-in-out px-4 md:px-0"
-        style={{
-          top: showBelow ? targetRect.top + targetRect.height + 20 : targetRect.top - 180,
-          left: targetRect.left > window.innerWidth - 320 ? 'auto' : targetRect.left, // Prevent overflow right
-          right: targetRect.left > window.innerWidth - 320 ? 20 : 'auto',
-        }}
+        className={`absolute w-full max-w-sm transition-all duration-500 ease-in-out px-4 md:px-0 
+          ${isMobile ? 'bottom-6 left-0 right-0 mx-auto' : ''}`}
+        style={!isMobile && targetRect ? {
+           // Desktop Positioning Logic
+           top: targetRect.top > 300 ? targetRect.top - 180 : targetRect.top + targetRect.height + 20,
+           left: targetRect.left > window.innerWidth - 320 ? 'auto' : Math.max(20, targetRect.left), 
+           right: targetRect.left > window.innerWidth - 320 ? 20 : 'auto',
+        } : {}}
       >
-        <div className="bg-white p-5 rounded-2xl shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-2">
+        <div className="bg-white p-5 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-4 border border-slate-100">
           <div className="flex justify-between items-start mb-2">
             <h3 className="font-bold text-lg text-slate-800">{step.title}</h3>
-            <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+            </button>
           </div>
           <p className="text-sm text-slate-500 mb-6 leading-relaxed">{step.content}</p>
           
           <div className="flex justify-between items-center">
-            <span className="text-xs font-bold text-slate-300">Step {currentStep + 1} of {steps.length}</span>
+            <span className="text-xs font-bold text-slate-300">Step {currentStep + 1} / {steps.length}</span>
             <div className="flex gap-2">
               {currentStep > 0 && (
-                <button onClick={onPrev} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Back</button>
+                <button 
+                    onClick={onPrev} 
+                    className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition"
+                >
+                    Back
+                </button>
               )}
               <button 
                 onClick={onNext} 
-                className="px-6 py-2 text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 rounded-lg shadow-lg"
+                className="px-6 py-2 text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 rounded-lg shadow-lg active:scale-95 transition"
               >
                 {currentStep === steps.length - 1 ? 'Finish' : 'Next'}
               </button>
@@ -1763,7 +1790,6 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
     </div>
   );
 };
-
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -1779,7 +1805,8 @@ export default function App() {
   const [activeTutorial, setActiveTutorial] = useState(null); // 'add_expense' or 'advanced_features'
   const [tutorialStep, setTutorialStep] = useState(0);
 
-  // Define the Tutorials and their "Actions" (e.g. opening modals)
+  const isMobile = window.innerWidth < 768;
+
   const getTutorialSteps = (id) => {
     switch(id) {
       case 'add_expense': return [
@@ -1787,69 +1814,81 @@ export default function App() {
           target: '#fab-add-expense', 
           title: 'Start Here', 
           content: 'Tap this button to open the "New Expense" form.',
-          action: () => setIsAddingExpense(false) // Ensure it's closed initially
+          action: () => setIsAddingExpense(false)
         },
         { 
-          target: '#modal-add-expense', // We need to add this ID to the modal
+          target: '#modal-add-expense', 
           title: 'The Form', 
           content: 'This is where you add your details.',
-          action: () => setIsAddingExpense(true) // AUTO-OPEN the modal for the user
+          action: () => setIsAddingExpense(true)
         },
         { 
-          target: '#input-expense-name', // We need to add this ID
+          target: '#input-expense-name',
           title: 'Smart Search', 
-          content: 'Type a brand name like "Netflix" or "Tesco" here. We will automatically find the official logo for you.',
+          content: 'Type a brand name like "Netflix" here. We automatically find the logo.',
           action: () => {}
         },
         { 
-          target: '#input-expense-amount', // We need to add this ID
+          target: '#input-expense-amount',
           title: 'The Cost', 
-          content: 'Enter the monthly cost here. You can use math too! (e.g. "12.50 + 5").',
+          content: 'Enter the monthly cost here.',
           action: () => {}
         }
       ];
       case 'advanced_features': return [
         {
-          target: '#btn-analytics', // We need to add this ID
+          // IF MOBILE: Target the mobile button, ELSE target desktop button
+          target: isMobile ? '#btn-analytics-mobile' : '#btn-analytics',
           title: 'Analytics Dashboard',
-          content: 'Tap here to see graphs of your spending and savings over the last 6 months.',
-          action: () => { setShowAnalytics(false); setMobileMenuOpen(false); }
+          content: 'Tap here to see graphs of your spending and savings over time.',
+          action: () => { 
+             setShowAnalytics(false); 
+             // IF MOBILE: Open the menu so the button is visible!
+             if(isMobile) setMobileMenuOpen(true);
+          }
         },
         {
-          target: '#btn-sandbox', // We need to add this ID
+          target: isMobile ? '#btn-sandbox-mobile' : '#btn-sandbox',
           title: 'Sandbox Mode',
-          content: 'This toggle activates "Simulation Mode". You can delete bills or change salaries safely—nothing is saved to your real database.',
-          action: () => {}
+          content: 'This toggle activates "Simulation Mode". Test safe scenarios here.',
+          action: () => {
+             // Keep menu open for second step on mobile
+             if(isMobile) setMobileMenuOpen(true);
+          }
         }
       ];
-
       case 'settings': return [
         {
-          target: '#btn-settings',
+          target: isMobile ? '#btn-settings-mobile' : '#btn-settings',
           title: 'Global Settings',
           content: 'Tap here to configure your profile, currency, and recurring budget rules.',
-          action: () => setShowSettings(true) // Open modal
+          action: () => {
+             setShowSettings(false); // Ensure modal is closed initially
+             if(isMobile) setMobileMenuOpen(true); // Open menu on mobile
+          }
         },
         {
           target: '#settings-spending-plan',
           title: 'Spending Plan',
-          content: 'Adjust your savings pots here. You can rename them or change the percentages. Remember: the total must always equal 100%.',
-          action: () => {}
+          content: 'Adjust your savings pots here. Ensure total equals 100%.',
+          action: () => {
+              setMobileMenuOpen(false); // Close mobile menu now
+              setShowSettings(true);    // Open Settings Modal
+          }
         },
         {
           target: '#settings-fixed-expenses',
           title: 'Recurring Bills',
-          content: 'Add bills here that you pay every single month. They will automatically copy over when you start a new month so you don\'t have to type them again.',
+          content: 'Add bills here that you pay every single month (Rent, Gym, etc).',
           action: () => {}
         },
         {
           target: '#settings-new-expense-amount',
           title: 'Variable Bills',
-          content: 'Pro Tip: Leave this amount blank (or 0) for things like Credit Cards where the bill changes every month. We will mark it as "Variable" so you remember to fill it in later!',
+          content: 'Leave this amount blank for bills that change every month (like Credit Cards).',
           action: () => {}
         }
       ];
-
       default: return [];
     }
   };
@@ -1866,14 +1905,18 @@ export default function App() {
   const handleTutorialNext = () => {
     const steps = getTutorialSteps(activeTutorial);
     if (tutorialStep < steps.length - 1) {
-      const nextStep = tutorialStep + 1;
-      setTutorialStep(nextStep);
-      // Run the action for the next step (e.g. opening a modal)
-      if (steps[nextStep].action) steps[nextStep].action();
+      const nextStepIndex = tutorialStep + 1;
+      setTutorialStep(nextStepIndex);
+      
+      // Run the action for the next step
+      if (steps[nextStepIndex].action) {
+          steps[nextStepIndex].action();
+      }
     } else {
       // Finish
       setActiveTutorial(null);
-      setIsAddingExpense(false); // Cleanup
+      setIsAddingExpense(false);
+      setMobileMenuOpen(false); // Close menu on finish
     }
   };
   const [activeReport, setActiveReport] = useState(null); // 'month' or 'history'
@@ -2756,15 +2799,16 @@ export default function App() {
             {/* Menu Grid */}
             <div className="absolute top-20 right-6 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 grid grid-cols-2 gap-2 animate-in slide-in-from-top-4 fade-in">
                 {[
-                  { label: 'Sandbox', icon: FlaskConical, action: toggleSandbox, color: 'text-purple-600', bg: 'bg-purple-50' },
-                  { label: 'Analytics', icon: BarChart3, action: () => setShowAnalytics(true), color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                  { id: 'btn-sandbox-mobile', label: 'Sandbox', icon: FlaskConical, action: toggleSandbox, color: 'text-purple-600', bg: 'bg-purple-50' },
+                  { id: 'btn-analytics-mobile', label: 'Analytics', icon: BarChart3, action: () => setShowAnalytics(true), color: 'text-emerald-600', bg: 'bg-emerald-50' },
                   { label: 'Reports', icon: FileText, action: () => setShowReportSelector(true), color: 'text-blue-600', bg: 'bg-blue-50' },
-                  { label: 'Settings', icon: Settings, action: () => setShowSettings(true), color: 'text-slate-600', bg: 'bg-slate-100' },
+                  { id: 'btn-settings-mobile', label: 'Settings', icon: Settings, action: () => setShowSettings(true), color: 'text-slate-600', bg: 'bg-slate-100' },
                   { label: 'Help', icon: HelpCircle, action: () => setShowHelp(true), color: 'text-amber-600', bg: 'bg-amber-50' },
                   { label: 'Logout', icon: LogOut, action: handleLogout, color: 'text-red-600', bg: 'bg-red-50' },
                 ].map((item, i) => (
                   <button 
-                    key={i} 
+                    key={i}
+                    id={item.id} // <--- IMPORTANT: Adding ID here
                     onClick={() => {
                       setMobileMenuOpen(false);
                       item.action();
