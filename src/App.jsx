@@ -2520,6 +2520,12 @@ export default function App() {
           </div>
         </div>
 
+        {/* --- NEW CODE: CREATOR FOOTER --- */}
+        <div className="text-center py-10 text-slate-400 text-xs font-medium print:hidden">
+          <p>Designed & Built by <span className="text-slate-600 font-bold">Yaseen Hussain</span></p>
+          <p className="opacity-50 mt-1">© {new Date().getFullYear()} Budget Planner • All Rights Reserved</p>
+        </div>
+
       </div>
 
       {/* --- NEW LOCATION: MOBILE MENU OVERLAY (OUTSIDE HEADER) --- */}
