@@ -1673,69 +1673,76 @@ const OnboardingWizard = ({ user, onComplete }) => {
 };
 
 
-// --- IMPROVED TUTORIAL OVERLAY ---
+// --- IMPROVED TUTORIAL OVERLAY (FIXED SCROLLING) ---
 const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
   const [targetRect, setTargetRect] = useState(null);
   const step = steps[currentStep];
   const isMobile = window.innerWidth < 768;
 
-  // 1. Scroll Lock & Position Calculation
   useEffect(() => {
-    // Lock body scroll
-    document.body.style.overflow = 'hidden';
+    // FIX: Only lock scroll on Mobile. Allow scrolling on Desktop.
+    if (isMobile) {
+      document.body.style.overflow = 'hidden';
+    }
 
     const updatePosition = () => {
       const element = document.querySelector(step.target);
       if (element) {
         const rect = element.getBoundingClientRect();
-        setTargetRect({
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-        });
         
-        // Only scroll if element is out of view
+        // Check if the element is actually visible in the viewport
+        // If not, on desktop we might need to scroll it into view initially
         const isInViewport = (
           rect.top >= 0 &&
           rect.left >= 0 &&
           rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
           rect.right <= (window.innerWidth || document.documentElement.clientWidth)
         );
-
-        if (!isInViewport) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        if (!isInViewport && !isMobile) {
+             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
+
+        setTargetRect({
+          top: rect.top,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+        });
       } else {
-        // If target not found (e.g. menu closed), fallback to center
         setTargetRect(null);
       }
     };
 
     updatePosition();
     window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true); // Capture scroll events
+    // Add scroll listener so the spotlight moves when you scroll on desktop
+    window.addEventListener('scroll', updatePosition, true); 
     
-    // Retry finding element after a short delay (allows menus to open)
     const timer = setTimeout(updatePosition, 100); 
 
     return () => {
-      document.body.style.overflow = 'unset'; // Unlock scroll
+      document.body.style.overflow = 'unset'; // Always cleanup scroll lock
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
       clearTimeout(timer);
     };
-  }, [currentStep, step.target]);
+  }, [currentStep, step.target, isMobile]);
+
+  // Determine vertical position: Prefer putting it ABOVE if we are low on the screen
+  const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+  // If target is in the bottom half of screen, put box above it.
+  const showAbove = targetRect && (targetRect.top > screenHeight / 2);
 
   return (
-    <div className="fixed inset-0 z-[200]">
-      {/* 1. The Backdrop (Darkness) */}
-      <div className="absolute inset-0 bg-black/60 mix-blend-hard-light transition-opacity duration-500" />
+    <div className="fixed inset-0 z-[200] pointer-events-none">
+      {/* 1. Backdrop - Allow pointer events so we can click/scroll content behind if needed */}
+      <div className="absolute inset-0 bg-black/60 mix-blend-hard-light transition-opacity duration-500 pointer-events-auto" />
 
-      {/* 2. The Spotlight (Hole in the darkness) */}
+      {/* 2. Spotlight */}
       {targetRect && (
         <div 
-          className="absolute transition-all duration-300 ease-out border-2 border-white/50 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] pointer-events-none"
+          className="absolute transition-all duration-100 ease-out border-2 border-white/50 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]"
           style={{
             top: targetRect.top - 5,
             left: targetRect.left - 5,
@@ -1745,26 +1752,29 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
         />
       )}
 
-      {/* 3. The Instruction Card */}
-      {/* ON DESKTOP: Floats near element. ON MOBILE: Fixed at bottom */}
+      {/* 3. Instruction Card */}
       <div 
-        className={`absolute w-full max-w-sm transition-all duration-500 ease-in-out px-4 md:px-0 
+        className={`absolute w-full max-w-sm transition-all duration-300 ease-out px-4 md:px-0 pointer-events-auto
           ${isMobile ? 'bottom-6 left-0 right-0 mx-auto' : ''}`}
         style={!isMobile && targetRect ? {
-           // Desktop Positioning Logic
-           top: targetRect.top > 300 ? targetRect.top - 180 : targetRect.top + targetRect.height + 20,
-           left: targetRect.left > window.innerWidth - 320 ? 'auto' : Math.max(20, targetRect.left), 
-           right: targetRect.left > window.innerWidth - 320 ? 20 : 'auto',
+           // Desktop Positioning: Flip based on screen position
+           top: showAbove 
+              ? targetRect.top - 10 // Shift up slightly above target (CSS translate will handle height)
+              : targetRect.top + targetRect.height + 20, 
+           left: targetRect.left > window.innerWidth - 350 ? 'auto' : Math.max(20, targetRect.left), 
+           right: targetRect.left > window.innerWidth - 350 ? 20 : 'auto',
+           transform: showAbove ? 'translateY(-100%)' : 'none' // Crucial: Moves the box up by its own height
         } : {}}
       >
-        <div className="bg-white p-5 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-4 border border-slate-100">
+        <div className="bg-white p-5 rounded-2xl shadow-2xl border border-slate-100 animate-in zoom-in-95">
           <div className="flex justify-between items-start mb-2">
             <h3 className="font-bold text-lg text-slate-800">{step.title}</h3>
             <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
             </button>
           </div>
-          <p className="text-sm text-slate-500 mb-6 leading-relaxed">{step.content}</p>
+          {/* Max height added to prevent card getting too tall */}
+          <p className="text-sm text-slate-500 mb-6 leading-relaxed max-h-40 overflow-y-auto">{step.content}</p>
           
           <div className="flex justify-between items-center">
             <span className="text-xs font-bold text-slate-300">Step {currentStep + 1} / {steps.length}</span>
