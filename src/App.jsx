@@ -1673,76 +1673,96 @@ const OnboardingWizard = ({ user, onComplete }) => {
 };
 
 
-// --- IMPROVED TUTORIAL OVERLAY (FIXED SCROLLING) ---
+// --- FINAL FIXED TUTORIAL OVERLAY ---
 const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
   const [targetRect, setTargetRect] = useState(null);
   const step = steps[currentStep];
   const isMobile = window.innerWidth < 768;
 
-  useEffect(() => {
-    // FIX: Only lock scroll on Mobile. Allow scrolling on Desktop.
-    if (isMobile) {
-      document.body.style.overflow = 'hidden';
+  // Function to calculate position and handle scrolling
+  const updatePosition = useCallback(() => {
+    const element = document.querySelector(step.target);
+    if (element) {
+      const rect = element.getBoundingClientRect();
+      
+      // Update the highlighter box
+      setTargetRect({
+        top: rect.top + window.scrollY, // Absolute position relative to document
+        left: rect.left + window.scrollX,
+        width: rect.width,
+        height: rect.height,
+        // Store viewport relative top for collision logic
+        viewportTop: rect.top, 
+        viewportBottom: rect.bottom
+      });
+    } else {
+      setTargetRect(null);
     }
+  }, [step.target]);
 
-    const updatePosition = () => {
-      const element = document.querySelector(step.target);
-      if (element) {
-        const rect = element.getBoundingClientRect();
-        
-        // Check if the element is actually visible in the viewport
-        // If not, on desktop we might need to scroll it into view initially
-        const isInViewport = (
-          rect.top >= 0 &&
-          rect.left >= 0 &&
-          rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-          rect.right <= (window.innerWidth || document.documentElement.clientWidth)
-        );
-        
-        if (!isInViewport && !isMobile) {
-             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+  // Handle Scrolling to the target on Step Change
+  useEffect(() => {
+    const element = document.querySelector(step.target);
+    if (element) {
+      // 1. Force the scroll
+      element.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center',
+        inline: 'center'
+      });
 
-        setTargetRect({
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-        });
-      } else {
-        setTargetRect(null);
+      // 2. Mobile Specific: Add extra padding at bottom if we are at the end
+      // This ensures the Fixed Card doesn't cover the highlighted element
+      if (isMobile) {
+        setTimeout(() => {
+           const rect = element.getBoundingClientRect();
+           const bottomSpace = window.innerHeight - rect.bottom;
+           // If element is covered by the bottom card (approx 200px)
+           if (bottomSpace < 200) {
+             window.scrollBy({ top: 200, behavior: 'smooth' });
+           }
+        }, 500);
       }
-    };
-
-    updatePosition();
-    window.addEventListener('resize', updatePosition);
-    // Add scroll listener so the spotlight moves when you scroll on desktop
-    window.addEventListener('scroll', updatePosition, true); 
+    }
     
-    const timer = setTimeout(updatePosition, 100); 
+    // Initial calculate
+    updatePosition();
+    
+    // Listeners
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition); // No 'true' capture needed
 
     return () => {
-      document.body.style.overflow = 'unset'; // Always cleanup scroll lock
       window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
-      clearTimeout(timer);
+      window.removeEventListener('scroll', updatePosition);
     };
-  }, [currentStep, step.target, isMobile]);
+  }, [currentStep, step.target, isMobile, updatePosition]);
 
-  // Determine vertical position: Prefer putting it ABOVE if we are low on the screen
-  const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
-  // If target is in the bottom half of screen, put box above it.
-  const showAbove = targetRect && (targetRect.top > screenHeight / 2);
+  // --- COLLISION LOGIC FOR DESKTOP ---
+  const CARD_HEIGHT = 280; // Approximate max height of card
+  let showAbove = false;
+  
+  if (targetRect && !isMobile) {
+    const spaceBelow = window.innerHeight - targetRect.viewportBottom;
+    // If less than 280px space below, and plenty of space above, FLIP IT.
+    if (spaceBelow < CARD_HEIGHT && targetRect.viewportTop > CARD_HEIGHT) {
+      showAbove = true;
+    }
+  }
 
   return (
-    <div className="fixed inset-0 z-[200] pointer-events-none">
-      {/* 1. Backdrop - Allow pointer events so we can click/scroll content behind if needed */}
-      <div className="absolute inset-0 bg-black/60 mix-blend-hard-light transition-opacity duration-500 pointer-events-auto" />
+    <div className="absolute top-0 left-0 w-full h-full z-[200] pointer-events-none">
+      
+      {/* 1. Backdrop (Document Height) */}
+      <div 
+        className="fixed inset-0 bg-black/60 mix-blend-hard-light transition-opacity duration-500 pointer-events-auto"
+        onClick={onClose} // Allow clicking background to close if stuck
+      />
 
-      {/* 2. Spotlight */}
+      {/* 2. Spotlight (Absolute to Document) */}
       {targetRect && (
         <div 
-          className="absolute transition-all duration-100 ease-out border-2 border-white/50 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]"
+          className="absolute transition-all duration-200 ease-out border-2 border-white/50 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]"
           style={{
             top: targetRect.top - 5,
             left: targetRect.left - 5,
@@ -1754,42 +1774,45 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
 
       {/* 3. Instruction Card */}
       <div 
-        className={`absolute w-full max-w-sm transition-all duration-300 ease-out px-4 md:px-0 pointer-events-auto
-          ${isMobile ? 'bottom-6 left-0 right-0 mx-auto' : ''}`}
+        className={`fixed transition-all duration-300 ease-out px-4 md:px-0 pointer-events-auto
+          ${isMobile ? 'bottom-6 left-0 right-0 mx-auto w-full max-w-sm' : 'w-80'}`}
         style={!isMobile && targetRect ? {
-           // Desktop Positioning: Flip based on screen position
+           // Desktop: Use Fixed positioning based on viewport coordinates
+           position: 'fixed',
            top: showAbove 
-              ? targetRect.top - 10 // Shift up slightly above target (CSS translate will handle height)
-              : targetRect.top + targetRect.height + 20, 
-           left: targetRect.left > window.innerWidth - 350 ? 'auto' : Math.max(20, targetRect.left), 
+              ? targetRect.viewportTop - 20 
+              : targetRect.viewportBottom + 20,
+           left: targetRect.left > window.innerWidth - 350 ? 'auto' : Math.max(20, targetRect.left),
            right: targetRect.left > window.innerWidth - 350 ? 20 : 'auto',
-           transform: showAbove ? 'translateY(-100%)' : 'none' // Crucial: Moves the box up by its own height
+           transform: showAbove ? 'translateY(-100%)' : 'none' 
         } : {}}
       >
-        <div className="bg-white p-5 rounded-2xl shadow-2xl border border-slate-100 animate-in zoom-in-95">
+        <div className="bg-white p-5 rounded-2xl shadow-2xl border border-slate-100 animate-in zoom-in-95 flex flex-col max-h-[80vh]">
           <div className="flex justify-between items-start mb-2">
             <h3 className="font-bold text-lg text-slate-800">{step.title}</h3>
             <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
             </button>
           </div>
-          {/* Max height added to prevent card getting too tall */}
-          <p className="text-sm text-slate-500 mb-6 leading-relaxed max-h-40 overflow-y-auto">{step.content}</p>
           
-          <div className="flex justify-between items-center">
+          <div className="overflow-y-auto custom-scrollbar mb-4">
+            <p className="text-sm text-slate-500 leading-relaxed">{step.content}</p>
+          </div>
+          
+          <div className="flex justify-between items-center mt-auto pt-2 border-t border-slate-50">
             <span className="text-xs font-bold text-slate-300">Step {currentStep + 1} / {steps.length}</span>
             <div className="flex gap-2">
               {currentStep > 0 && (
                 <button 
                     onClick={onPrev} 
-                    className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition"
+                    className="px-3 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition"
                 >
                     Back
                 </button>
               )}
               <button 
                 onClick={onNext} 
-                className="px-6 py-2 text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 rounded-lg shadow-lg active:scale-95 transition"
+                className="px-5 py-2 text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 rounded-lg shadow-lg active:scale-95 transition"
               >
                 {currentStep === steps.length - 1 ? 'Finish' : 'Next'}
               </button>
