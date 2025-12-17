@@ -2111,7 +2111,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Floating Action Button (FAB) - REPLACED WITH PILL */}
+      {/* Floating Action Button (FAB) */}
       <button 
         onClick={() => {
           triggerHaptic();
@@ -2153,20 +2153,14 @@ export default function App() {
         />
       )}
       
-      {/* --- NEW RENDER: ONBOARDING WIZARD --- */}
       {!loading && !onboardingComplete && user && (
         <OnboardingWizard 
           user={user}
           onComplete={async (newSettings) => {
-             // 1. Save the settings to Firestore
              const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
              await setDoc(settingsRef, newSettings);
-             
-             // 2. Refresh local state immediately to close wizard
              setUserSettings(newSettings);
              setOnboardingComplete(true);
-             
-             // 3. Trigger the Help Tutorial for a nice follow-up
              setShowHelp(true); 
           }}
         />
@@ -2209,7 +2203,7 @@ export default function App() {
         />
       )}
 
-      {/* MAIN APP HEADER */}
+      {/* MAIN APP HEADER - MENU BUTTON IS HERE, DROPDOWN IS GONE */}
       <header className={`text-white pt-6 pb-24 px-6 rounded-b-[2.5rem] shadow-xl relative z-0 print:hidden transition-all duration-500 ease-in-out ${isSandbox ? 'bg-indigo-900' : 'bg-slate-900'}`}>
         <div className="max-w-2xl mx-auto flex justify-between items-center mb-6 relative">
           
@@ -2228,7 +2222,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* DESKTOP ACTIONS (Hidden on Mobile) */}
+          {/* DESKTOP ACTIONS */}
           <div className="hidden md:flex gap-2">
              <button onClick={toggleSandbox} className={`p-2 rounded-xl hover:bg-white/10 transition border ${isSandbox ? 'bg-indigo-800 border-indigo-700' : 'bg-slate-800 border-slate-700/50'}`} title="Sandbox Mode">
               <FlaskConical className={`w-5 h-5 ${isSandbox ? 'text-white' : 'text-purple-400'}`} />
@@ -2250,51 +2244,17 @@ export default function App() {
             </button>
           </div>
 
-          {/* MOBILE MENU TRIGGER (Visible only on Mobile) */}
+          {/* MOBILE MENU TRIGGER */}
           <button 
             onClick={() => {
               triggerHaptic();
               setMobileMenuOpen(!mobileMenuOpen);
             }}
-            className="md:hidden p-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition active:scale-95 z-50 relative"
+            className="md:hidden p-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition active:scale-95"
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
 
-          {/* MOBILE MENU DROPDOWN & BACKDROP */}
-          {mobileMenuOpen && (
-            <>
-              {/* Invisible Backdrop to close menu when clicking outside */}
-              <div 
-                className="fixed inset-0 bg-black/20 z-[60] backdrop-blur-[2px] md:hidden animate-in fade-in"
-                onClick={() => setMobileMenuOpen(false)}
-              />
-              
-              {/* Dropdown Menu - Now using FIXED positioning to sit above everything */}
-              <div className="fixed top-24 right-6 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 grid grid-cols-2 gap-2 animate-in slide-in-from-top-4 fade-in z-[70] md:hidden">
-                 {[
-                   { label: 'Sandbox', icon: FlaskConical, action: toggleSandbox, color: 'text-purple-600', bg: 'bg-purple-50' },
-                   { label: 'Analytics', icon: BarChart3, action: () => setShowAnalytics(true), color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                   { label: 'Reports', icon: FileText, action: () => setShowReportSelector(true), color: 'text-blue-600', bg: 'bg-blue-50' },
-                   { label: 'Settings', icon: Settings, action: () => setShowSettings(true), color: 'text-slate-600', bg: 'bg-slate-100' },
-                   { label: 'Help', icon: HelpCircle, action: () => setShowHelp(true), color: 'text-amber-600', bg: 'bg-amber-50' },
-                   { label: 'Logout', icon: LogOut, action: handleLogout, color: 'text-red-600', bg: 'bg-red-50' },
-                 ].map((item, i) => (
-                   <button 
-                     key={i} 
-                     onClick={() => {
-                       setMobileMenuOpen(false);
-                       item.action();
-                     }}
-                     className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl hover:scale-95 transition ${item.bg}`}
-                   >
-                     <item.icon className={`w-6 h-6 ${item.color}`} />
-                     <span className={`text-xs font-bold ${item.color}`}>{item.label}</span>
-                   </button>
-                 ))}
-              </div>
-            </>
-          )}
         </div>
       </header>
 
@@ -2371,7 +2331,6 @@ export default function App() {
             {userSettings.allocationRules.map(plan => {
               const target = remainder * (plan.percentage / 100);
               
-              // Check if this is the specific scenario for the Remainder button
               const isFilled = displayActualSavings[plan.id] !== undefined && displayActualSavings[plan.id] !== '';
               const isLastToFill = !isFilled && (userSettings.allocationRules.length - filledPlansCount === 1);
 
@@ -2405,7 +2364,6 @@ export default function App() {
                  >
                    <Copy className="w-4 h-4" /> <span className="hidden sm:inline">Copy Last Month</span>
                  </button>
-                 {/* Original Inline Add Button - Removed as requested, replaced by FAB */}
                </div>
             </div>
             
@@ -2439,7 +2397,7 @@ export default function App() {
             ].map(group => (
               group.items.length > 0 && (
                 <React.Fragment key={group.title}>
-                  {/* Group Header (Only show if searching or if both exist) */}
+                  {/* Group Header */}
                   {(searchTerm || (fixedExpenses.length > 0 && variableExpenses.length > 0)) && (
                     <div className="bg-slate-50/50 px-5 py-2 border-y border-slate-100">
                       <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{group.title}</h4>
@@ -2453,7 +2411,6 @@ export default function App() {
                     return (
                     <div key={expense.id} className="p-4 flex justify-between items-center group hover:bg-slate-50 transition">
                       <div className="flex items-center gap-3 flex-1">
-                        {/* --- MODIFIED ICON SECTION --- */}
                         <div className={`p-2 rounded-full bg-slate-100 text-slate-500 w-10 h-10 flex items-center justify-center`}>
                            {expense.logo ? (
                              <img src={expense.logo} alt={expense.name} className="w-full h-full object-contain mix-blend-multiply" />
@@ -2461,7 +2418,6 @@ export default function App() {
                              <Icon className="w-4 h-4" />
                            )}
                         </div>
-                        {/* ----------------------------- */}
                         <div className="flex-1">
                           {isEditing ? (
                             <input 
@@ -2486,14 +2442,9 @@ export default function App() {
                             </span>
                             <input 
                               autoFocus
-                              /* CHANGE: type="text" and inputMode="decimal" */
                               type="text"
                               defaultValue={expense.amount}
-                              
-                              /* CHANGE: Force calculation on Blur */
                               onBlur={(e) => updateExpenseAmount(expense.id, safeCalculate(e.target.value))}
-                              
-                              /* CHANGE: Force calculation on Enter Key */
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                    updateExpenseAmount(expense.id, safeCalculate(e.currentTarget.value));
@@ -2569,6 +2520,43 @@ export default function App() {
         </div>
 
       </div>
+
+      {/* --- NEW LOCATION: MOBILE MENU OVERLAY (OUTSIDE HEADER) --- */}
+      {/* This ensures it sits on top of absolutely everything in the app */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-[100] md:hidden">
+            {/* Backdrop */}
+            <div 
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            
+            {/* Menu Grid */}
+            <div className="absolute top-20 right-6 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 grid grid-cols-2 gap-2 animate-in slide-in-from-top-4 fade-in">
+                {[
+                  { label: 'Sandbox', icon: FlaskConical, action: toggleSandbox, color: 'text-purple-600', bg: 'bg-purple-50' },
+                  { label: 'Analytics', icon: BarChart3, action: () => setShowAnalytics(true), color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                  { label: 'Reports', icon: FileText, action: () => setShowReportSelector(true), color: 'text-blue-600', bg: 'bg-blue-50' },
+                  { label: 'Settings', icon: Settings, action: () => setShowSettings(true), color: 'text-slate-600', bg: 'bg-slate-100' },
+                  { label: 'Help', icon: HelpCircle, action: () => setShowHelp(true), color: 'text-amber-600', bg: 'bg-amber-50' },
+                  { label: 'Logout', icon: LogOut, action: handleLogout, color: 'text-red-600', bg: 'bg-red-50' },
+                ].map((item, i) => (
+                  <button 
+                    key={i} 
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      item.action();
+                    }}
+                    className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl hover:scale-95 transition ${item.bg}`}
+                  >
+                    <item.icon className={`w-6 h-6 ${item.color}`} />
+                    <span className={`text-xs font-bold ${item.color}`}>{item.label}</span>
+                  </button>
+                ))}
+            </div>
+        </div>
+      )}
+      {/* ---------------------------------------------------------- */}
     </div>
   );
 }
