@@ -1214,6 +1214,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   
   const [newPlanName, setNewPlanName] = useState('');
   const [newPlanPercent, setNewPlanPercent] = useState('');
+  const [openColorMenuId, setOpenColorMenuId] = useState(null);
   const [newPlanColor, setNewPlanColor] = useState(POT_COLORS[0]);
   const [newDefExpName, setNewDefExpName] = useState('');
   const [newDefExpAmount, setNewDefExpAmount] = useState('');
@@ -1322,71 +1323,88 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
           
           <div className="space-y-3">
-            {/* --- LIST OF EXISTING POTS --- */}
+            {/* --- EXISTING POTS LIST --- */}
             {allocations.map(plan => (
-              <div key={plan.id} className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-                
-                {/* COLOR CHANGE BUTTON (Click to Cycle) */}
-                <button 
-                  onClick={() => {
-                    // Find current index and cycle to next color
-                    const currentIndex = POT_COLORS.findIndex(c => c.hex === (plan.hex || '#10b981'));
-                    const nextIndex = (currentIndex + 1) % POT_COLORS.length;
-                    const nextColor = POT_COLORS[nextIndex];
-                    
-                    setAllocations(allocations.map(a => a.id === plan.id ? {
-                        ...a,
-                        hex: nextColor.hex,
-                        color: nextColor.tailwind
-                    } : a));
-                  }}
-                  className="w-10 h-10 rounded-full border-2 border-slate-50 shadow-sm shrink-0 hover:scale-110 transition active:scale-95 group relative"
-                  style={{ backgroundColor: plan.hex || '#10b981' }}
-                  title="Click to change color"
-                  disabled={isTutorial}
-                >
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
-                    <Edit2 className="w-4 h-4 text-white drop-shadow-md" />
-                  </div>
-                </button>
-                
-                {/* Name Input */}
-                <input 
-                  value={plan.name}
-                  onChange={(e) => setAllocations(allocations.map(a => a.id === plan.id ? {...a, name: e.target.value} : a))}
-                  className="flex-1 font-bold text-slate-700 bg-transparent border-none outline-none focus:ring-0 text-sm" 
-                  disabled={isTutorial}
-                />
-
-                {/* Percentage Input */}
-                <div className="flex items-center gap-1 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100">
+              <div key={plan.id} className="relative">
+                <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm z-10 relative">
+                  
+                  {/* COLOR BUTTON (Opens Menu) */}
+                  <button 
+                    onClick={() => setOpenColorMenuId(openColorMenuId === plan.id ? null : plan.id)}
+                    className="w-10 h-10 rounded-full border-2 border-slate-50 shadow-sm shrink-0 hover:scale-105 transition active:scale-95 group relative"
+                    style={{ backgroundColor: plan.hex || '#10b981' }}
+                    title="Change Color"
+                    disabled={isTutorial}
+                  >
+                    {/* Pencil Icon Overlay */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/10 rounded-full">
+                      <Edit2 className="w-4 h-4 text-white drop-shadow-md" />
+                    </div>
+                  </button>
+                  
+                  {/* Name Input */}
                   <input 
-                    type="number"
-                    value={plan.percentage}
-                    onChange={(e) => setAllocations(allocations.map(a => a.id === plan.id ? {...a, percentage: parseFloat(e.target.value) || 0} : a))}
-                    className="w-8 bg-transparent text-right font-bold text-slate-800 outline-none p-0 text-sm"
+                    value={plan.name}
+                    onChange={(e) => setAllocations(allocations.map(a => a.id === plan.id ? {...a, name: e.target.value} : a))}
+                    className="flex-1 font-bold text-slate-700 bg-transparent border-none outline-none focus:ring-0 text-sm" 
                     disabled={isTutorial}
                   />
-                  <span className="text-slate-400 text-xs font-bold">%</span>
+
+                  {/* Percentage Input */}
+                  <div className="flex items-center gap-1 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100">
+                    <input 
+                      type="number"
+                      value={plan.percentage}
+                      onChange={(e) => setAllocations(allocations.map(a => a.id === plan.id ? {...a, percentage: parseFloat(e.target.value) || 0} : a))}
+                      className="w-8 bg-transparent text-right font-bold text-slate-800 outline-none p-0 text-sm"
+                      disabled={isTutorial}
+                    />
+                    <span className="text-slate-400 text-xs font-bold">%</span>
+                  </div>
+
+                  {/* Delete Button */}
+                  {!isTutorial && (
+                    <button onClick={() => removeAllocation(plan.id)} className="text-slate-300 hover:text-red-500 p-2 hover:bg-red-50 rounded-xl transition">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
 
-                {/* Delete Button */}
-                {!isTutorial && (
-                  <button onClick={() => removeAllocation(plan.id)} className="text-slate-300 hover:text-red-500 p-2 hover:bg-red-50 rounded-xl transition">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                {/* --- POP-OVER COLOR MENU (Visible if openColorMenuId matches) --- */}
+                {openColorMenuId === plan.id && (
+                  <div className="absolute top-14 left-0 z-20 bg-white p-3 rounded-2xl shadow-xl border border-slate-100 animate-in slide-in-from-top-2 fade-in w-full">
+                    <div className="text-xs font-bold text-slate-400 uppercase mb-2">Select Color</div>
+                    <div className="flex gap-2 flex-wrap justify-start">
+                      {POT_COLORS.map((colorOption) => (
+                        <button
+                          key={colorOption.id}
+                          onClick={() => {
+                            setAllocations(allocations.map(a => a.id === plan.id ? {
+                                ...a,
+                                hex: colorOption.hex,
+                                color: colorOption.tailwind
+                            } : a));
+                            setOpenColorMenuId(null); // Close menu after selection
+                          }}
+                          className={`w-8 h-8 rounded-full shadow-sm hover:scale-110 transition border-2 ${plan.hex === colorOption.hex ? 'border-slate-800 scale-110' : 'border-transparent'}`}
+                          style={{ backgroundColor: colorOption.hex }}
+                        >
+                           {plan.hex === colorOption.hex && <Check className="w-4 h-4 text-white mx-auto" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             ))}
             
-            {/* --- ADD NEW POT SECTION --- */}
+            {/* --- CREATE NEW POT --- */}
             <div className={`bg-slate-50 rounded-2xl p-4 border border-slate-200/60 ${isTutorial ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div className="flex justify-between items-center mb-3">
                    <p className="text-xs font-bold text-slate-400 uppercase">Create New Pot</p>
-                   <span className="text-[10px] font-bold text-slate-400 bg-white px-2 py-1 rounded-lg border border-slate-100">Select Color 👇</span>
                 </div>
                 
-                {/* 1. Color Palette Selector */}
+                {/* Color Selector */}
                 <div className="flex gap-3 overflow-x-auto pb-4 mb-2 no-scrollbar px-1">
                     {POT_COLORS.map((colorOption) => (
                         <button
@@ -1406,10 +1424,10 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                     ))}
                 </div>
 
-                {/* 2. Inputs */}
+                {/* Inputs & Add Button */}
                 <div className="flex gap-2">
                     <input 
-                      placeholder="Pot Name (e.g. Holiday)"
+                      placeholder="Name"
                       value={newPlanName}
                       onChange={(e) => setNewPlanName(e.target.value)}
                       className="flex-1 p-3 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-slate-200 transition font-medium"
@@ -1425,7 +1443,24 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
                     </div>
                     <button 
-                        onClick={addAllocation} 
+                        onClick={() => {
+                             if(!newPlanName || !newPlanPercent) return;
+                             
+                             // 1. Capture the CURRENT selected color immediately
+                             const selectedColor = newPlanColor;
+
+                             setAllocations([...allocations, { 
+                               id: Date.now().toString(), 
+                               name: newPlanName, 
+                               percentage: parseFloat(newPlanPercent),
+                               color: selectedColor.tailwind, 
+                               hex: selectedColor.hex 
+                             }]);
+                             
+                             setNewPlanName('');
+                             setNewPlanPercent('');
+                             setNewPlanColor(POT_COLORS[0]); // Reset AFTER adding
+                        }} 
                         className="text-white p-3 rounded-xl shadow-lg hover:opacity-90 transition active:scale-95 w-12 flex items-center justify-center"
                         style={{ backgroundColor: newPlanColor.hex }}
                     >
