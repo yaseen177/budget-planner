@@ -916,92 +916,85 @@ const StatCard = ({ label, amount, icon: Icon, colorClass, subText, currency }) 
   </div>
 );
 
-const AllocationCard = ({ title, targetAmount, actualAmount, percentage, color, currency, onUpdateActual, showRemainderButton, onFillRemainder }) => {
+const AllocationCard = ({ title, targetAmount, actualAmount, percentage, hexColor, currency, onUpdateActual, showRemainderButton, onFillRemainder }) => {
+  const actualNum = parseFloat(actualAmount) || 0;
+  // Calculate progress bar width (max 100%)
+  const progressPercent = Math.min(100, Math.max(0, (actualNum / targetAmount) * 100));
   
-  // Robust mapping for the Progress Bar color
-  const getBarColor = (c) => {
-    if (c.includes('emerald')) return 'bg-emerald-500';
-    if (c.includes('indigo')) return 'bg-indigo-500';
-    if (c.includes('sky')) return 'bg-sky-500';
-    if (c.includes('amber')) return 'bg-amber-500';
-    if (c.includes('purple')) return 'bg-purple-500';
-    if (c.includes('rose')) return 'bg-rose-500';
-    if (c.includes('cyan')) return 'bg-cyan-500';
-    if (c.includes('lime')) return 'bg-lime-500';
-    if (c.includes('fuchsia')) return 'bg-fuchsia-500';
-    if (c.includes('orange')) return 'bg-orange-500';
-    if (c.includes('teal')) return 'bg-teal-500';
-    return 'bg-slate-500';
-  };
-
-  const barColor = getBarColor(color);
+  // Use the passed Hex Color or fallback to Emerald Green
+  const activeColor = hexColor || '#10b981';
 
   return (
-    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm print:border-slate-300 print:shadow-none print:break-inside-avoid">
-      <div className="flex justify-between items-center mb-3">
+    <div className="bg-white p-5 rounded-[1.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 group relative overflow-hidden">
+      
+      {/* Header */}
+      <div className="flex justify-between items-start mb-4 relative z-10">
         <div className="flex items-center gap-3">
-          {/* Icon container uses the lighter background class passed in props */}
-          <div className={`p-2 rounded-lg ${color} bg-opacity-20`}>
-            <Target className="w-4 h-4" />
+          {/* 1. Icon Background: Uses Hex with 15% opacity */}
+          <div 
+            className="w-10 h-10 rounded-xl flex items-center justify-center transition-colors"
+            style={{ backgroundColor: `${activeColor}20`, color: activeColor }}
+          >
+            <Target className="w-5 h-5" />
           </div>
-          <h4 className="font-bold text-slate-700 print:text-black">{title}</h4>
+          <div>
+            <h4 className="font-bold text-slate-800 text-sm leading-tight">{title}</h4>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{percentage}% Pot</p>
+          </div>
         </div>
         <div className="text-right">
-           <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Target</p>
-           <p className="text-lg font-bold text-slate-800 print:text-black">{formatCurrency(targetAmount, currency)}</p>
+          <div className="font-bold text-slate-800">{formatCurrency(actualNum, currency)}</div>
+          <div className="text-[10px] text-slate-400 font-medium">of {formatCurrency(targetAmount, currency)}</div>
         </div>
       </div>
-      
-      {/* Progress Bar */}
-      <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden mb-3">
+
+      {/* 2. Progress Bar Background */}
+      <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden mb-4 relative z-10">
+        {/* 3. The Actual Colored Bar */}
         <div 
-          className={`h-2.5 rounded-full ${barColor} transition-all duration-1000 ease-out`} 
-          style={{ width: `${percentage}%` }}
-        ></div>
+          className="h-full rounded-full transition-all duration-1000 ease-out relative"
+          style={{ width: `${progressPercent}%`, backgroundColor: activeColor }}
+        >
+             {/* Subtle shine effect */}
+             <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-50"></div>
+        </div>
       </div>
 
-      {/* Actual Input Row */}
-      <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl print:bg-transparent print:p-0 print:border-t print:rounded-none print:mt-2">
-         <span className="text-xs font-bold text-slate-500 uppercase">Actual Saved</span>
-         <div className="flex items-center gap-2">
-           {showRemainderButton ? (
-              <button 
-                onClick={onFillRemainder}
-                className="text-xs bg-blue-100 text-blue-600 font-bold hover:bg-blue-200 px-3 py-1.5 rounded-lg print:hidden flex items-center gap-1"
-                title="Fill with remaining budget"
-              >
-                Remainder
-              </button>
-           ) : (
-              onUpdateActual && (
+      {/* Input Row */}
+      <div className="flex items-center gap-2 relative z-10">
+        <div className="relative flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
+          <input 
+            type="number" 
+            placeholder="0"
+            value={actualAmount}
+            onChange={(e) => onUpdateActual(e.target.value)}
+            className="w-full pl-7 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-opacity-50 transition"
+            style={{ '--tw-ring-color': activeColor }} // Uses CSS variable for ring color if configured, or just rely on border
+          />
+        </div>
+        
+        {/* Dynamic Button Color */}
+        {showRemainderButton ? (
+          <button 
+            onClick={onFillRemainder}
+            className="px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm hover:opacity-90 active:scale-95 transition"
+            style={{ backgroundColor: activeColor }}
+          >
+            Max
+          </button>
+        ) : (
+             onUpdateActual && (
                 <button 
                   onClick={() => onUpdateActual(targetAmount)}
-                  className="text-xs text-emerald-600 font-bold hover:bg-emerald-100 px-2 py-1 rounded print:hidden"
+                  className="px-3 py-2.5 rounded-xl text-xs font-bold transition border hover:opacity-100 opacity-80"
+                  style={{ color: activeColor, borderColor: `${activeColor}40`, backgroundColor: `${activeColor}10` }}
                   title="Match Target"
                 >
-                  Match Target
+                  <Check className="w-4 h-4" />
                 </button>
               )
-           )}
-           <div className="relative">
-             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
-                {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}
-             </span>
-             <input 
-                type="text"
-                value={actualAmount || ''}
-                onChange={(e) => onUpdateActual(e.target.value)}
-                onBlur={(e) => onUpdateActual(safeCalculate(e.target.value))}
-                onKeyDown={(e) => {
-                  if(e.key === 'Enter') {
-                    e.currentTarget.blur();
-                  }
-                }}
-                placeholder="0"
-                className="w-24 text-right bg-white border border-slate-200 rounded-lg py-1 pr-2 pl-6 text-sm font-bold text-slate-800 focus:border-emerald-500 outline-none print:bg-transparent print:border-none"
-             />
-           </div>
-         </div>
+        )}
       </div>
     </div>
   );
@@ -2904,14 +2897,19 @@ export default function App() {
                 {displayAllocations.map(plan => {
                   const target = remainder * (plan.percentage / 100);
                   const isLastToFill = (displayAllocations.length - filledPlansCount === 1);
+                  
                   return (
                     <AllocationCard 
                       key={plan.id}
                       title={plan.name} 
                       targetAmount={target}
                       actualAmount={displayActualSavings[plan.id]}
-                      percentage={plan.percentage} 
-                      color={plan.color || 'bg-slate-100 text-slate-700'}
+                      percentage={plan.percentage}
+                      
+                      // --- CRITICAL UPDATE: PASS HEX COLOR ---
+                      hexColor={plan.hex || '#10b981'} 
+                      // -------------------------------------
+                      
                       currency={userSettings.currency}
                       onUpdateActual={(val) => updateActualSavings(plan.id, val)}
                       showRemainderButton={isLastToFill}
