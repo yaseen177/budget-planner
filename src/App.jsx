@@ -101,6 +101,17 @@ const FULL_MONTH_NAMES = [
   "July", "August", "September", "October", "November", "December"
 ];
 
+const POT_COLORS = [
+  { id: 'emerald', hex: '#10b981', tailwind: 'bg-emerald-100 text-emerald-700' },
+  { id: 'blue', hex: '#3b82f6', tailwind: 'bg-blue-100 text-blue-700' },
+  { id: 'indigo', hex: '#6366f1', tailwind: 'bg-indigo-100 text-indigo-700' },
+  { id: 'violet', hex: '#8b5cf6', tailwind: 'bg-violet-100 text-violet-700' },
+  { id: 'amber', hex: '#f59e0b', tailwind: 'bg-amber-100 text-amber-700' },
+  { id: 'orange', hex: '#f97316', tailwind: 'bg-orange-100 text-orange-700' },
+  { id: 'cyan', hex: '#06b6d4', tailwind: 'bg-cyan-100 text-cyan-700' },
+  { id: 'pink', hex: '#ec4899', tailwind: 'bg-pink-100 text-pink-700' }, // Pink is distinct from Red (#ef4444)
+];
+
 const DEFAULT_FIXED_EXPENSES = [
   { id: 'fix_1', name: 'Mortgage', amount: 510.00, type: 'fixed' },
   { id: 'fix_2', name: 'Car Payment', amount: 342.93, type: 'fixed' },
@@ -648,13 +659,33 @@ const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, classNa
         value={value}
         onChange={(e) => {
           onChange(e.target.value);
-          setShowDropdown(false); // Hide until debounce fires
+          setShowDropdown(true); // Show immediately when typing
         }}
-        onBlur={() => setTimeout(() => setShowDropdown(false), 200)} // Delay hide so click registers
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
       />
       
-      {showDropdown && results.length > 0 && (
+      {/* Show dropdown if user has typed anything, even if no API results yet */}
+      {showDropdown && value.length > 0 && (
         <div className="absolute top-full left-0 right-0 bg-white shadow-xl rounded-xl border border-slate-100 mt-1 z-50 overflow-hidden max-h-60 overflow-y-auto">
+          
+          {/* --- 1. NEW: ADD MANUALLY BUTTON (Always First) --- */}
+          <button
+            className="w-full text-left p-3 hover:bg-emerald-50 flex items-center gap-3 transition border-b border-slate-50 group"
+            onClick={() => {
+              onSelectBrand(value, null); // Pass null logo for manual entry
+              setShowDropdown(false);
+            }}
+          >
+            <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 p-1 flex items-center justify-center text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition">
+                <Plus className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="font-bold text-slate-800 text-sm group-hover:text-emerald-700">Add "{value}" Manually</div>
+              <div className="text-xs text-slate-400">No logo</div>
+            </div>
+          </button>
+          {/* ------------------------------------------------ */}
+
           {results.map((brand, i) => (
             <button
               key={i}
@@ -674,9 +705,6 @@ const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, classNa
               </div>
             </button>
           ))}
-          <div className="p-2 bg-slate-50 text-xs text-center text-slate-400">
-            Select a brand or keep typing to add manually
-          </div>
         </div>
       )}
     </div>
@@ -695,27 +723,6 @@ const BudgetWheel = ({ salary, expenses, allocations, currency }) => {
 
   const expensesPercent = Math.min(100, (totalExpenses / salaryNum) * 100);
   const remainderPercentOfTotal = 100 - expensesPercent;
-  
-  // --- UPDATED: High Contrast Color Mapping ---
-  const getColorHex = (colorString) => {
-    if (!colorString) return '#94a3b8'; // Neutral Slate
-    const str = colorString.toLowerCase();
-    
-    // Distinct Spectrum
-    if (str.includes('emerald')) return '#10b981'; // Green
-    if (str.includes('indigo')) return '#6366f1';  // Deep Blue
-    if (str.includes('amber')) return '#f59e0b';   // Yellow/Orange
-    if (str.includes('sky')) return '#0ea5e9';     // Light Blue
-    if (str.includes('purple')) return '#a855f7';  // Purple
-    if (str.includes('rose')) return '#f43f5e';    // Red/Pink
-    if (str.includes('cyan')) return '#06b6d4';    // Bright Aqua
-    if (str.includes('lime')) return '#84cc16';    // Bright Green
-    if (str.includes('fuchsia')) return '#d946ef'; // Hot Pink
-    if (str.includes('orange')) return '#f97316';  // Deep Orange
-    if (str.includes('teal')) return '#14b8a6';    // Blue-Green
-    
-    return '#64748b'; // Fallback
-  };
 
   let currentDegree = 0;
   const segments = [];
@@ -726,15 +733,19 @@ const BudgetWheel = ({ salary, expenses, allocations, currency }) => {
     currentDegree += degrees;
   };
 
-  // 1. Expenses is always Red (Rose-500) for consistency
-  addSegment(expensesPercent, '#f43f5e'); 
+  // 1. EXPENSES IS ALWAYS RED (#ef4444)
+  // We use a specific Red (Red-500) that isn't available in the Pot picker
+  addSegment(expensesPercent, '#ef4444'); 
 
+  // 2. POTS USE THEIR SAVED HEX CODE
   allocations.forEach(plan => {
     const planPercentOfTotal = (plan.percentage / 100) * remainderPercentOfTotal;
-    addSegment(planPercentOfTotal, getColorHex(plan.color));
+    // Use saved hex, fallback to Emerald green if missing (backward compatibility)
+    const color = plan.hex || '#10b981'; 
+    addSegment(planPercentOfTotal, color);
   });
 
-  // Fill remainder with white/grey if not 100%
+  // Fill remainder with slate-100 if not 100%
   if (currentDegree < 360) {
       segments.push(`#f1f5f9 ${currentDegree}deg 360deg`);
   }
@@ -742,31 +753,42 @@ const BudgetWheel = ({ salary, expenses, allocations, currency }) => {
   const gradient = `conic-gradient(${segments.join(', ')})`;
 
   return (
-    <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden print:hidden">
-      <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 w-full text-left">Where your money goes</h3>
-      <div className="relative w-48 h-48">
+    <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden print:hidden h-full">
+      <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6 w-full text-left">Where your money goes</h3>
+      
+      <div className="relative w-56 h-56">
+        {/* The Gradient Wheel */}
         <div className="w-full h-full rounded-full transition-all duration-1000 ease-out" style={{ background: gradient }}></div>
+        
+        {/* The Inner Circle (Hollow Effect) */}
         <div className="absolute inset-2 bg-white rounded-full flex flex-col items-center justify-center">
            <div className="absolute inset-0 bg-white rounded-full flex flex-col items-center justify-center z-10">
               <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">Net Salary</span>
-              <span className="text-xl font-bold text-slate-800">{formatCurrency(salaryNum, currency)}</span>
+              <span className="text-2xl font-black text-slate-800 tracking-tight">{formatCurrency(salaryNum, currency)}</span>
            </div>
         </div>
       </div>
       
-      <div className="flex flex-wrap justify-center gap-3 mt-6 w-full">
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-rose-500"></div>
-          <span className="text-xs font-medium text-slate-600">Expenses</span>
+      {/* Legend */}
+      <div className="flex flex-wrap justify-center gap-3 mt-8 w-full">
+        {/* Expense Legend Item (Always Red) */}
+        <div className="flex items-center gap-2 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">
+          <div className="w-3 h-3 rounded-full bg-[#ef4444]"></div>
+          <span className="text-xs font-bold text-rose-700">Expenses</span>
         </div>
+
+        {/* Dynamic Pot Legend Items */}
         {allocations.map(plan => {
+           // Determine text color class based on the background color brightness roughly, 
+           // or just stick to slate-600 for simplicity. 
+           // Using the hex directly for the dot.
            return (
-            <div key={plan.id} className="flex items-center gap-1.5">
+            <div key={plan.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-100 bg-slate-50">
               <div 
                 className="w-3 h-3 rounded-full shadow-sm"
-                style={{ backgroundColor: getColorHex(plan.color) }}
+                style={{ backgroundColor: plan.hex || '#10b981' }}
               ></div>
-              <span className="text-xs font-medium text-slate-600">{plan.name.split(' ')[0]}</span>
+              <span className="text-xs font-bold text-slate-600">{plan.name}</span>
             </div>
            );
         })}
@@ -1198,6 +1220,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   
   const [newPlanName, setNewPlanName] = useState('');
   const [newPlanPercent, setNewPlanPercent] = useState('');
+  const [newPlanColor, setNewPlanColor] = useState(POT_COLORS[0]);
   const [newDefExpName, setNewDefExpName] = useState('');
   const [newDefExpAmount, setNewDefExpAmount] = useState('');
   const [newDefExpLogo, setNewDefExpLogo] = useState(null);
@@ -1305,6 +1328,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
           
           <div className="space-y-2">
+            {/* Existing Allocations List */}
             {allocations.map(plan => (
               <div key={plan.id} className="flex items-center gap-2 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                 <input 
@@ -1331,24 +1355,41 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
               </div>
             ))}
             
-            {/* Show Add Row (Disabled in Tutorial, but Visible for ID targeting) */}
-            <div className={`flex gap-2 pt-2 ${isTutorial ? 'opacity-50 pointer-events-none' : ''}`}>
-              <input 
-                placeholder="New Pot Name"
-                value={newPlanName}
-                onChange={(e) => setNewPlanName(e.target.value)}
-                className="flex-1 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
-              />
-              <input 
-                type="number"
-                placeholder="%"
-                value={newPlanPercent}
-                onChange={(e) => setNewPlanPercent(e.target.value)}
-                className="w-16 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
-              />
-              <button onClick={addAllocation} className="bg-slate-900 text-white p-3 rounded-xl">
-                <Plus className="w-4 h-4" />
-              </button>
+            {/* --- NEW ADD ROW SECTION (With Color Picker) --- */}
+            <div className={`pt-4 space-y-3 ${isTutorial ? 'opacity-50 pointer-events-none' : ''}`}>
+                
+                {/* 1. The Color Picker Circles */}
+                <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                    {POT_COLORS.map((colorOption) => (
+                        <button
+                            key={colorOption.id}
+                            onClick={() => setNewPlanColor(colorOption)}
+                            className={`w-8 h-8 rounded-full border-2 transition flex items-center justify-center shrink-0 ${colorOption.tailwind.split(' ')[0]} ${newPlanColor.id === colorOption.id ? 'border-slate-800 scale-110 shadow-md' : 'border-transparent opacity-50 hover:opacity-100'}`}
+                        >
+                            {newPlanColor.id === colorOption.id && <Check className="w-4 h-4" />}
+                        </button>
+                    ))}
+                </div>
+
+                {/* 2. The Inputs */}
+                <div className="flex gap-2">
+                    <input 
+                      placeholder="New Pot Name"
+                      value={newPlanName}
+                      onChange={(e) => setNewPlanName(e.target.value)}
+                      className="flex-1 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-100 transition"
+                    />
+                    <input 
+                      type="number"
+                      placeholder="%"
+                      value={newPlanPercent}
+                      onChange={(e) => setNewPlanPercent(e.target.value)}
+                      className="w-16 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-100 transition"
+                    />
+                    <button onClick={addAllocation} className="bg-slate-900 text-white p-3 rounded-xl hover:bg-slate-800 transition">
+                      <Plus className="w-4 h-4" />
+                    </button>
+                </div>
             </div>
           </div>
         </section>
