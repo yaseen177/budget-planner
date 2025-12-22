@@ -1,5 +1,5 @@
 //1REVERT BACK TO THIS IF ANY ERROR
-import AdminDashboard from './AdminDashboard';
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -20,7 +20,10 @@ import {
   onSnapshot,
   deleteDoc,
   getDocs,
-  getDoc
+  getDoc,
+  query,
+  orderBy,
+  limit
 } from 'firebase/firestore';
 import { 
   PieChart, 
@@ -2299,6 +2302,105 @@ const SwipeableExpenseRow = ({ children, onEdit, onDelete, isMobile }) => {
         onTouchEnd={handleTouchEnd}
       >
         {children}
+      </div>
+    </div>
+  );
+};
+
+
+// --- INTERNAL ADMIN DASHBOARD ---
+const AdminDashboard = ({ user, onExitAdmin }) => {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        // Query the logs collection you are already writing to in logSystemEvent
+        const q = query(
+          collection(db, 'artifacts', 'nuha-budget-app', 'system_logs'),
+          orderBy('timestamp', 'desc'),
+          limit(50)
+        );
+        const snapshot = await getDocs(q);
+        const data = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          // Convert Timestamp to readable date
+          timestamp: doc.data().timestamp?.toDate().toLocaleString()
+        }));
+        setLogs(data);
+      } catch (e) {
+        console.error("Admin Fetch Error:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLogs();
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-200 p-6 font-mono">
+      {/* Admin Header */}
+      <div className="max-w-6xl mx-auto flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="bg-indigo-500/20 p-2 rounded-lg text-indigo-400">
+            <Shield className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-white">System Admin</h1>
+            <p className="text-xs text-slate-500">Live Activity Log</p>
+          </div>
+        </div>
+        <button 
+          onClick={onExitAdmin}
+          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-2"
+        >
+          <LogOut className="w-4 h-4" /> Exit Admin
+        </button>
+      </div>
+
+      {/* Logs Table */}
+      <div className="max-w-6xl mx-auto bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+        <div className="p-4 bg-slate-800/50 border-b border-slate-800 flex justify-between items-center">
+          <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Recent System Events</h2>
+          <span className="text-xs text-slate-500">{logs.length} events loaded</span>
+        </div>
+        
+        {loading ? (
+          <div className="p-12 text-center text-slate-500 animate-pulse">Loading system logs...</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead className="text-slate-500 bg-slate-950/50 uppercase tracking-wider">
+                <tr>
+                  <th className="p-4 font-semibold">Time</th>
+                  <th className="p-4 font-semibold">User Email</th>
+                  <th className="p-4 font-semibold">Action Type</th>
+                  <th className="p-4 font-semibold">Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {logs.map((log) => (
+                  <tr key={log.id} className="hover:bg-white/5 transition">
+                    <td className="p-4 text-slate-400 whitespace-nowrap">{log.timestamp}</td>
+                    <td className="p-4 text-indigo-300">{log.userEmail}</td>
+                    <td className="p-4">
+                      <span className={`px-2 py-1 rounded-md font-bold uppercase text-[10px] ${
+                        log.type === 'login' ? 'bg-emerald-500/10 text-emerald-400' :
+                        log.type === 'config' ? 'bg-amber-500/10 text-amber-400' :
+                        'bg-blue-500/10 text-blue-400'
+                      }`}>
+                        {log.type}
+                      </span>
+                    </td>
+                    <td className="p-4 text-slate-300">{log.action}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
