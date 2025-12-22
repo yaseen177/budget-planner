@@ -66,7 +66,8 @@ import {
   TrendingUp,
   Maximize2,
   HelpCircle,
-  Menu
+  Menu,
+  Shield
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION AREA ---
