@@ -2039,24 +2039,6 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
   const step = steps[currentStep];
   const isMobile = window.innerWidth < 768;
 
-  // --- NEW: AURORA ANIMATION STYLES ---
-  const auroraStyles = `
-    @keyframes drift {
-      0% { transform: translate(0, 0) scale(1); opacity: 0.4; }
-      33% { transform: translate(30px, -50px) scale(1.1); opacity: 0.6; }
-      66% { transform: translate(-20px, 20px) scale(0.9); opacity: 0.4; }
-      100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
-    }
-    @keyframes drift-reverse {
-      0% { transform: translate(0, 0) scale(1); opacity: 0.4; }
-      33% { transform: translate(-30px, 50px) scale(1.2); opacity: 0.5; }
-      66% { transform: translate(20px, -20px) scale(0.8); opacity: 0.4; }
-      100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
-    }
-    .animate-aurora-1 { animation: drift 15s infinite ease-in-out; }
-    .animate-aurora-2 { animation: drift-reverse 20s infinite ease-in-out; }
-    .animate-aurora-3 { animation: drift 18s infinite ease-in-out reverse; }
-  `;
 
   const updatePosition = useCallback(() => {
     const element = document.querySelector(step.target);
@@ -2334,6 +2316,25 @@ export default function App() {
   const [tutorialStep, setTutorialStep] = useState(0);
 
   const isMobile = window.innerWidth < 768;
+
+  // --- NEW: AURORA ANIMATION STYLES ---
+  const auroraStyles = `
+    @keyframes drift {
+      0% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+      33% { transform: translate(30px, -50px) scale(1.1); opacity: 0.6; }
+      66% { transform: translate(-20px, 20px) scale(0.9); opacity: 0.4; }
+      100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+    }
+    @keyframes drift-reverse {
+      0% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+      33% { transform: translate(-30px, 50px) scale(1.2); opacity: 0.5; }
+      66% { transform: translate(20px, -20px) scale(0.8); opacity: 0.4; }
+      100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+    }
+    .animate-aurora-1 { animation: drift 15s infinite ease-in-out; }
+    .animate-aurora-2 { animation: drift-reverse 20s infinite ease-in-out; }
+    .animate-aurora-3 { animation: drift 18s infinite ease-in-out reverse; }
+  `;
 
   // --- DAYS LEFT CALCULATION ---
   const getDaysLeft = () => {
