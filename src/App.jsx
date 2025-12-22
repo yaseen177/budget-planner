@@ -1,4 +1,5 @@
 //1REVERT BACK TO THIS IF ANY ERROR
+import AdminDashboard from './AdminDashboard';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -15,6 +16,7 @@ import {
   collection, 
   doc, 
   setDoc, 
+  addDoc,
   onSnapshot,
   deleteDoc,
   getDocs,
@@ -2344,6 +2346,24 @@ export default function App() {
   };
   const daysLeftLabel = (currentDate.getMonth() === new Date().getMonth()) ? 'Days Left' : 'Total Days';
 
+  // --- NEW: LOGGING HELPER ---
+  const logSystemEvent = async (action, type = 'click') => {
+    if (!user) return;
+    try {
+      const logsRef = collection(db, 'artifacts', appId, 'system_logs');
+      // Note: Make sure you import 'addDoc' from 'firebase/firestore' at the top of the file!
+      await addDoc(logsRef, {
+        action: action,
+        type: type,
+        userId: user.uid,
+        userEmail: user.email,
+        timestamp: new Date()
+      });
+    } catch (e) {
+      console.error("Log error", e);
+    }
+  };
+
   const getTutorialSteps = (id) => {
     switch(id) {
       case 'add_expense': return [
@@ -2462,6 +2482,8 @@ export default function App() {
   const [showAnalytics, setShowAnalytics] = useState(false); // New state for analytics dashboard
   const [isSandbox, setIsSandbox] = useState(false); // New state for sandbox mode
   const [showSandboxInfo, setShowSandboxInfo] = useState(false);
+
+  const [isAdminMode, setIsAdminMode] = useState(false);
 
   // Data State
   const [salary, setSalary] = useState('');
@@ -2620,6 +2642,7 @@ export default function App() {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
+      logSystemEvent('User Logged In', 'login');
     } catch (error) {
       if (!YOUR_FIREBASE_KEYS.apiKey) {
         await signInAnonymously(auth);
@@ -2629,7 +2652,7 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = () => logSystemEvent('User Logged Out', 'login'); signOut(auth);
 
   const copyFromPreviousMonth = async () => {
     if (!user) return;
@@ -2680,6 +2703,7 @@ export default function App() {
   const saveSettings = async (newSettings) => {
     if (!user) return;
     triggerHaptic(); // Haptic
+    logSystemEvent('Settings & Pots Configuration Saved', 'config');
     const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
     await setDoc(settingsRef, newSettings);
     showToast("Settings saved!");
@@ -2710,6 +2734,7 @@ export default function App() {
     if (isSandbox) {
         setSandboxSalary(val);
     } else {
+      if(val !== salary) logSystemEvent(`Salary updated: ${val}`, 'action');
         setSalary(val);
         saveData(val, expenses, actualSavings);
     }
@@ -2744,6 +2769,7 @@ export default function App() {
 
   const handleAddExpenseSave = (name, amount, logo) => {
     triggerHaptic(); // Haptic
+    logSystemEvent(`Added expense: ${name}`, 'action');
     const newExp = {
       id: Date.now().toString(),
       name: name,
@@ -2793,6 +2819,8 @@ export default function App() {
 
   const removeExpense = (id) => {
     triggerHaptic(); // Haptic
+    const expName = displayExpenses.find(e => e.id === id)?.name || 'Unknown Bill';
+    logSystemEvent(`Deleted expense: ${expName}`, 'action');
     const updatedExpenses = displayExpenses.filter(e => e.id !== id);
     
     if (isSandbox) {
@@ -2892,6 +2920,17 @@ export default function App() {
 
   if (loading) return <DashboardSkeleton />;
   if (!user) return <LoginScreen onLogin={handleLogin} />;
+
+  // --- PASTE HERE: ADMIN RENDER CHECK ---
+  if (user && isAdminMode && user.email === "yaseen.hussain2001@gmail.com") {
+    return (
+      <AdminDashboard 
+        user={user} 
+        onLogout={handleLogout} 
+        onExitAdmin={() => setIsAdminMode(false)} 
+      />
+    );
+  }
 
   return (
     <div className={`relative min-h-screen pb-24 font-sans transition-colors duration-500 ${isSandbox ? 'bg-slate-50' : ''} print:bg-white print:pb-0`}>
@@ -3079,6 +3118,16 @@ export default function App() {
 
           {/* DESKTOP ACTIONS */}
           <div className="hidden md:flex gap-2">
+             {/* --- PASTE HERE: ADMIN BUTTON --- */}
+            {user.email === "yaseen.hussain2001@gmail.com" && (
+               <button 
+                 onClick={() => setIsAdminMode(true)} 
+                 className="p-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-400 transition shadow-lg shadow-indigo-500/20 border border-white/10"
+                 title="Admin Panel"
+               >
+                 <Shield className="w-5 h-5" />
+               </button>
+            )}
              <button id="btn-sandbox" onClick={toggleSandbox} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white" title="Sandbox Mode">
               <FlaskConical className={`w-5 h-5`} />
             </button>
@@ -3446,6 +3495,16 @@ export default function App() {
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in" onClick={() => setMobileMenuOpen(false)} />
             
             <div className="absolute top-20 right-6 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 grid grid-cols-2 gap-2 animate-in slide-in-from-top-4 fade-in">
+                {/* --- PASTE HERE: ADMIN BUTTON (MOBILE) --- */}
+                {user.email === "yaseen.hussain2001@gmail.com" && (
+                    <button 
+                      onClick={() => { setMobileMenuOpen(false); setIsAdminMode(true); }}
+                      className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl bg-indigo-50 hover:scale-95 transition"
+                    >
+                      <Shield className="w-6 h-6 text-indigo-600" />
+                      <span className="text-xs font-bold text-indigo-600">Admin</span>
+                    </button>
+                )}
                 {[
                   { id: 'btn-sandbox-mobile', label: 'Sandbox', icon: FlaskConical, action: toggleSandbox, color: 'text-purple-600', bg: 'bg-purple-50' },
                   { id: 'btn-analytics-mobile', label: 'Analytics', icon: BarChart3, action: () => setShowAnalytics(true), color: 'text-emerald-600', bg: 'bg-emerald-50' },
