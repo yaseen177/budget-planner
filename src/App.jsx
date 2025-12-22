@@ -2320,16 +2320,16 @@ export default function App() {
   // --- NEW: AURORA ANIMATION STYLES ---
   const auroraStyles = `
     @keyframes drift {
-      0% { transform: translate(0, 0) scale(1); opacity: 0.4; }
-      33% { transform: translate(30px, -50px) scale(1.1); opacity: 0.6; }
-      66% { transform: translate(-20px, 20px) scale(0.9); opacity: 0.4; }
-      100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+      0% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+      33% { transform: translate(30px, -50px) scale(1.1); opacity: 0.8; }
+      66% { transform: translate(-20px, 20px) scale(0.9); opacity: 0.6; }
+      100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
     }
     @keyframes drift-reverse {
-      0% { transform: translate(0, 0) scale(1); opacity: 0.4; }
-      33% { transform: translate(-30px, 50px) scale(1.2); opacity: 0.5; }
-      66% { transform: translate(20px, -20px) scale(0.8); opacity: 0.4; }
-      100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+      0% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+      33% { transform: translate(-30px, 50px) scale(1.2); opacity: 0.7; }
+      66% { transform: translate(20px, -20px) scale(0.8); opacity: 0.6; }
+      100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
     }
     .animate-aurora-1 { animation: drift 15s infinite ease-in-out; }
     .animate-aurora-2 { animation: drift-reverse 20s infinite ease-in-out; }
@@ -2915,12 +2915,13 @@ export default function App() {
       {!isSandbox && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
           <style>{auroraStyles}</style>
+          {/* Base tint */}
           <div className="absolute top-0 left-0 w-full h-[800px] bg-gradient-to-b from-emerald-50/50 to-transparent"></div>
           
-          {/* Animated Blobs */}
-          <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-200/30 rounded-full blur-[80px] animate-aurora-1 mix-blend-multiply"></div>
-          <div className="absolute top-[20%] left-[-10%] w-[400px] h-[400px] bg-emerald-200/30 rounded-full blur-[80px] animate-aurora-2 mix-blend-multiply"></div>
-          <div className="absolute bottom-[20%] right-[10%] w-[300px] h-[300px] bg-blue-200/30 rounded-full blur-[80px] animate-aurora-3 mix-blend-multiply"></div>
+          {/* Animated Blobs - MOVED DOWN to be visible below header */}
+          <div className="absolute top-[180px] right-[-10%] w-[400px] h-[400px] bg-indigo-300/40 rounded-full blur-[80px] animate-aurora-1 mix-blend-multiply"></div>
+          <div className="absolute top-[250px] left-[-10%] w-[350px] h-[350px] bg-emerald-300/40 rounded-full blur-[80px] animate-aurora-2 mix-blend-multiply"></div>
+          <div className="absolute top-[400px] right-[20%] w-[300px] h-[300px] bg-blue-300/40 rounded-full blur-[80px] animate-aurora-3 mix-blend-multiply"></div>
         </div>
       )}
 
