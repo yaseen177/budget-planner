@@ -834,7 +834,8 @@ const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, classNa
 
 // --- OTHER COMPONENTS ---
 
-const BudgetWheel = ({ salary, expenses, allocations, currency }) => {
+// --- NEW: INTERACTIVE BUDGET WHEEL ---
+const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, activeSlice }) => {
   if (!salary || parseFloat(salary) <= 0) return null;
 
   const salaryNum = parseFloat(salary);
@@ -844,73 +845,92 @@ const BudgetWheel = ({ salary, expenses, allocations, currency }) => {
   const remainderPercentOfTotal = 100 - expensesPercent;
 
   let currentDegree = 0;
+  
+  // Helper to create slice path
+  // Note: CSS conic-gradients can't easily handle click events per slice. 
+  // To make it truly interactive without complex SVG math, we will use a legend-based interaction 
+  // or overlay invisible buttons. For simplicity and robustness, we will make the LEGEND interactive
+  // and keep the visual wheel as a reference.
+  
   const segments = [];
-
   const addSegment = (percent, color) => {
     const degrees = (percent / 100) * 360;
     segments.push(`${color} ${currentDegree}deg ${currentDegree + degrees}deg`);
     currentDegree += degrees;
   };
 
-  // 1. EXPENSES IS ALWAYS RED (#ef4444)
-  // We use a specific Red (Red-500) that isn't available in the Pot picker
   addSegment(expensesPercent, '#ef4444'); 
-
-  // 2. POTS USE THEIR SAVED HEX CODE
   allocations.forEach(plan => {
     const planPercentOfTotal = (plan.percentage / 100) * remainderPercentOfTotal;
-    // Use saved hex, fallback to Emerald green if missing (backward compatibility)
-    const color = plan.hex || '#10b981'; 
-    addSegment(planPercentOfTotal, color);
+    addSegment(planPercentOfTotal, plan.hex || '#10b981');
   });
-
-  // Fill remainder with slate-100 if not 100%
-  if (currentDegree < 360) {
-      segments.push(`#f1f5f9 ${currentDegree}deg 360deg`);
-  }
-
+  if (currentDegree < 360) segments.push(`#f1f5f9 ${currentDegree}deg 360deg`);
+  
   const gradient = `conic-gradient(${segments.join(', ')})`;
 
+  // Dynamic Center Text
+  let centerLabel = "Net Salary";
+  let centerAmount = formatCurrency(salaryNum, currency);
+  
+  if (activeSlice === 'expenses') {
+      centerLabel = "Total Expenses";
+      centerAmount = formatCurrency(totalExpenses, currency);
+  } else if (activeSlice) {
+      const plan = allocations.find(p => p.id === activeSlice);
+      if (plan) {
+          centerLabel = plan.name;
+          const amount = (parseFloat(salary) - totalExpenses) * (plan.percentage / 100);
+          centerAmount = formatCurrency(amount, currency);
+      }
+  }
+
   return (
-    <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden print:hidden h-full">
-      <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6 w-full text-left">Where your money goes</h3>
+    <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden h-full">
+      <div className="flex justify-between w-full mb-6">
+         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Where your money goes</h3>
+         {activeSlice && (
+             <button onClick={() => onSliceClick(null)} className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500 font-bold hover:bg-slate-200">
+                 Reset View
+             </button>
+         )}
+      </div>
       
-      <div className="relative w-56 h-56">
-        {/* The Gradient Wheel */}
-        <div className="w-full h-full rounded-full transition-all duration-1000 ease-out" style={{ background: gradient }}></div>
-        
-        {/* The Inner Circle (Hollow Effect) */}
-        <div className="absolute inset-2 bg-white rounded-full flex flex-col items-center justify-center">
-           <div className="absolute inset-0 bg-white rounded-full flex flex-col items-center justify-center z-10">
-              <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">Net Salary</span>
-              <span className="text-2xl font-black text-slate-800 tracking-tight">{formatCurrency(salaryNum, currency)}</span>
+      <div className="relative w-56 h-56 transition-transform duration-500 hover:scale-105">
+        <div className="w-full h-full rounded-full transition-all duration-1000 ease-out shadow-inner" style={{ background: gradient, opacity: activeSlice ? 0.8 : 1 }}></div>
+        <div className="absolute inset-2 bg-white rounded-full flex flex-col items-center justify-center shadow-lg">
+           <div className="text-center animate-in fade-in zoom-in duration-300 key={activeSlice}">
+              <span className="text-xs text-slate-400 font-bold uppercase tracking-wide block mb-1">{centerLabel}</span>
+              <span className="text-2xl font-black text-slate-800 tracking-tight">{centerAmount}</span>
            </div>
         </div>
       </div>
       
-      {/* Legend */}
-      <div className="flex flex-wrap justify-center gap-3 mt-8 w-full">
-        {/* Expense Legend Item (Always Red) */}
-        <div className="flex items-center gap-2 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">
+      <div className="flex flex-wrap justify-center gap-2 mt-8 w-full">
+        {/* Interactive Legend Items */}
+        <button 
+            onClick={() => onSliceClick(activeSlice === 'expenses' ? null : 'expenses')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-200
+                ${activeSlice === 'expenses' 
+                    ? 'bg-rose-50 border-rose-200 ring-2 ring-rose-100 scale-105 shadow-sm' 
+                    : activeSlice ? 'opacity-40 grayscale border-transparent' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}
+        >
           <div className="w-3 h-3 rounded-full bg-[#ef4444]"></div>
-          <span className="text-xs font-bold text-rose-700">Expenses</span>
-        </div>
+          <span className={`text-xs font-bold ${activeSlice === 'expenses' ? 'text-rose-700' : 'text-slate-600'}`}>Expenses</span>
+        </button>
 
-        {/* Dynamic Pot Legend Items */}
-        {allocations.map(plan => {
-           // Determine text color class based on the background color brightness roughly, 
-           // or just stick to slate-600 for simplicity. 
-           // Using the hex directly for the dot.
-           return (
-            <div key={plan.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-100 bg-slate-50">
-              <div 
-                className="w-3 h-3 rounded-full shadow-sm"
-                style={{ backgroundColor: plan.hex || '#10b981' }}
-              ></div>
+        {allocations.map(plan => (
+            <button 
+                key={plan.id}
+                onClick={() => onSliceClick(activeSlice === plan.id ? null : plan.id)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-200
+                    ${activeSlice === plan.id 
+                        ? 'bg-emerald-50 border-emerald-200 ring-2 ring-emerald-100 scale-105 shadow-sm' 
+                        : activeSlice ? 'opacity-40 grayscale border-transparent' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}
+            >
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: plan.hex || '#10b981' }}></div>
               <span className="text-xs font-bold text-slate-600">{plan.name}</span>
-            </div>
-           );
-        })}
+            </button>
+        ))}
       </div>
     </div>
   );
@@ -2019,6 +2039,25 @@ const TutorialOverlay = ({ steps, currentStep, onNext, onPrev, onClose }) => {
   const step = steps[currentStep];
   const isMobile = window.innerWidth < 768;
 
+  // --- NEW: AURORA ANIMATION STYLES ---
+  const auroraStyles = `
+    @keyframes drift {
+      0% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+      33% { transform: translate(30px, -50px) scale(1.1); opacity: 0.6; }
+      66% { transform: translate(-20px, 20px) scale(0.9); opacity: 0.4; }
+      100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+    }
+    @keyframes drift-reverse {
+      0% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+      33% { transform: translate(-30px, 50px) scale(1.2); opacity: 0.5; }
+      66% { transform: translate(20px, -20px) scale(0.8); opacity: 0.4; }
+      100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+    }
+    .animate-aurora-1 { animation: drift 15s infinite ease-in-out; }
+    .animate-aurora-2 { animation: drift-reverse 20s infinite ease-in-out; }
+    .animate-aurora-3 { animation: drift 18s infinite ease-in-out reverse; }
+  `;
+
   const updatePosition = useCallback(() => {
     const element = document.querySelector(step.target);
     if (element) {
@@ -2212,6 +2251,74 @@ const DashboardSkeleton = () => (
   </div>
 );
 
+// --- NEW: SWIPEABLE EXPENSE ROW ---
+const SwipeableExpenseRow = ({ children, onEdit, onDelete, isMobile }) => {
+  const [offset, setOffset] = useState(0);
+  const startX = React.useRef(null);
+
+  // If not mobile, just render normal row
+  if (!isMobile) return <div className="relative group">{children}</div>;
+
+  const handleTouchStart = (e) => {
+    startX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e) => {
+    if (!startX.current) return;
+    const currentX = e.touches[0].clientX;
+    const diff = currentX - startX.current;
+    
+    // Limit swipe range: -120px (Right/Delete) to +80px (Left/Edit)
+    if (diff < -120) setOffset(-120);
+    else if (diff > 80) setOffset(80);
+    else setOffset(diff);
+  };
+
+  const handleTouchEnd = () => {
+    if (offset < -60) {
+       // Swiped Left fully -> Delete Logic could trigger here, 
+       // but for safety, keep the button exposed
+       setOffset(-70); 
+    } else if (offset > 60) {
+       setOffset(70); // Keep edit exposed
+    } else {
+       setOffset(0); // Snap back
+    }
+    startX.current = null;
+  };
+
+  return (
+    <div className="relative overflow-hidden mb-1">
+      {/* Background Actions Layer */}
+      <div className="absolute inset-y-0 left-0 w-full flex justify-between items-center px-4">
+         {/* Left Action (Edit) */}
+         <div className={`flex items-center justify-start w-1/2 h-full transition-opacity ${offset > 0 ? 'opacity-100' : 'opacity-0'}`}>
+            <button onClick={() => { onEdit(); setOffset(0); }} className="bg-emerald-500 text-white p-3 rounded-full shadow-sm">
+               <Edit2 className="w-5 h-5" />
+            </button>
+         </div>
+         {/* Right Action (Delete) */}
+         <div className={`flex items-center justify-end w-1/2 h-full transition-opacity ${offset < 0 ? 'opacity-100' : 'opacity-0'}`}>
+            <button onClick={() => { onDelete(); setOffset(0); }} className="bg-rose-500 text-white p-3 rounded-full shadow-sm">
+               <Trash2 className="w-5 h-5" />
+            </button>
+         </div>
+      </div>
+
+      {/* Foreground Content Layer */}
+      <div 
+        className="relative bg-white transition-transform duration-200 ease-out border-b border-slate-50 last:border-0"
+        style={{ transform: `translateX(${offset}px)` }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -2384,6 +2491,8 @@ export default function App() {
   const [isAddingExpense, setIsAddingExpense] = useState(false); // For Modal
   const [searchTerm, setSearchTerm] = useState(''); // Added search state
   const [sortMode, setSortMode] = useState('date');
+
+  const [highlightedSlice, setHighlightedSlice] = useState(null); // 'expenses' or pot ID
 
   // Derived state variables
   const displaySalary = isSandbox ? sandboxSalary : salary;
@@ -2767,8 +2876,24 @@ export default function App() {
     filteredExpenses.sort((a, b) => a.name.localeCompare(b.name));
   }
   
-  const fixedExpenses = filteredExpenses.filter(e => e.type === 'fixed');
-  const variableExpenses = filteredExpenses.filter(e => e.type === 'variable');
+  let finalExpenses = filteredExpenses;
+  
+  // If "Expenses" slice is clicked, show ALL expenses. If a POT slice is clicked, hide expenses.
+  // Note: Since this table only shows expenses, clicking a Savings Pot effectively hides the table content 
+  // or we could show nothing. For better UX, let's say clicking 'expenses' shows this table, 
+  // and clicking a pot shows NOTHING here (focusing user on the Pot cards).
+  
+  // Actually, a better UX for the list: 
+  // If highlightedSlice is 'expenses', show all expenses.
+  // If highlightedSlice is null, show all.
+  // If highlightedSlice is a pot ID, show nothing (or maybe filter if we had categories).
+  
+  if (highlightedSlice && highlightedSlice !== 'expenses') {
+     finalExpenses = []; // Hide expenses if focusing on a savings pot
+  }
+
+  const fixedExpenses = finalExpenses.filter(e => e.type === 'fixed');
+  const variableExpenses = finalExpenses.filter(e => e.type === 'variable');
 
   if (loading) return <DashboardSkeleton />;
   if (!user) return <LoginScreen onLogin={handleLogin} />;
@@ -2785,12 +2910,16 @@ export default function App() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* --- 1. SUBTLE BACKGROUND GRADIENT --- */}
+      {/* --- 1. SUBTLE BACKGROUND GRADIENT (AURORA) --- */}
       {!isSandbox && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-emerald-50/80 to-transparent"></div>
-          <div className="absolute top-[-100px] right-[-100px] w-96 h-96 bg-indigo-100/40 rounded-full blur-3xl"></div>
-          <div className="absolute top-[200px] left-[-100px] w-72 h-72 bg-emerald-100/40 rounded-full blur-3xl"></div>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <style>{auroraStyles}</style>
+          <div className="absolute top-0 left-0 w-full h-[800px] bg-gradient-to-b from-emerald-50/50 to-transparent"></div>
+          
+          {/* Animated Blobs */}
+          <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-200/30 rounded-full blur-[80px] animate-aurora-1 mix-blend-multiply"></div>
+          <div className="absolute top-[20%] left-[-10%] w-[400px] h-[400px] bg-emerald-200/30 rounded-full blur-[80px] animate-aurora-2 mix-blend-multiply"></div>
+          <div className="absolute bottom-[20%] right-[10%] w-[300px] h-[300px] bg-blue-200/30 rounded-full blur-[80px] animate-aurora-3 mix-blend-multiply"></div>
         </div>
       )}
 
@@ -3040,6 +3169,8 @@ export default function App() {
                       expenses={displayExpenses} 
                       allocations={displayAllocations}
                       currency={userSettings.currency}
+                      activeSlice={highlightedSlice}
+                      onSliceClick={setHighlightedSlice}
                     />
                  ) : (
                    <div className="h-48 flex items-center justify-center text-slate-300 font-bold border-2 border-dashed border-slate-100 rounded-full w-48 aspect-square">
@@ -3168,81 +3299,88 @@ export default function App() {
                     const isEditing = editingExpenseId === expense.id;
                     
                     return (
-                    <div key={expense.id} className="p-4 sm:px-6 flex justify-between items-center group hover:bg-slate-50/80 transition-all duration-200">
-                      {/* ... (Keep existing expense item render logic) ... */}
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className={`p-2.5 rounded-2xl bg-slate-50 text-slate-400 w-12 h-12 flex items-center justify-center border border-slate-100 shadow-sm group-hover:scale-110 transition duration-300`}>
-                           {expense.logo ? (
-                             <img src={expense.logo} alt={expense.name} className="w-full h-full object-contain mix-blend-multiply" />
-                           ) : (
-                             <Icon className="w-5 h-5" />
-                           )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          {isEditing ? (
-                            <input 
-                              autoFocus
-                              type="text"
-                              defaultValue={expense.name}
-                              className="font-medium text-slate-800 w-full bg-white border border-emerald-200 rounded px-2 py-1 outline-none ring-2 ring-emerald-100"
-                              onBlur={(e) => updateExpenseName(expense.id, e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
-                            />
-                          ) : (
-                            <p className="font-bold text-slate-700 truncate">{expense.name}</p>
-                          )}
-                          <p className="text-xs text-slate-400 capitalize flex items-center gap-1">
-                             <span className={`w-1.5 h-1.5 rounded-full ${expense.type === 'fixed' ? 'bg-indigo-400' : 'bg-emerald-400'}`}></span>
-                             {expense.type}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                      {isEditing ? (
-                          <div className="flex items-center gap-1">
-                            <input 
-                              autoFocus
-                              type="text"
-                              defaultValue={expense.amount}
-                              onBlur={(e) => updateExpenseAmount(expense.id, safeCalculate(e.target.value))}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                   updateExpenseAmount(expense.id, safeCalculate(e.currentTarget.value));
-                                   setEditingExpenseId(null);
-                                }
-                              }}
-                              className="w-24 p-2 border border-emerald-200 rounded-lg bg-white text-right font-bold text-slate-800 ring-2 ring-emerald-100 outline-none"
-                            />
+                    <SwipeableExpenseRow 
+                       key={expense.id} 
+                       isMobile={isMobile}
+                       onEdit={() => { triggerHaptic(); setEditingExpenseId(expense.id); }}
+                       onDelete={() => removeExpense(expense.id)}
+                    >
+                      <div className="p-4 sm:px-6 flex justify-between items-center group hover:bg-slate-50/80 transition-all duration-200">
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className={`p-2.5 rounded-2xl bg-slate-50 text-slate-400 w-12 h-12 flex items-center justify-center border border-slate-100 shadow-sm group-hover:scale-110 transition duration-300`}>
+                             {expense.logo ? (
+                               <img src={expense.logo} alt={expense.name} className="w-full h-full object-contain mix-blend-multiply" />
+                             ) : (
+                               <Icon className="w-5 h-5" />
+                             )}
                           </div>
-                        ) : (
-                          <button 
-                            onClick={() => {
-                              triggerHaptic();
-                              setEditingExpenseId(expense.id);
-                            }}
-                            className={`flex items-center gap-2 hover:bg-white px-3 py-1.5 rounded-xl transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200 text-orange-600' : 'text-slate-700'} print:hover:bg-transparent print:p-0 print:ring-0`}
-                          >
-                            {expense.amount === 0 ? (
-                              <span className="text-sm font-bold flex items-center gap-1">
-                                Set Amount <Edit2 className="w-3 h-3" />
-                              </span>
+                          <div className="flex-1 min-w-0">
+                            {isEditing ? (
+                              <input 
+                                autoFocus
+                                type="text"
+                                defaultValue={expense.name}
+                                className="font-medium text-slate-800 w-full bg-white border border-emerald-200 rounded px-2 py-1 outline-none ring-2 ring-emerald-100"
+                                onBlur={(e) => updateExpenseName(expense.id, e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
+                              />
                             ) : (
-                              <span className="font-bold text-lg">{formatCurrency(expense.amount, userSettings.currency)}</span>
+                              <p className="font-bold text-slate-700 truncate">{expense.name}</p>
                             )}
-                          </button>
-                        )}
-                        
+                            <p className="text-xs text-slate-400 capitalize flex items-center gap-1">
+                               <span className={`w-1.5 h-1.5 rounded-full ${expense.type === 'fixed' ? 'bg-indigo-400' : 'bg-emerald-400'}`}></span>
+                               {expense.type}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
                         {isEditing ? (
-                           <button onClick={() => setEditingExpenseId(null)} className="bg-emerald-500 text-white p-2 rounded-full hover:bg-emerald-600 transition shadow-lg shadow-emerald-200">
-                             <Check className="w-4 h-4" />
-                           </button>
-                        ) : (
-                          <button onClick={() => removeExpense(expense.id)} className="text-slate-300 hover:text-red-500 transition p-2 rounded-xl hover:bg-red-50 opacity-0 group-hover:opacity-100 print:hidden">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                            <div className="flex items-center gap-1">
+                              <input 
+                                autoFocus
+                                type="text"
+                                defaultValue={expense.amount}
+                                onBlur={(e) => updateExpenseAmount(expense.id, safeCalculate(e.target.value))}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                     updateExpenseAmount(expense.id, safeCalculate(e.currentTarget.value));
+                                     setEditingExpenseId(null);
+                                  }
+                                }}
+                                className="w-24 p-2 border border-emerald-200 rounded-lg bg-white text-right font-bold text-slate-800 ring-2 ring-emerald-100 outline-none"
+                              />
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => {
+                                triggerHaptic();
+                                setEditingExpenseId(expense.id);
+                              }}
+                              className={`flex items-center gap-2 hover:bg-white px-3 py-1.5 rounded-xl transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200 text-orange-600' : 'text-slate-700'} print:hover:bg-transparent print:p-0 print:ring-0`}
+                            >
+                              {expense.amount === 0 ? (
+                                <span className="text-sm font-bold flex items-center gap-1">
+                                  Set Amount <Edit2 className="w-3 h-3" />
+                                </span>
+                              ) : (
+                                <span className="font-bold text-lg">{formatCurrency(expense.amount, userSettings.currency)}</span>
+                              )}
+                            </button>
+                          )}
+                          
+                          {isEditing ? (
+                             <button onClick={() => setEditingExpenseId(null)} className="bg-emerald-500 text-white p-2 rounded-full hover:bg-emerald-600 transition shadow-lg shadow-emerald-200">
+                               <Check className="w-4 h-4" />
+                             </button>
+                          ) : (
+                            // Added "hidden md:block" here so it doesn't show on mobile (swipe is used instead)
+                            <button onClick={() => removeExpense(expense.id)} className="text-slate-300 hover:text-red-500 transition p-2 rounded-xl hover:bg-red-50 opacity-0 group-hover:opacity-100 print:hidden hidden md:block">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    </SwipeableExpenseRow>
                   )})}
                 </React.Fragment>
               )
