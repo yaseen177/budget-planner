@@ -347,10 +347,31 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
     return history.slice(-months);
   }, [history, timeRange]);
 
-  // 1. Wealth Projections
-  const avgSavings = filteredData.length > 0 
-      ? filteredData.reduce((sum, m) => sum + m.remainder, 0) / filteredData.length 
-      : 0;
+  // 1. Pot-Specific Projections
+  // Calculate average actual savings PER POT over the filtered period
+  const potProjections = useMemo(() => {
+    const projections = {};
+    if (filteredData.length === 0) return {};
+
+    allocationRules.forEach(rule => {
+      // Sum up actuals for this specific pot across all filtered months
+      const totalActualForPot = filteredData.reduce((sum, m) => {
+        const val = parseFloat(m.pots[rule.id]?.actual) || 0;
+        return sum + val;
+      }, 0);
+      
+      // Calculate monthly average based on the filtered timeframe
+      const avg = totalActualForPot / filteredData.length;
+      
+      projections[rule.id] = {
+        avg: avg,
+        sixMonths: avg * 6,
+        oneYear: avg * 12,
+        fiveYears: avg * 60
+      };
+    });
+    return projections;
+  }, [filteredData, allocationRules]);
   
   // 2. Variance Calculations (Month-over-Month)
   const getVariance = (key) => {
@@ -405,30 +426,64 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
            </div>
         ) : (
           <>
-            {/* --- NEW: WEALTH PROJECTION CARD --- */}
-            <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-lg relative overflow-hidden mb-0">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full -mr-10 -mt-10 blur-xl"></div>
-                <div className="relative z-10">
-                    <div className="flex items-center gap-2 mb-4 opacity-80">
-                        <TrendingUp className="w-4 h-4 text-emerald-400" />
-                        <span className="text-xs font-bold uppercase tracking-wider">Future You</span>
-                    </div>
-                    <p className="text-sm text-slate-300 mb-6">
-                        Based on your average savings of <span className="text-white font-bold">{formatCurrency(avgSavings, currency)}/mo</span>, here is your projected wealth:
-                    </p>
-                    <div className="grid grid-cols-3 gap-2">
-                        {[
-                            { label: '6 Months', value: avgSavings * 6 },
-                            { label: '1 Year', value: avgSavings * 12 },
-                            { label: '5 Years', value: avgSavings * 60 },
-                        ].map((item, i) => (
-                            <div key={i} className="bg-white/10 p-3 rounded-xl border border-white/5 text-center">
-                                <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">{item.label}</div>
-                                <div className="font-bold text-sm md:text-base text-emerald-400">{formatCurrency(item.value, currency)}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+            {/* --- NEW: POT PROJECTION CARDS --- */}
+            <div className="mb-6">
+               <h3 className="text-sm font-bold text-slate-800 mb-3 px-2 flex items-center gap-2">
+                 <TrendingUp className="w-4 h-4 text-emerald-500" /> Future Projections
+               </h3>
+               {/* Horizontal Scroll Container */}
+               <div className="flex gap-4 overflow-x-auto pb-4 px-2 -mx-2 no-scrollbar snap-x">
+                 {allocationRules.map(rule => {
+                    const proj = potProjections[rule.id] || { avg: 0, sixMonths: 0, oneYear: 0, fiveYears: 0 };
+                    
+                    // Simple logic to try and match the pot color (fallback to slate)
+                    let colorHex = '#64748b'; 
+                    if (rule.color.includes('emerald')) colorHex = '#10b981';
+                    else if (rule.color.includes('indigo')) colorHex = '#6366f1';
+                    else if (rule.color.includes('sky')) colorHex = '#0ea5e9';
+                    else if (rule.color.includes('amber')) colorHex = '#f59e0b';
+                    else if (rule.color.includes('rose')) colorHex = '#f43f5e';
+                    else if (rule.color.includes('purple')) colorHex = '#a855f7';
+                    
+                    return (
+                       <div key={rule.id} className="min-w-[280px] bg-slate-900 text-white p-5 rounded-2xl shadow-lg relative overflow-hidden snap-center flex-shrink-0 border border-slate-800">
+                          {/* Background Glow based on pot color */}
+                          <div 
+                            className="absolute top-0 right-0 w-32 h-32 rounded-full -mr-10 -mt-10 blur-xl opacity-20"
+                            style={{ backgroundColor: colorHex }}
+                          ></div>
+                          
+                          <div className="relative z-10">
+                              <div className="flex justify-between items-start mb-4">
+                                <div>
+                                   <div className="text-[10px] font-bold opacity-60 uppercase tracking-wider mb-1">Projecting</div>
+                                   <h4 className="font-bold text-lg leading-tight truncate max-w-[140px]" title={rule.name}>{rule.name}</h4>
+                                </div>
+                                <div className="text-right">
+                                   <div className="text-[10px] font-bold opacity-60 uppercase tracking-wider mb-1">Avg/Mo</div>
+                                   <div className="font-mono text-emerald-400 font-bold">{formatCurrency(proj.avg, currency)}</div>
+                                </div>
+                              </div>
+                              
+                              <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-white/10">
+                                  <div>
+                                     <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">6 Months</div>
+                                     <div className="font-bold text-sm">{formatCurrency(proj.sixMonths, currency)}</div>
+                                  </div>
+                                  <div>
+                                     <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">1 Year</div>
+                                     <div className="font-bold text-sm">{formatCurrency(proj.oneYear, currency)}</div>
+                                  </div>
+                                  <div>
+                                     <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">5 Years</div>
+                                     <div className="font-bold text-sm">{formatCurrency(proj.fiveYears, currency)}</div>
+                                  </div>
+                              </div>
+                          </div>
+                       </div>
+                    );
+                 })}
+               </div>
             </div>
 
             {/* 1. SALARY GRAPH */}
