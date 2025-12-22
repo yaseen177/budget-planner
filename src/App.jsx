@@ -3116,8 +3116,8 @@ export default function App() {
       {/* MAIN CONTENT (BENTO GRID) */}
       <div className="px-4 -mt-24 max-w-5xl mx-auto pb-12 relative z-10 print:mt-0 print:px-0">
         
-        {/* Month Selector Pill */}
-        <div className="flex items-center justify-between bg-white/90 backdrop-blur-md p-1.5 rounded-full shadow-lg border border-white/50 max-w-[280px] mx-auto mb-8 print:hidden ring-1 ring-slate-100/50">
+        {/* Month Selector Pill (Sticky) */}
+        <div className="sticky top-6 z-50 flex items-center justify-between bg-white/80 backdrop-blur-xl p-1.5 rounded-full shadow-2xl border border-white/40 max-w-[280px] mx-auto mb-8 print:hidden ring-1 ring-white/60 transition-all duration-300">
           <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-500">
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -3229,6 +3229,18 @@ export default function App() {
                 </span>
              </div>
              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {/* --- NEW: EMPTY POTS STATE --- */}
+                {displayAllocations.length === 0 && (
+                   <div className="col-span-full py-10 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
+                      <div className="bg-white p-4 rounded-full shadow-sm mb-3">
+                         <Target className="w-8 h-8 text-slate-300" />
+                      </div>
+                      <p className="font-bold text-sm">No savings pots yet</p>
+                      <button onClick={() => setShowSettings(true)} className="text-xs text-indigo-500 font-bold mt-2 hover:underline">
+                        Create a Pot in Settings
+                      </button>
+                   </div>
+                )}
                 {displayAllocations.map(plan => {
                   const target = remainder * (plan.percentage / 100);
                   const isLastToFill = (displayAllocations.length - filledPlansCount === 1);
@@ -3388,14 +3400,21 @@ export default function App() {
               )
             ))}
              {expenses.length === 0 && (
-              <div className="py-24 text-center text-slate-400 flex flex-col items-center gap-4">
-                <div className="bg-slate-50 p-6 rounded-full border border-slate-100">
-                  <ShoppingCart className="w-10 h-10 text-slate-300" />
+              <div className="py-20 text-center flex flex-col items-center justify-center">
+                <div className="relative mb-6">
+                   <div className="absolute inset-0 bg-emerald-100 rounded-full blur-xl opacity-50 animate-pulse"></div>
+                   <div className="relative bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                      <ShoppingCart className="w-10 h-10 text-emerald-200" />
+                   </div>
+                   {/* Floating "Plus" badge */}
+                   <div className="absolute -bottom-2 -right-2 bg-slate-900 text-white p-1.5 rounded-full border-4 border-white shadow-sm">
+                      <Plus className="w-4 h-4" />
+                   </div>
                 </div>
-                <div>
-                  <p className="font-bold text-slate-600 text-lg">No expenses yet</p>
-                  <p className="text-sm text-slate-400 mt-1 max-w-xs mx-auto">Tap the <span className="font-bold text-slate-600">+ New Expense</span> button to start building your month.</p>
-                </div>
+                <h3 className="text-slate-800 font-bold text-lg mb-1">A fresh start!</h3>
+                <p className="text-slate-400 text-sm max-w-[200px] leading-relaxed mx-auto">
+                  No expenses for this month yet. Tap the button below to add your first bill.
+                </p>
               </div>
             )}
           </div>
@@ -3407,10 +3426,16 @@ export default function App() {
           </div>
         </div>
         
-        {/* Creator Footer */}
-        <div className="text-center py-12 text-slate-400 text-xs font-medium print:hidden">
-          <p>Designed & Built by <span className="text-slate-600 font-bold">Yaseen Hussain</span></p>
-          <p className="opacity-50 mt-1">© {new Date().getFullYear()} Budget Planner • All Rights Reserved</p>
+        {/* Creator Footer (Boxed) */}
+        <div className="py-12 flex justify-center print:hidden relative z-10">
+           <div className="bg-white/60 backdrop-blur-md px-6 py-3 rounded-2xl shadow-sm border border-white/50 text-center">
+              <p className="text-slate-500 text-xs font-medium">
+                 Designed & Built by <span className="text-slate-800 font-bold">Yaseen Hussain</span>
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5 font-bold tracking-wide uppercase opacity-70">
+                 © {new Date().getFullYear()} Budget Planner
+              </p>
+           </div>
         </div>
 
       </div>
