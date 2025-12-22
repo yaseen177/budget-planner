@@ -2732,7 +2732,10 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => logSystemEvent('User Logged Out', 'login'); signOut(auth);
+  const handleLogout = () => {
+    logSystemEvent('User Logged Out', 'login'); 
+    signOut(auth);
+  };
 
   const copyFromPreviousMonth = async () => {
     if (!user) return;
