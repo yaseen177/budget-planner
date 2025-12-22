@@ -2905,18 +2905,23 @@ export default function App() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* --- 1. SUBTLE BACKGROUND GRADIENT (AURORA) --- */}
+      {/* --- 1. AURORA BACKGROUND (FULL PAGE) --- */}
       {!isSandbox && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
           <style>{auroraStyles}</style>
           
-          {/* 1. Base Layer (This replaces the bg-slate-50 we removed) */}
+          {/* Base Layer (White/Slate) */}
           <div className="absolute inset-0 bg-slate-50"></div>
           
-          {/* 2. The Blobs (Moved down to 300px+ so they aren't hidden by the header) */}
-          <div className="absolute top-[300px] left-[-10%] w-[500px] h-[500px] bg-purple-300 rounded-full mix-blend-multiply filter blur-[80px] opacity-70 animate-aurora-1"></div>
-          <div className="absolute top-[300px] right-[-10%] w-[500px] h-[500px] bg-cyan-300 rounded-full mix-blend-multiply filter blur-[80px] opacity-70 animate-aurora-2"></div>
-          <div className="absolute top-[500px] left-[20%] w-[500px] h-[500px] bg-pink-300 rounded-full mix-blend-multiply filter blur-[80px] opacity-70 animate-aurora-3"></div>
+          {/* Top Blobs (Visible immediately) */}
+          <div className="absolute top-[300px] left-[-10%] w-[500px] h-[500px] bg-purple-300 rounded-full mix-blend-multiply filter blur-[90px] opacity-60 animate-aurora-1"></div>
+          <div className="absolute top-[300px] right-[-10%] w-[500px] h-[500px] bg-cyan-300 rounded-full mix-blend-multiply filter blur-[90px] opacity-60 animate-aurora-2"></div>
+          
+          {/* Middle Blobs (Visible as you look down) */}
+          <div className="absolute top-[60%] left-[20%] w-[600px] h-[600px] bg-pink-300 rounded-full mix-blend-multiply filter blur-[100px] opacity-50 animate-aurora-3"></div>
+          
+          {/* Bottom Blobs (Anchoring the bottom of the screen) */}
+          <div className="absolute bottom-[-10%] right-[10%] w-[500px] h-[500px] bg-emerald-300 rounded-full mix-blend-multiply filter blur-[90px] opacity-50 animate-aurora-2"></div>
         </div>
       )}
 
