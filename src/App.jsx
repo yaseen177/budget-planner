@@ -2624,6 +2624,7 @@ export default function App() {
     initAuth();
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log("Auth State Changed:", currentUser ? "User Found" : "No User");
       setUser(currentUser);
       setLoading(false);
     });
@@ -2705,18 +2706,25 @@ export default function App() {
 
   const handleLogin = async () => {
     try {
-      // 1. Force the browser to remember the session
+      // 1. Force persistence (Session = keep me logged in until I close the tab/browser)
       await setPersistence(auth, browserLocalPersistence);
       
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
       
-      // 2. Log success (Optional)
-      console.log("Login successful");
+      // 2. Wait for the popup to finish
+      const result = await signInWithPopup(auth, provider);
+      
+      // 3. MANUAL OVERRIDE: 
+      // The listener might be blocked by the COOP error, so we manually 
+      // tell the app "We have a user!" immediately.
+      console.log("Login successful. forcing state update for:", result.user.email);
+      setUser(result.user); 
+      
       logSystemEvent('User Logged In', 'login');
     } catch (error) {
-      console.error("Login Error:", error); // See the exact error in Console
+      console.error("Login Failed:", error);
       if (!YOUR_FIREBASE_KEYS.apiKey) {
+        // Fallback for demo mode if keys are missing
         await signInAnonymously(auth);
       } else {
         alert(`Login failed: ${error.message}`);
