@@ -2317,23 +2317,17 @@ export default function App() {
 
   const isMobile = window.innerWidth < 768;
 
-  // --- NEW: AURORA ANIMATION STYLES ---
+  // --- AURORA STYLES (Fixed) ---
   const auroraStyles = `
     @keyframes drift {
-      0% { transform: translate(0, 0) scale(1); opacity: 0.6; }
-      33% { transform: translate(30px, -50px) scale(1.1); opacity: 0.8; }
-      66% { transform: translate(-20px, 20px) scale(0.9); opacity: 0.6; }
-      100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+      0% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(30px, -50px) scale(1.1); }
+      66% { transform: translate(-20px, 20px) scale(0.9); }
+      100% { transform: translate(0, 0) scale(1); }
     }
-    @keyframes drift-reverse {
-      0% { transform: translate(0, 0) scale(1); opacity: 0.6; }
-      33% { transform: translate(-30px, 50px) scale(1.2); opacity: 0.7; }
-      66% { transform: translate(20px, -20px) scale(0.8); opacity: 0.6; }
-      100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
-    }
-    .animate-aurora-1 { animation: drift 15s infinite ease-in-out; }
-    .animate-aurora-2 { animation: drift-reverse 20s infinite ease-in-out; }
-    .animate-aurora-3 { animation: drift 18s infinite ease-in-out reverse; }
+    .animate-aurora-1 { animation: drift 10s infinite ease-in-out; }
+    .animate-aurora-2 { animation: drift 15s infinite ease-in-out reverse; }
+    .animate-aurora-3 { animation: drift 12s infinite ease-in-out; }
   `;
 
   // --- DAYS LEFT CALCULATION ---
@@ -2900,7 +2894,7 @@ export default function App() {
   if (!user) return <LoginScreen onLogin={handleLogin} />;
 
   return (
-    <div className={`relative min-h-screen pb-24 font-sans transition-colors duration-500 ${isSandbox ? 'bg-slate-50' : 'bg-slate-50'} print:bg-white print:pb-0`}>
+    <div className={`relative min-h-screen pb-24 font-sans transition-colors duration-500 ${isSandbox ? 'bg-slate-50' : ''} print:bg-white print:pb-0`}>
       <style>{`
         @media print {
           @page { margin: 10mm; size: A4 landscape; }
@@ -2915,13 +2909,14 @@ export default function App() {
       {!isSandbox && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
           <style>{auroraStyles}</style>
-          {/* Base tint */}
-          <div className="absolute top-0 left-0 w-full h-[800px] bg-gradient-to-b from-emerald-50/50 to-transparent"></div>
           
-          {/* Animated Blobs - MOVED DOWN to be visible below header */}
-          <div className="absolute top-[180px] right-[-10%] w-[400px] h-[400px] bg-indigo-300/40 rounded-full blur-[80px] animate-aurora-1 mix-blend-multiply"></div>
-          <div className="absolute top-[250px] left-[-10%] w-[350px] h-[350px] bg-emerald-300/40 rounded-full blur-[80px] animate-aurora-2 mix-blend-multiply"></div>
-          <div className="absolute top-[400px] right-[20%] w-[300px] h-[300px] bg-blue-300/40 rounded-full blur-[80px] animate-aurora-3 mix-blend-multiply"></div>
+          {/* 1. Base Layer (This replaces the bg-slate-50 we removed) */}
+          <div className="absolute inset-0 bg-slate-50"></div>
+          
+          {/* 2. The Blobs (Moved down to 300px+ so they aren't hidden by the header) */}
+          <div className="absolute top-[300px] left-[-10%] w-[500px] h-[500px] bg-purple-300 rounded-full mix-blend-multiply filter blur-[80px] opacity-70 animate-aurora-1"></div>
+          <div className="absolute top-[300px] right-[-10%] w-[500px] h-[500px] bg-cyan-300 rounded-full mix-blend-multiply filter blur-[80px] opacity-70 animate-aurora-2"></div>
+          <div className="absolute top-[500px] left-[20%] w-[500px] h-[500px] bg-pink-300 rounded-full mix-blend-multiply filter blur-[80px] opacity-70 animate-aurora-3"></div>
         </div>
       )}
 
