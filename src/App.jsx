@@ -347,6 +347,24 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
     return history.slice(-months);
   }, [history, timeRange]);
 
+  // 1. Wealth Projections
+  const avgSavings = filteredData.length > 0 
+      ? filteredData.reduce((sum, m) => sum + m.remainder, 0) / filteredData.length 
+      : 0;
+  
+  // 2. Variance Calculations (Month-over-Month)
+  const getVariance = (key) => {
+      if (filteredData.length < 2) return null;
+      const current = filteredData[filteredData.length - 1][key];
+      const previous = filteredData[filteredData.length - 2][key];
+      if (previous === 0) return null;
+      const percent = ((current - previous) / previous) * 100;
+      return percent;
+  };
+  
+  const incomeVar = getVariance('salary');
+  const expenseVar = getVariance('expenses');
+
   if (loading) return <div className="fixed inset-0 z-[100] bg-white flex items-center justify-center">Loading Analytics...</div>;
 
   // -- RENDER --
@@ -387,10 +405,45 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
            </div>
         ) : (
           <>
+            {/* --- NEW: WEALTH PROJECTION CARD --- */}
+            <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-lg relative overflow-hidden mb-0">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full -mr-10 -mt-10 blur-xl"></div>
+                <div className="relative z-10">
+                    <div className="flex items-center gap-2 mb-4 opacity-80">
+                        <TrendingUp className="w-4 h-4 text-emerald-400" />
+                        <span className="text-xs font-bold uppercase tracking-wider">Future You</span>
+                    </div>
+                    <p className="text-sm text-slate-300 mb-6">
+                        Based on your average savings of <span className="text-white font-bold">{formatCurrency(avgSavings, currency)}/mo</span>, here is your projected wealth:
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                        {[
+                            { label: '6 Months', value: avgSavings * 6 },
+                            { label: '1 Year', value: avgSavings * 12 },
+                            { label: '5 Years', value: avgSavings * 60 },
+                        ].map((item, i) => (
+                            <div key={i} className="bg-white/10 p-3 rounded-xl border border-white/5 text-center">
+                                <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">{item.label}</div>
+                                <div className="font-bold text-sm md:text-base text-emerald-400">{formatCurrency(item.value, currency)}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
             {/* 1. SALARY GRAPH */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                <div className="flex justify-between items-center mb-4">
-                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Income Trend</h3>
+                 <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Income Trend</h3>
+                    {/* --- NEW: INCOME VARIANCE PILL --- */}
+                    {incomeVar !== null && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${incomeVar >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                            {incomeVar >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                            {Math.abs(incomeVar).toFixed(1)}%
+                        </span>
+                    )}
+                 </div>
                  <span className="text-emerald-600 text-xs font-bold bg-emerald-50 px-2 py-1 rounded-lg">
                    Avg: {formatCurrency(filteredData.reduce((a,b)=>a+b.salary,0)/filteredData.length, currency)}
                  </span>
@@ -408,7 +461,17 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
             {/* 2. EXPENSES GRAPH */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                <div className="flex justify-between items-center mb-4">
-                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Monthly Expenses</h3>
+                 <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Monthly Expenses</h3>
+                    {/* --- NEW: EXPENSE VARIANCE PILL --- */}
+                    {expenseVar !== null && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${expenseVar <= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                            {/* Logic flipped for expenses: Up is Bad (Rose), Down is Good (Emerald) */}
+                            {expenseVar > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                            {Math.abs(expenseVar).toFixed(1)}%
+                        </span>
+                    )}
+                 </div>
                  <span className="text-rose-500 text-xs font-bold bg-rose-50 px-2 py-1 rounded-lg">
                     Avg: {formatCurrency(filteredData.reduce((a,b)=>a+b.expenses,0)/filteredData.length, currency)}
                  </span>
