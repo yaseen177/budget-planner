@@ -3514,36 +3514,38 @@ export default function App() {
   
   // 2. Calculate Days Until Next Payday
   const calculateDaysUntilPayday = (payDayStr, salaryInputted) => {
-      const today = new Date();
-      const currentDay = today.getDate();
-      const payDay = parseInt(payDayStr) || 1; 
-      
-      let targetDate = new Date(today.getFullYear(), today.getMonth(), payDay);
+    const today = new Date();
+    const currentDay = today.getDate();
+    const payDay = parseInt(payDayStr) || 1; 
+    
+    // Start with Payday of THIS month
+    let targetDate = new Date(today.getFullYear(), today.getMonth(), payDay);
 
-      // Rule 1: If today is AFTER payday, target is next month
-      if (currentDay >= payDay) {
-         targetDate.setMonth(targetDate.getMonth() + 1);
-      } else {
-         // Rule 2: Today is BEFORE payday. 
-         // If Salary IS inputted, assume we are budgeting for the UPCOMING cycle.
-         // Therefore, the "Next Payday" is actually the one NEXT month.
-         if (salaryInputted && parseFloat(salaryInputted) > 0) {
-            targetDate.setMonth(targetDate.getMonth() + 1);
-         }
-         // If Salary NOT inputted, we are just waiting for the immediate next payday (this month)
-      }
-      
-      const diffTime = targetDate - today;
-      return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-  };
+    // Rule 1: If today is AFTER payday (e.g. 29th, Payday 28th), target is Next Month
+    if (currentDay >= payDay) {
+       targetDate.setMonth(targetDate.getMonth() + 1);
+    } else {
+       // Rule 2: Today is BEFORE payday (e.g. 23rd, Payday 28th). 
+       // If Salary IS inputted, we assume the user is prepping for the UPCOMING cycle (Dec 28 - Jan 28).
+       // Therefore, the money needs to last until the payday AFTER (Jan 28).
+       if (salaryInputted && parseFloat(salaryInputted) > 0) {
+          targetDate.setMonth(targetDate.getMonth() + 1);
+       }
+       // If Salary NOT inputted, we are just waiting for the immediate next payday (Dec 28)
+    }
+    
+    const diffTime = targetDate - today;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+};
 
-  const daysUntilPayday = calculateDaysUntilPayday(userSettings.payDay, displaySalary);
-  
-  // 3. Daily Pace = Current Account Remainder / Days Til Payday
-  const dailyAllowance = daysUntilPayday > 0 ? (currentAccountTarget / daysUntilPayday) : 0;
-  
-  // Label update
-  const daysLeftLabel = `Next Payday in`;
+const daysUntilPayday = calculateDaysUntilPayday(userSettings.payDay, displaySalary);
+
+// 4. Daily Pace = ACTUAL Current Account Remainder / Days Til Next Payday
+// This tells you: "Based on the cash actually sitting in your main account, here is what you can spend per day."
+const dailyAllowance = daysUntilPayday > 0 ? (currentAccountActual / daysUntilPayday) : 0;
+
+// Label update
+const daysLeftLabel = `Next Payday in`;
   // --- UPDATED LOGIC END ---
 
   // Count how many plans have an actual value entered
