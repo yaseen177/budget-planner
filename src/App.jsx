@@ -2821,14 +2821,26 @@ export default function App() {
         setSalary(data.salary || '');
         setExpenses(data.expenses || []);
         setActualSavings(data.actualSavings || {});
+
+        // --- NEW: AUTO-LOCK LOGIC ---
+        if (data.salary && !data.allocationRules) {
+           // This is a "Legacy Month" (Has data, but no rules saved).
+           // We automatically save the current global rules to it to lock it.
+           setDoc(docRef, { ...data, allocationRules: userSettings.allocationRules }, { merge: true });
+           
+           // Temporarily show global rules until the save confirms
+           setMonthAllocations(userSettings.allocationRules);
+        } else {
+           // Normal load: use the saved rules (or null if it's a fresh/empty month)
+           setMonthAllocations(data.allocationRules || null);
+        }
       } else {
+        // New/Empty Month
         setSalary('');
         setExpenses(userSettings.defaultFixedExpenses || DEFAULT_FIXED_EXPENSES);
         setActualSavings({});
         setMonthAllocations(null);
       }
-    }, (error) => {
-      console.error("Error fetching data:", error);
     });
 
     return () => unsubscribe();
