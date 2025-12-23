@@ -1080,6 +1080,7 @@ const AllocationCard = ({ title, targetAmount, actualAmount, percentage, hexColo
   const actualNum = parseFloat(actualAmount) || 0;
   // Calculate progress bar width (max 100%)
   const progressPercent = Math.min(100, Math.max(0, (actualNum / targetAmount) * 100));
+  const [showHelp, setShowHelp] = useState(false);
   
   // Use the passed Hex Color or fallback to Emerald Green
   const activeColor = hexColor || '#10b981';
@@ -1120,20 +1121,34 @@ const AllocationCard = ({ title, targetAmount, actualAmount, percentage, hexColo
         </div>
       </div>
 
-      {/* Input Row - NEW DESIGN WITH HELPER */}
+      {/* Input Row - NEW DESIGN WITH CLICKABLE HELPER */}
       <div className="relative z-10">
         
-        {/* Label with Tooltip */}
-        <div className="group relative flex items-center gap-1.5 mb-1.5 ml-1 w-fit cursor-help">
+        {/* CLICK BACKDROP: This invisible layer catches clicks anywhere else to close the popup */}
+        {showHelp && (
+            <div className="fixed inset-0 z-40 cursor-default" onClick={() => setShowHelp(false)}></div>
+        )}
+
+        {/* Label with Clickable Tooltip */}
+        <div className="relative flex items-center gap-1.5 mb-1.5 ml-1 w-fit">
            <label className="block text-[10px] font-bold text-slate-400 uppercase">Actual Money Deposited</label>
-           <HelpCircle className="w-3 h-3 text-slate-300" />
            
-           {/* The Helper Bubble (Appears on Hover) */}
-           <div className="absolute bottom-full left-0 mb-2 w-48 bg-slate-800 text-white text-xs rounded-lg p-3 shadow-xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 font-normal normal-case">
-              <div className="absolute -bottom-1 left-4 w-2 h-2 bg-slate-800 rotate-45"></div>
-              <strong>What is this?</strong><br/>
-              Type the exact amount you just transferred to this pot in your real bank app.
-           </div>
+           <button 
+             onClick={() => setShowHelp(!showHelp)}
+             className="focus:outline-none transition hover:scale-110 active:scale-95"
+           >
+             {/* Icon Darkened (text-slate-500 instead of 300) */}
+             <HelpCircle className="w-3 h-3 text-slate-500" />
+           </button>
+           
+           {/* The Helper Bubble (Shows only when clicked) */}
+           {showHelp && (
+             <div className="absolute bottom-full left-0 mb-2 w-48 bg-slate-800 text-white text-xs rounded-lg p-3 shadow-xl z-50 animate-in fade-in zoom-in-95 origin-bottom-left font-normal normal-case">
+                <div className="absolute -bottom-1 left-4 w-2 h-2 bg-slate-800 rotate-45"></div>
+                <strong>What is this?</strong><br/>
+                Type the exact amount you just transferred to this pot in your real bank app.
+             </div>
+           )}
         </div>
 
         <div className="flex items-center gap-2">
