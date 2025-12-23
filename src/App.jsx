@@ -758,7 +758,7 @@ const SandboxInfoModal = ({ onClose, onConfirm }) => (
 
 const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, className, autoFocus }) => {
   const [results, setResults] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [isFocused, setIsFocused] = useState(false); // NEW: Track focus to prevent "spazzing"
   
   // Use the keys provided
   const SECRET_KEY = "sk_EYBVfqJ-SQm1aE9boQ7uzg"; 
@@ -779,8 +779,9 @@ const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, classNa
           }
         });
         const data = await response.json();
-        setResults(data.slice(0, 5)); // Limit to 5 results
-        setShowDropdown(true);
+        setResults(data.slice(0, 5)); 
+        // FIXED: Removed setShowDropdown(true) here. 
+        // We rely on isFocused now, so it won't pop up randomly while you're editing the amount.
       } catch (e) {
         console.error("Logo search failed", e);
       }
@@ -788,6 +789,25 @@ const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, classNa
 
     return () => clearTimeout(timeoutId);
   }, [value]);
+
+  // NEW: Handle Enter Key to auto-select the best match (Fixes Bug 1)
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // 1. Try to select the first API result
+      if (results.length > 0) {
+         const brand = results[0];
+         const logoUrl = `https://img.logo.dev/${brand.domain}?token=${PUBLIC_KEY}`;
+         onSelectBrand(brand.name, logoUrl);
+      } 
+      // 2. Fallback to manual entry if no results but text exists
+      else if (value.length > 0) {
+         onSelectBrand(value, null);
+      }
+      // Close dropdown by blurring (or relying on parent state updates)
+      e.currentTarget.blur();
+    }
+  };
 
   return (
     <div className="relative">
@@ -797,23 +817,21 @@ const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, classNa
         placeholder={placeholder} 
         className={className}
         value={value}
-        onChange={(e) => {
-          onChange(e.target.value);
-          setShowDropdown(true); // Show immediately when typing
-        }}
-        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setTimeout(() => setIsFocused(false), 200)} // Delay to allow clicks
+        onKeyDown={handleKeyDown}
       />
       
-      {/* Show dropdown if user has typed anything, even if no API results yet */}
-      {showDropdown && value.length > 0 && (
+      {/* FIXED: Only show if user is FOCUSED on this input. Prevents blocking other buttons. */}
+      {isFocused && value.length > 0 && (
         <div className="absolute top-full left-0 right-0 bg-white shadow-xl rounded-xl border border-slate-100 mt-1 z-50 overflow-hidden max-h-60 overflow-y-auto">
           
-          {/* --- 1. NEW: ADD MANUALLY BUTTON (Always First) --- */}
+          {/* Add Manually Option */}
           <button
             className="w-full text-left p-3 hover:bg-emerald-50 flex items-center gap-3 transition border-b border-slate-50 group"
             onClick={() => {
-              onSelectBrand(value, null); // Pass null logo for manual entry
-              setShowDropdown(false);
+              onSelectBrand(value, null);
             }}
           >
             <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 p-1 flex items-center justify-center text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition">
@@ -824,8 +842,8 @@ const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, classNa
               <div className="text-xs text-slate-400">No logo</div>
             </div>
           </button>
-          {/* ------------------------------------------------ */}
 
+          {/* API Results */}
           {results.map((brand, i) => (
             <button
               key={i}
@@ -833,7 +851,6 @@ const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, classNa
               onClick={() => {
                 const logoUrl = `https://img.logo.dev/${brand.domain}?token=${PUBLIC_KEY}`;
                 onSelectBrand(brand.name, logoUrl);
-                setShowDropdown(false);
               }}
             >
               <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 p-1 flex items-center justify-center bg-white">
