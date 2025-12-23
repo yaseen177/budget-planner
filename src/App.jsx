@@ -2735,6 +2735,32 @@ export default function App() {
 
   const [isAdminMode, setIsAdminMode] = useState(false);
 
+  // --- NEW: SCROLL DETECTION FOR MONTH SELECTOR ---
+  const [showMonthNav, setShowMonthNav] = useState(true);
+  const lastScrollY = React.useRef(0);
+
+  useEffect(() => {
+    const controlNavbar = () => {
+      if (typeof window !== 'undefined') {
+        // Always show if near the very top
+        if (window.scrollY < 50) {
+            setShowMonthNav(true);
+            lastScrollY.current = window.scrollY;
+            return;
+        }
+        // Hide if scrolling down, Show if scrolling up
+        if (window.scrollY > lastScrollY.current) {
+          setShowMonthNav(false); 
+        } else {
+          setShowMonthNav(true);  
+        }
+        lastScrollY.current = window.scrollY;
+      }
+    };
+    window.addEventListener('scroll', controlNavbar);
+    return () => window.removeEventListener('scroll', controlNavbar);
+  }, []);
+
   // Data State
   const [salary, setSalary] = useState('');
   const [expenses, setExpenses] = useState([]);
@@ -3471,7 +3497,7 @@ export default function App() {
       <div className="px-4 -mt-24 max-w-5xl mx-auto pb-12 relative z-10 print:mt-0 print:px-0">
         
         {/* Month Selector Pill (Sticky) */}
-        <div className="sticky top-6 z-50 mx-auto max-w-[280px] mb-8 print:hidden relative">
+        <div className={`sticky top-6 z-50 mx-auto max-w-[280px] mb-8 print:hidden relative transition-all duration-500 ease-in-out transform ${showMonthNav ? 'translate-y-0 opacity-100' : '-translate-y-16 opacity-0 pointer-events-none'}`}>
           
           {/* Main Pill Controls */}
           <div className="flex items-center justify-between bg-white/80 backdrop-blur-xl p-1.5 rounded-full shadow-2xl border border-white/40 ring-1 ring-white/60 transition-all duration-300">
@@ -3480,7 +3506,7 @@ export default function App() {
             </button>
             
             {/* Clickable Label to toggle Menu */}
-            <button 
+            <button
               onClick={() => {
                 setPickerYear(currentDate.getFullYear()); // Sync year when opening
                 setShowDatePicker(!showDatePicker);
