@@ -2706,6 +2706,8 @@ export default function App() {
   const [expenses, setExpenses] = useState([]);
   const [actualSavings, setActualSavings] = useState({}); // New State for Actuals
   const [monthAllocations, setMonthAllocations] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
   
   // Sandbox Data State
   const [sandboxSalary, setSandboxSalary] = useState('');
@@ -3109,6 +3111,14 @@ export default function App() {
         // Let's modify the main useEffect.
     }
   };
+
+  const jumpToDate = (monthIndex) => {
+    triggerHaptic();
+    // Create new date for the selected year and month
+    const newDate = new Date(pickerYear, monthIndex, 1);
+    setCurrentDate(newDate);
+    setShowDatePicker(false);
+  };
   
   const toggleSort = () => {
     triggerHaptic();
@@ -3427,16 +3437,64 @@ export default function App() {
       <div className="px-4 -mt-24 max-w-5xl mx-auto pb-12 relative z-10 print:mt-0 print:px-0">
         
         {/* Month Selector Pill (Sticky) */}
-        <div className="sticky top-6 z-50 flex items-center justify-between bg-white/80 backdrop-blur-xl p-1.5 rounded-full shadow-2xl border border-white/40 max-w-[280px] mx-auto mb-8 print:hidden ring-1 ring-white/60 transition-all duration-300">
-          <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-500">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <span className="font-bold text-sm text-slate-800 uppercase tracking-wider px-4">
-            {MONTH_NAMES[currentDate.getMonth()]} {currentDate.getFullYear()}
-          </span>
-          <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-500">
-            <ChevronRight className="w-5 h-5" />
-          </button>
+        <div className="sticky top-6 z-50 mx-auto max-w-[280px] mb-8 print:hidden relative">
+          
+          {/* Main Pill Controls */}
+          <div className="flex items-center justify-between bg-white/80 backdrop-blur-xl p-1.5 rounded-full shadow-2xl border border-white/40 ring-1 ring-white/60 transition-all duration-300">
+            <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-500">
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            
+            {/* Clickable Label to toggle Menu */}
+            <button 
+              onClick={() => {
+                setPickerYear(currentDate.getFullYear()); // Sync year when opening
+                setShowDatePicker(!showDatePicker);
+              }}
+              className="font-bold text-sm text-slate-800 uppercase tracking-wider px-4 py-1.5 hover:bg-slate-100 rounded-xl transition"
+            >
+              {MONTH_NAMES[currentDate.getMonth()]} {currentDate.getFullYear()}
+            </button>
+            
+            <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-500">
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* THE POPUP MENU */}
+          {showDatePicker && (
+             <>
+               {/* Invisible Backdrop to close when clicking outside */}
+               <div className="fixed inset-0 z-40" onClick={() => setShowDatePicker(false)}></div>
+               
+               {/* The Menu Card */}
+               <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-64 bg-white rounded-3xl shadow-2xl border border-slate-100 p-4 z-50 animate-in zoom-in-95 origin-top">
+                  
+                  {/* Year Selector */}
+                  <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-50">
+                     <button onClick={() => setPickerYear(y => y - 1)} className="p-2 hover:bg-slate-50 rounded-full text-slate-400 hover:text-slate-600"><ChevronLeft className="w-4 h-4" /></button>
+                     <span className="font-bold text-lg text-slate-800">{pickerYear}</span>
+                     <button onClick={() => setPickerYear(y => y + 1)} className="p-2 hover:bg-slate-50 rounded-full text-slate-400 hover:text-slate-600"><ChevronRight className="w-4 h-4" /></button>
+                  </div>
+
+                  {/* Month Grid */}
+                  <div className="grid grid-cols-3 gap-2">
+                     {MONTH_NAMES.map((m, i) => {
+                        const isCurrent = currentDate.getMonth() === i && currentDate.getFullYear() === pickerYear;
+                        return (
+                          <button 
+                             key={m} 
+                             onClick={() => jumpToDate(i)}
+                             className={`py-2 rounded-xl text-xs font-bold transition ${isCurrent ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}
+                          >
+                             {m}
+                          </button>
+                        );
+                     })}
+                  </div>
+               </div>
+             </>
+          )}
         </div>
 
         {/* --- BENTO GRID LAYOUT --- */}
