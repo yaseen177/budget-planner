@@ -2855,55 +2855,68 @@ export default function App() {
   const [magicInput, setMagicInput] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
 
+  // --- DEBUGGING VERSION OF MAGIC ADD ---
   const handleMagicAdd = async (e) => {
     e.preventDefault();
     if (!magicInput.trim()) return;
 
     setIsAiLoading(true);
-    try {
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    console.log("🚀 Starting AI Request...");
+    console.log("🔑 API Key check:", YOUR_FIREBASE_KEYS.apiKey ? "Present" : "Missing"); // Just checking existence
+
+    // Helper to try a specific model
+    const tryModel = async (modelName) => {
+      console.log(`🤖 Attempting with model: ${modelName}`);
+      const model = genAI.getGenerativeModel({ model: modelName });
       
       const prompt = `
         You are a financial assistant. Extract expense data from this text: "${magicInput}".
         Current Date: ${new Date().toISOString()}.
-        
-        Rules:
-        1. Return ONLY a raw JSON object (no markdown, no quotes around the block).
-        2. Format: { "name": "string", "amount": number, "date": "YYYY-MM-DD" }
-        3. If the user says "next month", calculate the date correctly.
-        4. If amount is missing, use 0.
+        Return ONLY a raw JSON object (no markdown) with keys: name (string), amount (number), date (YYYY-MM-DD).
+        If amount missing use 0.
       `;
 
       const result = await model.generateContent(prompt);
       const response = await result.response;
-      const text = response.text();
+      return response.text();
+    };
+
+    try {
+      let text;
+      try {
+        // 1. Try the fast model first
+        text = await tryModel("gemini-1.5-flash");
+      } catch (firstError) {
+        console.warn("⚠️ gemini-1.5-flash failed:", firstError.message);
+        console.log("🔄 Switching to backup model: gemini-pro...");
+        
+        // 2. Fallback to the older reliable model
+        text = await tryModel("gemini-pro");
+      }
+
+      console.log("✅ AI Response received:", text);
       
-      // Clean the response in case AI adds markdown
+      // Clean up the text
       const cleanJson = text.replace(/```json|```/g, '').trim();
       const data = JSON.parse(cleanJson);
 
-      // Add to Firestore
       await addDoc(collection(db, "expenses"), {
         uid: user.uid,
         name: data.name,
         amount: parseFloat(data.amount),
-        date: data.date, // YYYY-MM-DD
+        date: data.date,
         type: 'one-off',
         category: 'general',
         createdAt: new Date()
       });
 
       setMagicInput("");
-      setToastMessage(`✨ Added ${data.name} (£${data.amount}) for ${data.date}`);
-      
-      // Check if the date matches current view
-      if (!data.date.includes(getMonthId(currentDate))) {
-         alert(`Note: This expense was added for ${data.date}. Switch months to see it.`);
-      }
+      setToastMessage(`✨ Added ${data.name} (£${data.amount})`);
 
-    } catch (error) {
-      console.error("AI Error:", error);
-      setToastMessage("❌ Could not understand. Try 'MOT £50 next jan'");
+    } catch (finalError) {
+      console.error("❌ CRITICAL AI FAILURE:", finalError);
+      alert(`AI Error: ${finalError.message}. Check the Console (F12) for details.`);
+      setToastMessage("❌ Failed. Check console.");
     } finally {
       setIsAiLoading(false);
     }
