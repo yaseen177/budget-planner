@@ -1120,41 +1120,44 @@ const AllocationCard = ({ title, targetAmount, actualAmount, percentage, hexColo
         </div>
       </div>
 
-      {/* Input Row */}
-      <div className="flex items-center gap-2 relative z-10">
-        <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
-          <input 
-            type="number" 
-            placeholder="0"
-            value={actualAmount}
-            onChange={(e) => onUpdateActual(e.target.value)}
-            className="w-full pl-7 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-opacity-50 transition"
-            style={{ '--tw-ring-color': activeColor }} // Uses CSS variable for ring color if configured, or just rely on border
-          />
+      {/* Input Row - NEW DESIGN */}
+      <div className="relative z-10">
+        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Deposit Amount</label>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
+            <input 
+              type="number" 
+              placeholder="Type here..."
+              value={actualAmount}
+              onChange={(e) => onUpdateActual(e.target.value)}
+              className="w-full pl-7 pr-3 py-3 bg-white border-2 border-slate-100 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-transparent focus:ring-4 transition shadow-sm placeholder:text-slate-300 placeholder:font-normal"
+              style={{ '--tw-ring-color': `${activeColor}30` }} 
+            />
+          </div>
+          
+          {/* Dynamic Button Color */}
+          {showRemainderButton ? (
+            <button 
+              onClick={onFillRemainder}
+              className="px-4 py-3 rounded-xl text-xs font-bold text-white shadow-md hover:opacity-90 active:scale-95 transition h-full"
+              style={{ backgroundColor: activeColor }}
+            >
+              Max
+            </button>
+          ) : (
+               onUpdateActual && (
+                  <button 
+                    onClick={() => onUpdateActual(targetAmount)}
+                    className="px-3 py-3 rounded-xl text-xs font-bold transition border-2 hover:opacity-100 opacity-70 h-full"
+                    style={{ color: activeColor, borderColor: `${activeColor}30`, backgroundColor: `${activeColor}10` }}
+                    title="Match Target"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                )
+          )}
         </div>
-        
-        {/* Dynamic Button Color */}
-        {showRemainderButton ? (
-          <button 
-            onClick={onFillRemainder}
-            className="px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm hover:opacity-90 active:scale-95 transition"
-            style={{ backgroundColor: activeColor }}
-          >
-            Max
-          </button>
-        ) : (
-             onUpdateActual && (
-                <button 
-                  onClick={() => onUpdateActual(targetAmount)}
-                  className="px-3 py-2.5 rounded-xl text-xs font-bold transition border hover:opacity-100 opacity-80"
-                  style={{ color: activeColor, borderColor: `${activeColor}40`, backgroundColor: `${activeColor}10` }}
-                  title="Match Target"
-                >
-                  <Check className="w-4 h-4" />
-                </button>
-              )
-        )}
       </div>
     </div>
   );
@@ -3593,16 +3596,36 @@ export default function App() {
           </div>
         </div>
 
-        {/* TILE 3: ALLOCATIONS STRIP (If visible) */}
+        {/* TILE 3: ALLOCATIONS STRIP */}
         {salaryNum > 0 && (
           <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-200/60 mb-6">
-             <div className="flex items-center gap-3 mb-4">
+             
+             {/* 1. Header Row */}
+             <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 bg-amber-100 text-amber-600 rounded-xl"><Target className="w-4 h-4" /></div>
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Your Pots</h3>
-                <span className="ml-auto text-xs font-bold bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full">
-                  {formatCurrency(remainder, userSettings.currency)} Available
-                </span>
              </div>
+
+             {/* 2. BIG REMINDER BANNER */}
+             <div className="bg-slate-900 rounded-3xl p-6 mb-8 text-white flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden shadow-xl">
+                {/* Background Decoration */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+                
+                <div className="relative z-10 text-center md:text-left">
+                   <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Money Left to Sort</p>
+                   <div className="text-4xl font-black tracking-tight text-emerald-400">
+                      {formatCurrency(remainder, userSettings.currency)}
+                   </div>
+                   <p className="text-slate-500 text-xs mt-1">Salary minus Expenses</p>
+                </div>
+
+                <div className="relative z-10 flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/5">
+                   <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                   <span className="text-xs font-bold">Ready to Allocate</span>
+                </div>
+             </div>
+
+             {/* 3. Grid of Pots */}
              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {/* --- NEW: EMPTY POTS STATE --- */}
                 {displayAllocations.length === 0 && (
@@ -3627,11 +3650,7 @@ export default function App() {
                       targetAmount={target}
                       actualAmount={displayActualSavings[plan.id]}
                       percentage={plan.percentage}
-                      
-                      // --- CRITICAL UPDATE: PASS HEX COLOR ---
                       hexColor={plan.hex || '#10b981'} 
-                      // -------------------------------------
-                      
                       currency={userSettings.currency}
                       onUpdateActual={(val) => updateActualSavings(plan.id, val)}
                       showRemainderButton={isLastToFill}
