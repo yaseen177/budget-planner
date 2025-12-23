@@ -3505,54 +3505,53 @@ export default function App() {
 
   // --- UPDATED LOGIC START ---
   
-  // 1. Calculate Target for Current Account (The Remainder based on Percentage)
+  // 1. Calculate Target for Current Account
   const allocatedPercent = userSettings.allocationRules.reduce((sum, p) => sum + p.percentage, 0);
   const currentAccountPercent = Math.max(0, 100 - allocatedPercent);
   const currentAccountTarget = remainder * (currentAccountPercent / 100);
 
-  // 2. Calculate ACTUAL Current Account (Physical Cash Remainder)
-  // (Salary - Expenses - Money actually moved to pots)
+  // 2. Calculate ACTUAL Current Account
   const totalDepositedToPots = Object.values(displayActualSavings).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
   const currentAccountActual = Math.max(0, remainder - totalDepositedToPots);
   
   // 3. Calculate Days Until Next Payday
-  const calculateDaysUntilPayday = (payDayStr, salaryInputted) => {
+  const calculatePaydayLogic = (payDayStr, salaryInputted) => {
       const today = new Date();
+      // Reset time to midnight to ensure clean day calculations
+      today.setHours(0,0,0,0);
+      
       const currentDay = today.getDate();
       const payDay = parseInt(payDayStr) || 1; 
       
-      // Start by looking at the payday in the CURRENT calendar month
+      // Start with Payday of THIS month
       let targetDate = new Date(today.getFullYear(), today.getMonth(), payDay);
+      targetDate.setHours(0,0,0,0);
 
-      // SCENARIO 1: Today is AFTER the payday (e.g. Today 29th, Payday 25th)
-      // Result: Next payday is obviously next month (Jan 25th).
+      const hasSalary = salaryInputted && parseFloat(salaryInputted) > 0;
+
+      // LOGIC:
+      // If Today >= Payday: We passed it. Next one is Next Month.
+      // If Today < Payday AND We have Salary: We are currently IN the cycle, so the money needs to last until the NEXT NEXT Payday.
+      
       if (currentDay >= payDay) {
          targetDate.setMonth(targetDate.getMonth() + 1);
-      } 
-      // SCENARIO 2: Today is BEFORE the payday (e.g. Today 15th, Payday 25th)
-      else {
-         // Logic: If the user has "Filled" the current month (i.e. inputted Salary),
-         // they are actively budgeting for the cycle starting on the 25th.
-         // This money needs to last until the payday AFTER that (Next Month).
-         if (salaryInputted && parseFloat(salaryInputted) > 0) {
-            targetDate.setMonth(targetDate.getMonth() + 1);
-         }
-         // If they haven't inputted salary, they are still waiting for this month's payday.
+      } else if (hasSalary) {
+         targetDate.setMonth(targetDate.getMonth() + 1);
       }
       
       const diffTime = targetDate - today;
-      return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      return { days, targetDate };
   };
 
-  const daysUntilPayday = calculateDaysUntilPayday(userSettings.payDay, displaySalary);
+  const { days: daysUntilPayday, targetDate: targetPaydayDate } = calculatePaydayLogic(userSettings.payDay, displaySalary);
   
-  // 4. Daily Pace = ACTUAL Remainder / Days
-  // Rounded to 2 decimal places
+  // 4. Daily Pace
   const rawPace = daysUntilPayday > 0 ? (currentAccountActual / daysUntilPayday) : 0;
   const dailyAllowance = parseFloat(rawPace.toFixed(2));
   
-  // Label update
-  const daysLeftLabel = `Next Payday in`;
+  const daysLeftLabel = `Next Payday`;
   // --- UPDATED LOGIC END ---
 
   // Count how many plans have an actual value entered
@@ -3994,7 +3993,7 @@ export default function App() {
                 </div>
              </div>
 
-             {/* Stat 2: Days Left (UNCHANGED) */}
+             {/* Stat 2: Days Left */}
              <div className="flex-1 bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200/60 flex flex-col justify-center relative overflow-hidden group">
                 <div className="absolute bottom-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-8 -mb-8 group-hover:scale-110 transition duration-500"></div>
                 <div className="relative z-10">
@@ -4002,11 +4001,17 @@ export default function App() {
                     <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><Calendar className="w-4 h-4" /></div>
                     <span className="text-xs font-bold text-slate-400 uppercase">{daysLeftLabel}</span>
                   </div>
-                  <span className="text-3xl font-bold text-slate-800 tracking-tight">
-                    {getDaysLeft()}
-                  </span>
-                  <span className="text-xs text-slate-400 ml-2 font-medium">
-                  {currentDate.getMonth() === new Date().getMonth() ? 'in this month' : 'days total'}
+                  <div className="flex items-baseline">
+                     <span className="text-3xl font-bold text-slate-800 tracking-tight">
+                       {daysUntilPayday}
+                     </span>
+                     <span className="text-xs text-slate-400 ml-1 font-bold lowercase">
+                       days
+                     </span>
+                  </div>
+                  {/* Displays the actual date, e.g. "until 28 Jan" */}
+                  <span className="text-[10px] text-slate-400 font-medium mt-1 block">
+                     until {targetPaydayDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                   </span>
                 </div>
              </div>
