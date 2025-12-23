@@ -1415,12 +1415,16 @@ const HistoryReportView = ({ data, allocations, onClose, currency }) => {
   );
 };
 
-const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onResetMonth, isTutorial, onExitTutorial }) => {
+const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onResetMonth, isTutorial, onExitTutorial, isLegacyMode }) => {
   const [displayName, setDisplayName] = useState(currentSettings.displayName || user.displayName || '');
+  const [currency, setCurrency] = useState(currentSettings.currency || 'GBP');
+  const [bank, setBank] = useState(currentSettings.bankDetails || null);
+  const [payDay, setPayDay] = useState(currentSettings.payDay || '1');
+  
   const [allocations, setAllocations] = useState(currentSettings.allocationRules || []);
   const [defaultExpenses, setDefaultExpenses] = useState(currentSettings.defaultFixedExpenses || []);
-  const [currency, setCurrency] = useState(currentSettings.currency || 'GBP');
   
+  // ... (keep existing state for new pots/colors etc) ...
   const [newPlanName, setNewPlanName] = useState('');
   const [newPlanPercent, setNewPlanPercent] = useState('');
   const [openColorMenuId, setOpenColorMenuId] = useState(null);
@@ -1431,21 +1435,29 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   const [newDefExpLogo, setNewDefExpLogo] = useState(null);
 
   const totalPercentage = allocations.reduce((sum, item) => sum + parseFloat(item.percentage), 0);
+  const remainderPercent = Math.max(0, 100 - totalPercentage);
 
   const handleSave = () => {
-    if (totalPercentage !== 100) {
-      alert("Total percentage must equal 100%");
+    if (totalPercentage > 100) {
+      alert("Total percentage cannot exceed 100%");
+      return;
+    }
+    if (!bank || !payDay) {
+      alert("Please select a Bank and Payday");
       return;
     }
     onSaveSettings({
       displayName,
       currency,
+      bankDetails: bank,
+      payDay,
       allocationRules: allocations,
       defaultFixedExpenses: defaultExpenses
     });
     onClose();
   };
 
+  // ... (Keep addAllocation, removeAllocation, addDefaultExpense, removeDefaultExpense functions exactly as they are) ...
   const addAllocation = () => {
     if(!newPlanName || !newPlanPercent) return;
     setAllocations([...allocations, { 
@@ -1457,13 +1469,10 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
     setNewPlanName('');
     setNewPlanPercent('');
   };
-
   const removeAllocation = (id) => setAllocations(allocations.filter(a => a.id !== id));
-
   const addDefaultExpense = () => {
     if(!newDefExpName) return; 
     const amountVal = parseFloat(newDefExpAmount) || 0;
-    
     setDefaultExpenses([...defaultExpenses, {
       id: Date.now().toString(),
       name: newDefExpName,
@@ -1475,34 +1484,73 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
     setNewDefExpAmount('');
     setNewDefExpLogo(null);
   };
-
   const removeDefaultExpense = (id) => setDefaultExpenses(defaultExpenses.filter(e => e.id !== id));
+
 
   return (
     <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 overflow-y-auto animate-in slide-in-from-bottom-10 print:hidden">
       <div className="bg-white border-b border-slate-100 p-4 sticky top-0 z-10 flex justify-between items-center shadow-sm">
         <h2 className="text-lg font-bold flex items-center gap-2 text-slate-800">
-          <Settings className="w-5 h-5 text-slate-500" /> {isTutorial ? 'Settings Demo' : 'Settings'}
+          <Settings className="w-5 h-5 text-slate-500" /> {isTutorial ? 'Settings Demo' : isLegacyMode ? 'Complete Setup' : 'Settings'}
         </h2>
-        <button onClick={isTutorial ? onExitTutorial : onClose} className="p-2 hover:bg-slate-100 rounded-full transition">
-          <X className="w-6 h-6 text-slate-500" />
-        </button>
+        {!isLegacyMode && (
+           <button onClick={isTutorial ? onExitTutorial : onClose} className="p-2 hover:bg-slate-100 rounded-full transition">
+             <X className="w-6 h-6 text-slate-500" />
+           </button>
+        )}
       </div>
 
       <div className="max-w-xl mx-auto p-6 space-y-8 pb-20">
+        
+        {isLegacyMode && (
+          <div className="bg-amber-50 text-amber-800 p-4 rounded-xl border border-amber-200 text-sm font-bold mb-4">
+             Please update your Bank and Payday to use the new features.
+          </div>
+        )}
+
+        {/* BANK & PAYDAY */}
+        <section className="space-y-3">
+           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Bank & Payday</h3>
+           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+              
+              <div>
+                 <label className="block text-xs font-semibold text-slate-500 mb-2">Main Current Account</label>
+                 {bank ? (
+                    <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200">
+                       <div className="flex items-center gap-3">
+                          <img src={bank.logo} className="w-8 h-8 rounded-full object-contain" />
+                          <span className="font-bold text-slate-700">{bank.name}</span>
+                       </div>
+                       <button onClick={() => setBank(null)} className="text-xs font-bold text-indigo-500">Change</button>
+                    </div>
+                 ) : (
+                    <BankSelector selectedBank={bank} onSelect={setBank} />
+                 )}
+              </div>
+
+              <div>
+                 <label className="block text-xs font-semibold text-slate-500 mb-2">Payday (Day of Month)</label>
+                 <select value={payDay} onChange={(e) => setPayDay(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold">
+                    {Array.from({length: 31}, (_, i) => i + 1).map(day => (
+                       <option key={day} value={day}>{day}</option>
+                    ))}
+                 </select>
+              </div>
+
+           </div>
+        </section>
+
         {/* Profile Name */}
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Profile & Currency</h3>
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-          <div>
+            <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">Display Name</label>
               <input 
                 type="text" 
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                // CHANGED: Added text-base
                 className="w-full p-2 rounded-lg border border-slate-300 focus:border-emerald-500 outline-none transition text-base"
-                placeholder="Your Name"
                 disabled={isTutorial}
               />
             </div>
@@ -1524,43 +1572,46 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
         </section>
 
-        {/* 1. Spending Plan */}
+        {/* Spending Plan */}
         <section className="space-y-3" id="settings-spending-plan">
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Spending Plan</h3>
-            <span className={`px-2 py-0.5 rounded text-xs font-bold ${totalPercentage === 100 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-              Total: {totalPercentage}%
+            <span className={`px-2 py-0.5 rounded text-xs font-bold ${totalPercentage <= 100 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              Allocated: {totalPercentage}%
             </span>
           </div>
           
+          <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-xl flex items-center gap-3 mb-2">
+              <div className="bg-white p-1.5 rounded-full shadow-sm">
+                 {bank?.logo ? <img src={bank.logo} className="w-5 h-5 rounded-full object-contain"/> : <Wallet className="w-5 h-5 text-indigo-500"/>}
+              </div>
+              <div className="flex-1">
+                 <p className="text-xs font-bold text-indigo-400 uppercase">{bank?.name || 'Current Account'} (Remainder)</p>
+              </div>
+              <div className="text-lg font-black text-indigo-900">{remainderPercent}%</div>
+          </div>
+
           <div className="space-y-3">
-            {/* --- EXISTING POTS LIST (FIXED LAYOUT) --- */}
-            {allocations.map(plan => (
+             {/* ... (Keep existing POT list rendering logic) ... */}
+              {allocations.map(plan => (
               <div key={plan.id} className="relative">
                 <div className="flex items-center gap-2 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm z-10 relative overflow-hidden">
-                  
-                  {/* COLOR BUTTON */}
                   <button 
                     onClick={() => setOpenColorMenuId(openColorMenuId === plan.id ? null : plan.id)}
                     className="w-10 h-10 rounded-full border-2 border-slate-50 shadow-sm shrink-0 hover:scale-105 transition active:scale-95 group relative"
                     style={{ backgroundColor: plan.hex || '#10b981' }}
-                    title="Change Color"
                     disabled={isTutorial}
                   >
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/10 rounded-full">
                       <Edit2 className="w-4 h-4 text-white drop-shadow-md" />
                     </div>
                   </button>
-                  
-                  {/* Name Input (Added min-w-0 to prevent pushing) */}
                   <input 
                     value={plan.name}
                     onChange={(e) => setAllocations(allocations.map(a => a.id === plan.id ? {...a, name: e.target.value} : a))}
                     className="flex-1 min-w-0 font-bold text-slate-700 bg-transparent border-none outline-none focus:ring-0 text-base truncate" 
                     disabled={isTutorial}
                   />
-
-                  {/* Percentage Input (Added shrink-0) */}
                   <div className="flex items-center gap-1 bg-slate-50 px-2 py-2 rounded-xl border border-slate-100 shrink-0">
                     <input 
                       type="number"
@@ -1571,17 +1622,14 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                     />
                     <span className="text-slate-400 text-xs font-bold">%</span>
                   </div>
-
-                  {/* Delete Button (Added shrink-0) */}
                   {!isTutorial && (
                     <button onClick={() => removeAllocation(plan.id)} className="shrink-0 text-slate-300 hover:text-red-500 p-2 hover:bg-red-50 rounded-xl transition">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
-
-                {/* --- POP-OVER COLOR MENU --- */}
-                {openColorMenuId === plan.id && (
+                 {/* ... (Keep Color Menu Logic) ... */}
+                 {openColorMenuId === plan.id && (
                   <div className="absolute top-14 left-0 z-20 bg-white p-3 rounded-2xl shadow-xl border border-slate-100 animate-in slide-in-from-top-2 fade-in w-full">
                     <div className="text-xs font-bold text-slate-400 uppercase mb-2">Select Color</div>
                     <div className="flex gap-2 flex-wrap justify-start">
@@ -1607,23 +1655,19 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                 )}
               </div>
             ))}
-            
-            {/* --- CREATE NEW POT (FIXED LAYOUT) --- */}
-            <div className={`bg-slate-50 rounded-2xl p-3 border border-slate-200/60 ${isTutorial ? 'opacity-50 pointer-events-none' : ''}`}>
+
+            {/* ... (Keep Create Pot Logic) ... */}
+             <div className={`bg-slate-50 rounded-2xl p-3 border border-slate-200/60 ${isTutorial ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div className="flex justify-between items-center mb-2">
                    <p className="text-xs font-bold text-slate-400 uppercase">Create New Pot</p>
                 </div>
-
                 <div className="flex gap-2 items-center relative">
-                    {/* Name Input (Added min-w-0 to prevent pushing) */}
                     <input 
                       placeholder="Name"
                       value={newPlanName}
                       onChange={(e) => setNewPlanName(e.target.value)}
                       className="flex-1 min-w-0 p-3 text-base border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-slate-200 transition font-medium"
                     />
-                    
-                    {/* Percent Input (shrink-0) */}
                     <div className="relative w-20 shrink-0">
                         <input 
                           type="number"
@@ -1634,21 +1678,15 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                         />
                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
                     </div>
-
-                    {/* Color Dropdown Trigger (shrink-0) */}
-                    <div className="relative shrink-0">
+                    {/* ... (Color Dropdown for new pot - keep existing logic) ... */}
+                     <div className="relative shrink-0">
                         <button 
                             onClick={() => setShowNewPotColorMenu(!showNewPotColorMenu)}
                             className="w-11 h-11 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center transition hover:scale-105 active:scale-95"
                             style={{ backgroundColor: newPlanColor.hex }}
-                            title="Select Color"
                         >
-                           <div className="bg-black/10 rounded-full p-1">
-                              <Edit2 className="w-3 h-3 text-white" />
-                           </div>
+                           <div className="bg-black/10 rounded-full p-1"><Edit2 className="w-3 h-3 text-white" /></div>
                         </button>
-                        
-                        {/* THE DROPDOWN MENU (Added right-0 to align it inside the screen) */}
                         {showNewPotColorMenu && (
                             <div className="absolute bottom-full right-0 mb-2 p-3 bg-white rounded-2xl shadow-xl border border-slate-100 w-48 z-50 animate-in zoom-in-95 grid grid-cols-5 gap-2">
                                 {POT_COLORS.map((colorOption) => (
@@ -1665,8 +1703,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                             </div>
                         )}
                     </div>
-
-                    {/* Add Button (shrink-0) */}
                     <button 
                         onClick={() => {
                              if(!newPlanName || !newPlanPercent) return;
@@ -1691,12 +1727,11 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
         </section>
 
-        {/* 2. Fixed Expenses */}
+        {/* 2. Fixed Expenses (Keep existing) */}
         <section className="space-y-3" id="settings-fixed-expenses">
-          <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Default Monthly Bills</h3>
-          <p className="text-xs text-slate-500">These automatically copy over when you start a new month.</p>
-          
-          <div className="space-y-2">
+           {/* ... (Existing Fixed Expenses Logic) ... */}
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Default Monthly Bills</h3>
+             <div className="space-y-2">
             {defaultExpenses.map(exp => (
               <div key={exp.id} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-3">
@@ -1715,8 +1750,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                 </div>
               </div>
             ))}
-            
-            {/* Show Add Row (Disabled in Tutorial, but Visible for ID targeting) */}
             <div className={`flex gap-2 pt-2 items-start ${isTutorial ? 'opacity-50 pointer-events-none' : ''}`}>
               <div className="flex-1">
                 <BrandSearchInput
@@ -1727,12 +1760,9 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                     setNewDefExpName(brandName);
                     setNewDefExpLogo(brandLogo);
                   }}
-                  // CHANGED: text-sm -> text-base
                   className="w-full p-3 text-base border border-slate-200 rounded-xl bg-slate-50"
                 />
               </div>
-              
-              {/* TARGET ID IS HERE */}
               <div id="settings-new-expense-amount">
                 <input 
                     type="text"
@@ -1741,7 +1771,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                     value={newDefExpAmount}
                     onChange={(e) => setNewDefExpAmount(e.target.value)}
                     onBlur={() => setNewDefExpAmount(safeCalculate(newDefExpAmount))}
-                    // CHANGED: text-sm -> text-base
                     className="w-24 p-3 text-base border border-slate-200 rounded-xl bg-slate-50"
                 />
               </div>
@@ -1757,31 +1786,18 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
              <h3 className="text-sm font-bold text-red-400 uppercase tracking-wider flex items-center gap-2">
               <AlertTriangle className="w-4 h-4" /> Danger Zone
             </h3>
-            <button 
-              onClick={onResetMonth}
-              className="w-full border border-red-100 text-red-600 bg-red-50 py-4 rounded-xl font-semibold hover:bg-red-100 transition flex items-center justify-center gap-2"
-            >
+            <button onClick={onResetMonth} className="w-full border border-red-100 text-red-600 bg-red-50 py-4 rounded-xl font-semibold hover:bg-red-100 transition flex items-center justify-center gap-2">
               Reset This Month Data
             </button>
           </section>
         )}
 
-        {/* DYNAMIC FOOTER BUTTON */}
-        {isTutorial ? (
-          <button 
-            onClick={onExitTutorial} // Uses the special exit handler
-            className="w-full bg-rose-500 text-white py-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 hover:bg-rose-600 transition transform active:scale-95 animate-pulse"
-          >
-            <LogOut className="w-5 h-5" /> Exit Tutorial
-          </button>
-        ) : (
-          <button 
+        <button 
             onClick={handleSave}
             className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 hover:bg-slate-800 transition transform active:scale-95"
           >
             <Save className="w-5 h-5" /> Save Changes
-          </button>
-        )}
+        </button>
       </div>
     </div>
   );
@@ -1947,15 +1963,87 @@ const HelpModal = ({ onClose, onStartTutorial }) => {
 };
 
 
-// --- NEW COMPONENT: ONBOARDING WIZARD ---
-const OnboardingWizard = ({ user, onComplete }) => {
-  const [step, setStep] = useState(0); // 0:Intro, 1:Currency, 2:Pots, 3:Bills
-  const [currency, setCurrency] = useState('GBP');
+// --- NEW CONSTANTS: UK BANKS ---
+const UK_BANKS = [
+  { id: 'monzo', name: 'Monzo', domain: 'monzo.com', color: '#14213d' },
+  { id: 'starling', name: 'Starling', domain: 'starlingbank.com', color: '#3D8D7A' },
+  { id: 'lloyds', name: 'Lloyds', domain: 'lloydsbank.com', color: '#006A4D' },
+  { id: 'barclays', name: 'Barclays', domain: 'barclays.co.uk', color: '#00AEEF' },
+  { id: 'hsbc', name: 'HSBC', domain: 'hsbc.co.uk', color: '#DB0011' },
+  { id: 'natwest', name: 'NatWest', domain: 'natwest.com', color: '#42145F' },
+  { id: 'santander', name: 'Santander', domain: 'santander.co.uk', color: '#EC0000' },
+  { id: 'halifax', name: 'Halifax', domain: 'halifax.co.uk', color: '#005EB8' },
+  { id: 'revolut', name: 'Revolut', domain: 'revolut.com', color: '#0075EB' },
+  { id: 'nationwide', name: 'Nationwide', domain: 'nationwide.co.uk', color: '#D2112C' },
+];
+
+// --- NEW HELPER: PAYDAY CALCULATOR ---
+const calculateDaysUntilPayday = (payDayStr, salaryInputted) => {
+  const today = new Date();
+  const currentDay = today.getDate();
+  const payDay = parseInt(payDayStr) || 1; // Default to 1st if error
   
-  // Pots State
+  // Logic:
+  // If we have salary data, we are likely budgeting for the period STARTING on the next payday.
+  // However, usually "Days Left" implies "How long do I have to make this money last?"
+  
+  // If today is 23rd, Payday is 25th. 
+  // Scenario A: I haven't been paid yet. I have 2 days left of OLD money.
+  // Scenario B: I just got paid (or input salary early). I have ~30 days until NEXT pay.
+  
+  // Based on your prompt: "If salary entered BEFORE payday, assume countdown is for NEXT month"
+  
+  let targetDate = new Date(today.getFullYear(), today.getMonth(), payDay);
+  
+  // If today is AFTER payday (e.g. 26th, Payday 25th), target is next month
+  if (currentDay >= payDay) {
+     targetDate.setMonth(targetDate.getMonth() + 1);
+  } else {
+     // Today is BEFORE payday (e.g. 23rd, Payday 25th).
+     // IF salary is entered, we assume we are prepping for the new cycle, so target is NEXT month.
+     if (salaryInputted) {
+        // targetDate is currently THIS month's payday (25th). 
+        // We want the ONE AFTER (Next Month).
+        // Wait, if I enter salary early, I want to know how long THAT salary has to last. 
+        // It has to last until the payday AFTER the upcoming one.
+        // Actually, easiest interpretation: Days Left = Days until the Next Payday occurs.
+        
+        // Let's stick to strict "Days until money runs out / refresh".
+        // If I input salary today (23rd) for the cycle starting 25th, 
+        // my "Days Left" for that new money is roughly 30 days (from 25th to 25th).
+     }
+  }
+
+  // SIMPLIFIED LOGIC based on prompt specifics:
+  // If Salary is present > 0, and Today < Payday:
+  // We assume the user is "early" and looking at the UPCOMING month. 
+  // So the target is Payday of NEXT month.
+  if (salaryInputted && parseFloat(salaryInputted) > 0 && currentDay < payDay) {
+      targetDate = new Date(today.getFullYear(), today.getMonth() + 1, payDay);
+  } else if (currentDay >= payDay) {
+      // Standard: It's past payday, next one is next month
+      targetDate = new Date(today.getFullYear(), today.getMonth() + 1, payDay);
+  }
+  // Else (Today < Payday, no salary input yet): Target is THIS month's payday (Upcoming)
+
+  const diffTime = Math.abs(targetDate - today);
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+};
+
+// --- NEW COMPONENT: ONBOARDING WIZARD ---
+// --- ONBOARDING WIZARD COMPONENT ---
+const OnboardingWizard = ({ user, onComplete }) => {
+  const [step, setStep] = useState(0); 
+  // Steps: 0:Intro, 1:Bank, 2:Payday, 3:Currency, 4:Pots, 5:Bills
+  
+  const [currency, setCurrency] = useState('GBP');
+  const [bank, setBank] = useState(null);
+  const [payDay, setPayDay] = useState(''); // Stores string '1' to '31'
+  
+  // Pots State (User defined pots only - Current Account is calculated automatically)
   const [pots, setPots] = useState([
     { id: '1', name: 'Savings', percentage: 20, color: 'bg-emerald-100 text-emerald-700 bar-emerald' },
-    { id: '2', name: 'Expenses', percentage: 80, color: 'bg-indigo-100 text-indigo-700 bar-indigo' }
+    { id: '2', name: 'Holidays', percentage: 10, color: 'bg-sky-100 text-sky-700 bar-sky' }
   ]);
   const [newPotName, setNewPotName] = useState('');
   const [newPotPercent, setNewPotPercent] = useState('');
@@ -1970,21 +2058,17 @@ const OnboardingWizard = ({ user, onComplete }) => {
 
   const addPot = () => {
     if (!newPotName || !newPotPercent) return;
+    
+    // Assign a random color style for new pots
     const colors = [
-      'bg-emerald-100 text-emerald-700 bar-emerald',
       'bg-indigo-100 text-indigo-700 bar-indigo',
-      'bg-sky-100 text-sky-700 bar-sky',
       'bg-amber-100 text-amber-700 bar-amber',
       'bg-purple-100 text-purple-700 bar-purple',
-      'bg-fuchsia-100 text-fuchsia-700 bar-fuchsia',
-      'bg-orange-100 text-orange-700 bar-orange',
-      'bg-cyan-100 text-cyan-700 bar-cyan',
-      'bg-lime-100 text-lime-700 bar-lime'
+      'bg-rose-100 text-rose-700 bar-rose',
+      'bg-cyan-100 text-cyan-700 bar-cyan'
     ];
-    // ---------------------------------------
-    
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
-    
+
     setPots([...pots, { 
       id: Date.now().toString(), 
       name: newPotName, 
@@ -2013,6 +2097,8 @@ const OnboardingWizard = ({ user, onComplete }) => {
     const settings = {
       displayName: user.displayName || 'Friend',
       currency,
+      bankDetails: bank, // Save selected bank (includes name, logo, color)
+      payDay: payDay,    // Save selected payday
       allocationRules: pots,
       defaultFixedExpenses: bills
     };
@@ -2020,12 +2106,12 @@ const OnboardingWizard = ({ user, onComplete }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center p-6 animate-in fade-in duration-500">
-      <div className="max-w-md w-full space-y-8">
+    <div className="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 overflow-y-auto">
+      <div className="max-w-md w-full space-y-8 py-10">
         
-        {/* Progress Dots */}
+        {/* Progress Dots - 6 Steps total */}
         <div className="flex justify-center gap-2 mb-8">
-          {[0, 1, 2, 3].map(i => (
+          {[0, 1, 2, 3, 4, 5].map(i => (
             <div key={i} className={`w-3 h-3 rounded-full transition-all ${step === i ? 'bg-slate-900 scale-125' : 'bg-slate-200'}`} />
           ))}
         </div>
@@ -2044,11 +2130,61 @@ const OnboardingWizard = ({ user, onComplete }) => {
           </div>
         )}
 
-        {/* STEP 1: CURRENCY */}
+        {/* STEP 1: BANK SELECTION (NEW) */}
         {step === 1 && (
+           <div className="space-y-6 animate-in slide-in-from-right-8">
+             <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-800">Where does your salary go?</h2>
+              <p className="text-slate-500">Select your main Current Account.</p>
+            </div>
+            
+            <BankSelector 
+               selectedBank={bank}
+               onSelect={(b) => setBank(b)}
+            />
+
+            <button disabled={!bank} onClick={() => setStep(2)} className="w-full bg-slate-900 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
+              Next
+            </button>
+           </div>
+        )}
+
+        {/* STEP 2: PAYDAY SELECTION (NEW) */}
+        {step === 2 && (
+           <div className="space-y-6 animate-in slide-in-from-right-8">
+             <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-800">When is Payday?</h2>
+              <p className="text-slate-500">We use this to track your monthly cycle.</p>
+            </div>
+
+            <div className="grid grid-cols-7 gap-2 max-h-64 overflow-y-auto p-1">
+               {Array.from({length: 31}, (_, i) => i + 1).map(day => (
+                  <button 
+                    key={day}
+                    onClick={() => setPayDay(String(day))}
+                    className={`aspect-square rounded-lg font-bold border flex items-center justify-center transition ${payDay === String(day) ? 'bg-slate-900 text-white border-slate-900 scale-110 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}
+                  >
+                    {day}
+                  </button>
+               ))}
+            </div>
+            {payDay && (
+              <p className="text-center font-bold text-emerald-600 animate-in fade-in">
+                Payday is on the {payDay}{['1','21','31'].includes(payDay)?'st':['2','22'].includes(payDay)?'nd':['3','23'].includes(payDay)?'rd':'th'}
+              </p>
+            )}
+
+            <button disabled={!payDay} onClick={() => setStep(3)} className="w-full bg-slate-900 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
+              Next
+            </button>
+           </div>
+        )}
+
+        {/* STEP 3: CURRENCY */}
+        {step === 3 && (
           <div className="space-y-6 animate-in slide-in-from-right-8">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">First things first</h2>
+              <h2 className="text-2xl font-bold text-slate-800">Your Currency</h2>
               <p className="text-slate-500">Select your primary currency.</p>
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -2062,18 +2198,18 @@ const OnboardingWizard = ({ user, onComplete }) => {
                 </button>
               ))}
             </div>
-            <button onClick={() => setStep(2)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
+            <button onClick={() => setStep(4)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
               Next Step
             </button>
           </div>
         )}
 
-        {/* STEP 2: POTS */}
-        {step === 2 && (
+        {/* STEP 4: POTS & CURRENT ACCOUNT */}
+        {step === 4 && (
           <div className="space-y-6 animate-in slide-in-from-right-8">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">The 100% Rule</h2>
-              <p className="text-slate-500">Every penny needs a job. Assign percentages to your savings pots.</p>
+              <h2 className="text-2xl font-bold text-slate-800">Savings & Pots</h2>
+              <p className="text-slate-500">Create your pots. <strong>Anything remaining</strong> stays in your {bank?.name || 'Current'} Account.</p>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 max-h-60 overflow-y-auto">
@@ -2088,7 +2224,6 @@ const OnboardingWizard = ({ user, onComplete }) => {
               ))}
             </div>
 
-            {/* Add Pot Form */}
             <div className="flex gap-2">
                <input 
                  className="flex-1 p-3 rounded-xl border border-slate-200 bg-white" 
@@ -2106,23 +2241,34 @@ const OnboardingWizard = ({ user, onComplete }) => {
                <button onClick={addPot} className="bg-slate-900 text-white p-3 rounded-xl"><Plus className="w-5 h-5" /></button>
             </div>
 
-            <div className={`p-4 rounded-xl flex justify-between items-center ${totalPercent === 100 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-               <span className="font-bold text-sm">Total Allocation</span>
-               <span className="font-bold text-xl">{totalPercent}%</span>
+            {/* MANDATORY CURRENT ACCOUNT CARD */}
+            <div className={`p-4 rounded-xl flex justify-between items-center border ${totalPercent > 100 ? 'bg-red-50 border-red-200' : 'bg-indigo-50 border-indigo-100'}`}>
+                <div className="flex items-center gap-3">
+                   {bank?.logo ? (
+                     <img src={bank.logo} className="w-8 h-8 rounded-full shadow-sm bg-white object-contain"/> 
+                   ) : (
+                     <div className="bg-white p-1.5 rounded-full"><Wallet className="w-5 h-5 text-indigo-500"/></div>
+                   )}
+                   <div>
+                     <p className={`text-xs font-bold uppercase ${totalPercent > 100 ? 'text-red-500' : 'text-indigo-400'}`}>Remains in {bank?.name}</p>
+                     <p className={`font-black text-xl ${totalPercent > 100 ? 'text-red-700' : 'text-indigo-900'}`}>{Math.max(0, 100 - totalPercent)}%</p>
+                   </div>
+                </div>
+                {totalPercent > 100 && <AlertCircle className="w-6 h-6 text-red-500" />}
             </div>
 
             <button 
-              disabled={totalPercent !== 100}
-              onClick={() => setStep(3)} 
+              disabled={totalPercent > 100}
+              onClick={() => setStep(5)} 
               className="w-full bg-slate-900 disabled:bg-slate-300 disabled:text-slate-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition"
             >
-              Continue
+              {totalPercent > 100 ? 'Total cannot exceed 100%' : 'Continue'}
             </button>
           </div>
         )}
 
-        {/* STEP 3: BILLS */}
-        {step === 3 && (
+        {/* STEP 5: FIXED EXPENSES */}
+        {step === 5 && (
           <div className="space-y-6 animate-in slide-in-from-right-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-slate-800">Monthly Commitments</h2>
@@ -2449,6 +2595,57 @@ const SwipeableExpenseRow = ({ children, onEdit, onDelete, isMobile }) => {
 };
 
 
+const BankSelector = ({ selectedBank, onSelect, onManualEntry }) => {
+  const [isSearching, setIsSearching] = useState(false);
+
+  return (
+    <div className="space-y-4">
+      {!isSearching ? (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-60 overflow-y-auto p-1">
+            {UK_BANKS.map(bank => (
+              <button
+                key={bank.id}
+                onClick={() => onSelect({ name: bank.name, logo: `https://img.logo.dev/${bank.domain}?token=pk_IlDYZIBjQZOkL2hI7rtHmA` })}
+                className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${selectedBank?.name === bank.name ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-200 hover:border-slate-300 bg-white'}`}
+              >
+                <img 
+                  src={`https://img.logo.dev/${bank.domain}?token=pk_IlDYZIBjQZOkL2hI7rtHmA`} 
+                  alt={bank.name} 
+                  className="w-8 h-8 object-contain rounded-full"
+                />
+                <span className="text-xs font-bold text-slate-700">{bank.name}</span>
+              </button>
+            ))}
+          </div>
+          <button 
+            onClick={() => setIsSearching(true)}
+            className="w-full py-3 text-sm font-bold text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl border border-dashed border-slate-300 transition"
+          >
+            My bank isn't listed
+          </button>
+        </>
+      ) : (
+        <div className="animate-in fade-in">
+           <div className="flex justify-between items-center mb-2">
+              <label className="text-xs font-bold text-slate-400 uppercase">Search Bank</label>
+              <button onClick={() => setIsSearching(false)} className="text-xs text-indigo-500 font-bold">Back to list</button>
+           </div>
+           <BrandSearchInput 
+              placeholder="e.g. Chase, Virgin Money..."
+              value=""
+              onChange={() => {}} // Local state handled in BrandSearchInput, we just want the select
+              onSelectBrand={(name, logo) => onSelect({ name, logo })}
+              className="w-full p-3 rounded-xl border border-slate-200"
+              autoFocus
+           />
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 // --- INTERNAL ADMIN DASHBOARD COMPONENT ---
 const AdminDashboard = ({ user, onExitAdmin }) => {
   const [logs, setLogs] = useState([]);
@@ -2459,6 +2656,7 @@ const AdminDashboard = ({ user, onExitAdmin }) => {
   const [filterType, setFilterType] = useState('ALL');
   const [filterDate, setFilterDate] = useState('');
 
+  
   useEffect(() => {
     const fetchLogs = async () => {
       try {
@@ -2644,6 +2842,8 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTutorial, setActiveTutorial] = useState(null); // 'add_expense' or 'advanced_features'
   const [tutorialStep, setTutorialStep] = useState(0);
+
+  const [isLegacyUser, setIsLegacyUser] = useState(false);
 
   const isMobile = window.innerWidth < 768;
 
@@ -2934,12 +3134,19 @@ export default function App() {
     const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
     const unsub = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) {
-        setUserSettings(docSnap.data());
-        // User has settings, so they are NOT new (or have finished onboarding)
+        const data = docSnap.data();
+        setUserSettings(data);
+        
+        // CHECK IF LEGACY: Missing Bank or Payday
+        if (!data.bankDetails || !data.payDay) {
+           setIsLegacyUser(true);
+           setShowSettings(true); // Force open settings
+        } else {
+           setIsLegacyUser(false);
+        }
         setOnboardingComplete(true);
       } else {
         // User has NO settings. Do NOT save defaults yet.
-        // This triggers the Onboarding Wizard to appear.
         setOnboardingComplete(false);
         setUserSettings({
           displayName: user.displayName || '',
@@ -3410,7 +3617,7 @@ export default function App() {
         onSave={handleAddExpenseSave}
       />
 
-      {showSettings && (
+{showSettings && (
         <SettingsScreen 
           user={user} 
           currentSettings={isTutorialMode ? {
@@ -3422,14 +3629,15 @@ export default function App() {
           onSaveSettings={saveSettings}
           onResetMonth={resetCurrentMonth}
           isTutorial={isTutorialMode}
-          // --- FIX: EXIT TUTORIAL HANDLER ---
           onExitTutorial={() => {
              setActiveTutorial(null);
              setShowSettings(false);
              setMobileMenuOpen(false);
-             setShowHelp(true); // Redirect to Help
+             setShowHelp(true);
           }}
-          // ----------------------------------
+          // --- ADD THIS LINE ---
+          isLegacyMode={isLegacyUser}
+          // --------------------
         />
       )}
 
