@@ -2595,8 +2595,10 @@ const SwipeableExpenseRow = ({ children, onEdit, onDelete, isMobile }) => {
 };
 
 
-const BankSelector = ({ selectedBank, onSelect, onManualEntry }) => {
+const BankSelector = ({ selectedBank, onSelect }) => {
   const [isSearching, setIsSearching] = useState(false);
+  // FIX: Added local state for the search input
+  const [searchTerm, setSearchTerm] = useState('');
 
   return (
     <div className="space-y-4">
@@ -2606,7 +2608,7 @@ const BankSelector = ({ selectedBank, onSelect, onManualEntry }) => {
             {UK_BANKS.map(bank => (
               <button
                 key={bank.id}
-                onClick={() => onSelect({ name: bank.name, logo: `https://img.logo.dev/${bank.domain}?token=pk_IlDYZIBjQZOkL2hI7rtHmA` })}
+                onClick={() => onSelect({ name: bank.name, logo: `https://img.logo.dev/${bank.domain}?token=pk_IlDYZIBjQZOkL2hI7rtHmA`, color: bank.color })}
                 className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${selectedBank?.name === bank.name ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-200 hover:border-slate-300 bg-white'}`}
               >
                 <img 
@@ -2631,11 +2633,12 @@ const BankSelector = ({ selectedBank, onSelect, onManualEntry }) => {
               <label className="text-xs font-bold text-slate-400 uppercase">Search Bank</label>
               <button onClick={() => setIsSearching(false)} className="text-xs text-indigo-500 font-bold">Back to list</button>
            </div>
+           {/* FIX: Connected value and onChange to state */}
            <BrandSearchInput 
               placeholder="e.g. Chase, Virgin Money..."
-              value=""
-              onChange={() => {}} // Local state handled in BrandSearchInput, we just want the select
-              onSelectBrand={(name, logo) => onSelect({ name, logo })}
+              value={searchTerm}
+              onChange={setSearchTerm}
+              onSelectBrand={(name, logo) => onSelect({ name, logo, color: '#64748b' })} // Default color for unknown banks
               className="w-full p-3 rounded-xl border border-slate-200"
               autoFocus
            />
@@ -2644,7 +2647,6 @@ const BankSelector = ({ selectedBank, onSelect, onManualEntry }) => {
     </div>
   );
 };
-
 
 // --- INTERNAL ADMIN DASHBOARD COMPONENT ---
 const AdminDashboard = ({ user, onExitAdmin }) => {
@@ -2872,7 +2874,7 @@ export default function App() {
     // Otherwise show total days in that month
     return new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
   };
-  const daysLeftLabel = (currentDate.getMonth() === new Date().getMonth()) ? 'Days Left' : 'Total Days';
+
 
   // --- NEW: LOGGING HELPER ---
   // Added "directUser" parameter to handle login events immediately
@@ -3501,9 +3503,46 @@ export default function App() {
   const salaryNum = parseFloat(displaySalary) || 0;
   const remainder = Math.max(0, salaryNum - totalExpenses);
 
-  // NEW: Calculate Daily Allowance
-  const daysRemaining = getDaysLeft();
-  const dailyAllowance = daysRemaining > 0 ? (remainder / daysRemaining) : 0;
+  // --- UPDATED LOGIC START ---
+  
+  // 1. Calculate Target for Current Account (The Remainder)
+  const allocatedPercent = userSettings.allocationRules.reduce((sum, p) => sum + p.percentage, 0);
+  const currentAccountPercent = Math.max(0, 100 - allocatedPercent);
+  const currentAccountTarget = remainder * (currentAccountPercent / 100);
+  
+  // 2. Calculate Days Until Next Payday
+  const calculateDaysUntilPayday = (payDayStr, salaryInputted) => {
+      const today = new Date();
+      const currentDay = today.getDate();
+      const payDay = parseInt(payDayStr) || 1; 
+      
+      let targetDate = new Date(today.getFullYear(), today.getMonth(), payDay);
+
+      // Rule 1: If today is AFTER payday, target is next month
+      if (currentDay >= payDay) {
+         targetDate.setMonth(targetDate.getMonth() + 1);
+      } else {
+         // Rule 2: Today is BEFORE payday. 
+         // If Salary IS inputted, assume we are budgeting for the UPCOMING cycle.
+         // Therefore, the "Next Payday" is actually the one NEXT month.
+         if (salaryInputted && parseFloat(salaryInputted) > 0) {
+            targetDate.setMonth(targetDate.getMonth() + 1);
+         }
+         // If Salary NOT inputted, we are just waiting for the immediate next payday (this month)
+      }
+      
+      const diffTime = targetDate - today;
+      return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+  };
+
+  const daysUntilPayday = calculateDaysUntilPayday(userSettings.payDay, displaySalary);
+  
+  // 3. Daily Pace = Current Account Remainder / Days Til Payday
+  const dailyAllowance = daysUntilPayday > 0 ? (currentAccountTarget / daysUntilPayday) : 0;
+  
+  // Label update
+  const daysLeftLabel = `Next Payday in`;
+  // --- UPDATED LOGIC END ---
 
   // Count how many plans have an actual value entered
   const filledPlansCount = userSettings.allocationRules.filter(plan => {
@@ -4100,6 +4139,47 @@ export default function App() {
                   );
                 })}
              </div>
+
+             {/* --- NEW SECTION: KEEP IN CURRENT ACCOUNT --- */}
+             <div className="mt-6">
+                <div 
+                   className="rounded-[2rem] p-6 text-white shadow-lg relative overflow-hidden"
+                   style={{ backgroundColor: userSettings.bankDetails?.color || '#1e293b' }}
+                >
+                   {/* Background Logo Decoration (Faded) */}
+                   {userSettings.bankDetails?.logo && (
+                      <div className="absolute -right-6 -bottom-6 opacity-10 rotate-12">
+                         <img src={userSettings.bankDetails.logo} className="w-48 h-48 object-contain invert" />
+                      </div>
+                   )}
+                   
+                   <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-4">
+                      <div className="flex items-center gap-4">
+                         <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm shadow-inner border border-white/10">
+                            {userSettings.bankDetails?.logo ? (
+                               <img src={userSettings.bankDetails.logo} className="w-8 h-8 object-contain rounded-full bg-white p-0.5" />
+                            ) : (
+                               <Wallet className="w-8 h-8 text-white" />
+                            )}
+                         </div>
+                         <div>
+                            <h3 className="text-lg font-bold opacity-90">Keep in {userSettings.bankDetails?.name || 'Current Account'}</h3>
+                            <div className="flex items-center gap-2 text-sm font-medium opacity-70">
+                               <span>Remainder Pot</span>
+                               <span>•</span>
+                               <span>{currentAccountPercent.toFixed(0)}% Allocation</span>
+                            </div>
+                         </div>
+                      </div>
+
+                      <div className="text-center md:text-right bg-black/20 px-6 py-3 rounded-2xl border border-white/5 backdrop-blur-sm">
+                         <p className="text-xs font-bold uppercase tracking-widest opacity-60 mb-1">Do not transfer</p>
+                         <p className="text-3xl font-black tracking-tight">{formatCurrency(currentAccountTarget, userSettings.currency)}</p>
+                      </div>
+                   </div>
+                </div>
+             </div>
+             {/* ------------------------------------------- */}
           </div>
         )}
 
