@@ -177,12 +177,25 @@ const openReportInNewTab = (elementId, title) => {
     <html lang="en">
     <head>
       <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${title}</title><script src="https://cdn.tailwindcss.com"></script>
-      <style>body { background-color: white; padding: 20px; font-family: sans-serif; -webkit-print-color-adjust: exact; } @media print { body { padding: 0; } .no-print { display: none; } }</style>
+      <title>${title}</title>
+      <script src="https://cdn.tailwindcss.com"></script>
+      <style>
+        body { background-color: white; padding: 20px; font-family: sans-serif; -webkit-print-color-adjust: exact; } 
+        @media print { 
+          body { padding: 0; margin: 0; } 
+          /* Force hide elements with no-print class */
+          .no-print, .print\\:hidden { display: none !important; } 
+        }
+      </style>
     </head>
     <body>
-      <div class="max-w-4xl mx-auto">${element.innerHTML}</div>
-      <div class="fixed bottom-4 right-4 no-print flex gap-2"><button onclick="window.print()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold shadow-lg">Print / Save as PDF</button></div>
+      <div class="max-w-4xl mx-auto print:w-full">${element.innerHTML}</div>
+      
+      <div class="fixed bottom-4 right-4 no-print print:hidden flex gap-2 z-50">
+        <button onclick="window.print()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold shadow-lg hover:bg-blue-700 transition">
+          Print / Save as PDF
+        </button>
+      </div>
     </body>
     </html>`;
   const blob = new Blob([htmlContent], { type: 'text/html' });
