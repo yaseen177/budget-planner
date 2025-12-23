@@ -2536,16 +2536,19 @@ export default function App() {
   const daysLeftLabel = (currentDate.getMonth() === new Date().getMonth()) ? 'Days Left' : 'Total Days';
 
   // --- NEW: LOGGING HELPER ---
-  const logSystemEvent = async (action, type = 'click') => {
-    if (!user) return;
+  // Added "directUser" parameter to handle login events immediately
+  const logSystemEvent = async (action, type = 'click', directUser = null) => {
+    const activeUser = directUser || user; // Use the direct user if provided, otherwise use state
+    
+    if (!activeUser) return; // Guard clause
+
     try {
       const logsRef = collection(db, 'artifacts', appId, 'system_logs');
-      // Note: Make sure you import 'addDoc' from 'firebase/firestore' at the top of the file!
       await addDoc(logsRef, {
         action: action,
         type: type,
-        userId: user.uid,
-        userEmail: user.email,
+        userId: activeUser.uid,
+        userEmail: activeUser.email,
         timestamp: new Date()
       });
     } catch (e) {
@@ -2843,6 +2846,9 @@ export default function App() {
       // tell the app "We have a user!" immediately.
       console.log("Login successful. forcing state update for:", result.user.email);
       setUser(result.user); 
+      
+      // Pass 'result.user' as the 3rd argument so it logs immediately
+      logSystemEvent('User Logged In', 'login', result.user);
       
       logSystemEvent('User Logged In', 'login');
     } catch (error) {
