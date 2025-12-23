@@ -153,13 +153,13 @@ const safeCalculate = (expression) => {
   }
 };
 
-const formatCurrency = (amount, currency = 'GBP') => {
+const formatCurrency = (amount, currency = 'GBP', decimals = 0) => {
   const localeMap = { 'GBP': 'en-GB', 'USD': 'en-US', 'EUR': 'de-DE' };
   return new Intl.NumberFormat(localeMap[currency] || 'en-GB', {
     style: 'currency',
     currency: currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
   }).format(amount);
 };
 
@@ -4045,7 +4045,7 @@ export default function App() {
                 
                 <div className="flex items-baseline justify-center gap-1">
                    <span className="text-3xl font-black text-indigo-700 tracking-tight">
-                     {formatCurrency(dailyAllowance, userSettings.currency)}
+                     {formatCurrency(dailyAllowance, userSettings.currency, 2)}
                    </span>
                    <span className="text-sm font-bold text-indigo-400">/ day</span>
                 </div>
