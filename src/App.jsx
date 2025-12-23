@@ -27,8 +27,6 @@ import {
   orderBy,
   limit
 } from 'firebase/firestore';
-// --- NEW: IMPORT GEMINI SDK ---
-
 import { 
   PieChart, 
   Wallet, 
@@ -77,8 +75,6 @@ import {
   Shield
 } from 'lucide-react';
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
-const genAI = new GoogleGenerativeAI("AIzaSyAxyzxPaG3cChz9w1edYfWIbulQqA8aCBQ");
 // --- FIREBASE CONFIGURATION AREA ---
 const YOUR_FIREBASE_KEYS = {
   apiKey: "AIzaSyA6K0QPohae3zLl2z9yqVwblJCfaAmEVlQ",
@@ -2851,77 +2847,6 @@ export default function App() {
 
   const [highlightedSlice, setHighlightedSlice] = useState(null); // 'expenses' or pot ID
 
-  // --- NEW: AI MAGIC ADD LOGIC ---
-  const [magicInput, setMagicInput] = useState("");
-  const [isAiLoading, setIsAiLoading] = useState(false);
-
-  // --- DEBUGGING VERSION OF MAGIC ADD ---
-  const handleMagicAdd = async (e) => {
-    e.preventDefault();
-    if (!magicInput.trim()) return;
-
-    setIsAiLoading(true);
-    console.log("🚀 Starting AI Request...");
-    console.log("🔑 API Key check:", YOUR_FIREBASE_KEYS.apiKey ? "Present" : "Missing"); // Just checking existence
-
-    // Helper to try a specific model
-    const tryModel = async (modelName) => {
-      console.log(`🤖 Attempting with model: ${modelName}`);
-      const model = genAI.getGenerativeModel({ model: modelName });
-      
-      const prompt = `
-        You are a financial assistant. Extract expense data from this text: "${magicInput}".
-        Current Date: ${new Date().toISOString()}.
-        Return ONLY a raw JSON object (no markdown) with keys: name (string), amount (number), date (YYYY-MM-DD).
-        If amount missing use 0.
-      `;
-
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      return response.text();
-    };
-
-    try {
-      let text;
-      try {
-        // 1. Try the fast model first
-        text = await tryModel("gemini-1.5-flash");
-      } catch (firstError) {
-        console.warn("⚠️ gemini-1.5-flash failed:", firstError.message);
-        console.log("🔄 Switching to backup model: gemini-pro...");
-        
-        // 2. Fallback to the older reliable model
-        text = await tryModel("gemini-pro");
-      }
-
-      console.log("✅ AI Response received:", text);
-      
-      // Clean up the text
-      const cleanJson = text.replace(/```json|```/g, '').trim();
-      const data = JSON.parse(cleanJson);
-
-      await addDoc(collection(db, "expenses"), {
-        uid: user.uid,
-        name: data.name,
-        amount: parseFloat(data.amount),
-        date: data.date,
-        type: 'one-off',
-        category: 'general',
-        createdAt: new Date()
-      });
-
-      setMagicInput("");
-      setToastMessage(`✨ Added ${data.name} (£${data.amount})`);
-
-    } catch (finalError) {
-      console.error("❌ CRITICAL AI FAILURE:", finalError);
-      alert(`AI Error: ${finalError.message}. Check the Console (F12) for details.`);
-      setToastMessage("❌ Failed. Check console.");
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
-
   // Derived state variables
   const displaySalary = isSandbox ? sandboxSalary : salary;
   
@@ -3687,34 +3612,6 @@ export default function App() {
                </div>
              </>
           )}
-        </div>
-
-        {/* --- NEW: MAGIC AI INPUT --- */}
-        <div className="max-w-md mx-auto mb-8 px-4 relative z-40">
-          <form onSubmit={handleMagicAdd} className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-lg">✨</span>
-            </div>
-            <input
-              type="text"
-              value={magicInput}
-              onChange={(e) => setMagicInput(e.target.value)}
-              disabled={isAiLoading}
-              placeholder={isAiLoading ? "Thinking..." : "Type '£50 petrol next friday'..."}
-              className="block w-full pl-10 pr-12 py-3 border-none rounded-2xl bg-white shadow-lg ring-1 ring-slate-200/50 focus:ring-2 focus:ring-emerald-500/50 focus:outline-none transition-all text-slate-600 placeholder:text-slate-400 font-medium"
-            />
-            <button 
-              type="submit"
-              disabled={!magicInput || isAiLoading}
-              className="absolute right-2 top-2 bottom-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-xs flex items-center gap-1"
-            >
-              {isAiLoading ? (
-                 <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                 <>ADD <ArrowRight className="w-3 h-3" /></>
-              )}
-            </button>
-          </form>
         </div>
 
         {/* --- BENTO GRID LAYOUT --- */}
