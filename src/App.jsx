@@ -3294,6 +3294,10 @@ export default function App() {
   const salaryNum = parseFloat(displaySalary) || 0;
   const remainder = Math.max(0, salaryNum - totalExpenses);
 
+  // NEW: Calculate Daily Allowance
+  const daysRemaining = getDaysLeft();
+  const dailyAllowance = daysRemaining > 0 ? (remainder / daysRemaining) : 0;
+
   // Count how many plans have an actual value entered
   const filledPlansCount = userSettings.allocationRules.filter(plan => {
       const val = displayActualSavings[plan.id];
@@ -3744,10 +3748,32 @@ export default function App() {
                     {getDaysLeft()}
                   </span>
                   <span className="text-xs text-slate-400 ml-2 font-medium">
-                     {currentDate.getMonth() === new Date().getMonth() ? 'in this month' : 'days total'}
+                  {currentDate.getMonth() === new Date().getMonth() ? 'in this month' : 'days total'}
                   </span>
                 </div>
              </div>
+             
+             {/* --- PASTE THIS NEW WIDGET BELOW --- */}
+             {/* Stat 3: Daily Allowance Widget */}
+             <div className="flex-1 bg-indigo-50 p-6 rounded-[2.5rem] shadow-sm border border-indigo-100 flex flex-col justify-center text-center relative overflow-hidden group">
+                {/* Decorative Top Bar */}
+                <div className="absolute top-0 left-0 w-full h-1.5 bg-indigo-200/50"></div>
+                
+                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Daily Pace</span>
+                
+                <div className="flex items-baseline justify-center gap-1">
+                   <span className="text-3xl font-black text-indigo-700 tracking-tight">
+                     {formatCurrency(dailyAllowance, userSettings.currency)}
+                   </span>
+                   <span className="text-sm font-bold text-indigo-400">/ day</span>
+                </div>
+                
+                <p className="text-[10px] text-indigo-400 mt-2 font-medium opacity-80 px-2">
+                   Spend less than this today to stay on track.
+                </p>
+             </div>
+             {/* ----------------------------------- */}
+
           </div>
         </div>
 
