@@ -874,20 +874,37 @@ const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, ac
   // and keep the visual wheel as a reference.
   
   const segments = [];
-  const addSegment = (percent, color) => {
+
+  // --- CHANGED: Pattern Logic Start ---
+  // Define a subtle cross-hatch pattern for inactive areas
+  const crossPattern = "repeating-linear-gradient(45deg, #e2e8f0 0, #e2e8f0 1px, transparent 0, transparent 6px), repeating-linear-gradient(-45deg, #e2e8f0 0, #e2e8f0 1px, transparent 0, transparent 6px)";
+
+  const addSegment = (id, percent, color) => {
     const degrees = (percent / 100) * 360;
-    segments.push(`${color} ${currentDegree}deg ${currentDegree + degrees}deg`);
+    // IF activeSlice is set: Only show color if ID matches, otherwise transparent (reveals pattern)
+    // IF NO activeSlice: Show color normally
+    const segmentColor = activeSlice ? (activeSlice === id ? color : 'transparent') : color;
+    
+    segments.push(`${segmentColor} ${currentDegree}deg ${currentDegree + degrees}deg`);
     currentDegree += degrees;
   };
 
-  addSegment(expensesPercent, '#ef4444'); 
+  addSegment('expenses', expensesPercent, '#ef4444'); 
   allocations.forEach(plan => {
     const planPercentOfTotal = (plan.percentage / 100) * remainderPercentOfTotal;
-    addSegment(planPercentOfTotal, plan.hex || '#10b981');
+    addSegment(plan.id, planPercentOfTotal, plan.hex || '#10b981');
   });
-  if (currentDegree < 360) segments.push(`#f1f5f9 ${currentDegree}deg 360deg`);
   
-  const gradient = `conic-gradient(${segments.join(', ')})`;
+  // Remainder segment (Transparent if pattern active, else default slate)
+  if (currentDegree < 360) {
+      segments.push(`${activeSlice ? 'transparent' : '#f1f5f9'} ${currentDegree}deg 360deg`);
+  }
+  
+  const conic = `conic-gradient(${segments.join(', ')})`;
+  
+  // Composite Background: Conic Gradient on Top, Pattern on Bottom
+  const finalBackground = activeSlice ? `${conic}, ${crossPattern}` : conic;
+  // --- CHANGED: Pattern Logic End ---
 
   // Dynamic Center Text
   let centerLabel = "Net Salary";
@@ -917,7 +934,8 @@ const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, ac
       </div>
       
       <div className="relative w-56 h-56 transition-transform duration-500 hover:scale-105">
-        <div className="w-full h-full rounded-full transition-all duration-1000 ease-out shadow-inner" style={{ background: gradient, opacity: activeSlice ? 0.8 : 1 }}></div>
+        {/* UPDATED STYLE PROP HERE: */}
+        <div className="w-full h-full rounded-full transition-all duration-1000 ease-out shadow-inner" style={{ background: finalBackground }}></div>
         <div className="absolute inset-2 bg-white rounded-full flex flex-col items-center justify-center shadow-lg">
            <div className="text-center animate-in fade-in zoom-in duration-300 key={activeSlice}">
               <span className="text-xs text-slate-400 font-bold uppercase tracking-wide block mb-1">{centerLabel}</span>
