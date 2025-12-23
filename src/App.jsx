@@ -1788,100 +1788,139 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
 };
 
 // --- UPDATED HELP MODAL ---
-const HelpModal = ({ onClose, onStartTutorial }) => (
-  <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 overflow-y-auto animate-in slide-in-from-bottom-10">
-    <div className="bg-white border-b border-slate-100 p-4 sticky top-0 z-10 flex justify-between items-center shadow-sm">
-      <h2 className="text-lg font-bold flex items-center gap-2 text-slate-800">
-        <HelpCircle className="w-5 h-5 text-emerald-500" /> User Guide
-      </h2>
-      <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition">
-        <X className="w-6 h-6 text-slate-500" />
-      </button>
-    </div>
+const HelpModal = ({ onClose, onStartTutorial }) => {
+  const [openFaq, setOpenFaq] = useState(null);
 
-    <div className="max-w-2xl mx-auto p-6 space-y-8 pb-20">
-      
-      {/* SECTION 1: BASICS & SETTINGS */}
-      <section className="space-y-4">
-        <div className="flex justify-between items-center">
-           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Configuration</h3>
-           {/* --- NEW BUTTON --- */}
-           <button 
-             onClick={() => onStartTutorial('settings')}
-             className="text-xs bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-200 transition flex items-center gap-1"
-           >
-             <Settings className="w-3 h-3" /> Show me how
-           </button>
-           {/* ------------------ */}
-        </div>
-        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
-          <div className="flex gap-4">
-             <div className="bg-white p-2 rounded-lg border border-slate-200 h-fit"><Settings className="w-5 h-5 text-slate-400" /></div>
-             <div>
-              <h4 className="font-bold text-slate-800">Allocations & Fixed Bills</h4>
-              <p className="text-sm text-slate-500 mt-1">Configure your savings pots and recurring monthly commitments.</p>
+  const faqs = [
+    {
+      question: "Why doesn't this match my bank balance?",
+      answer: "That is the goal! Your bank shows you history + current funds. We show you the future. We virtually deduct your bills *now* so you see exactly what is 'Safe-to-Spend' without accidentally touching money meant for bills."
+    },
+    {
+      question: "What should I do on Payday?",
+      answer: "1. Enter your Salary.\n2. Add any 'One-Off' expenses (like an MOT or Gift) using the 'New Expense' button.\n3. The remaining 'Safe-to-Spend' figure is yours. Transfer it to pots or spend it freely!"
+    },
+    {
+      question: "Fixed vs. Variable Expenses?",
+      answer: "Fixed Bills (in Settings) are recurring costs like Rent/Netflix that copy over every month. Variable Expenses are added on the dashboard and are for *this month only* (like a Dentist trip)."
+    }
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 overflow-y-auto animate-in slide-in-from-bottom-10">
+      <div className="bg-white border-b border-slate-100 p-4 sticky top-0 z-10 flex justify-between items-center shadow-sm">
+        <h2 className="text-lg font-bold flex items-center gap-2 text-slate-800">
+          <HelpCircle className="w-5 h-5 text-emerald-500" /> User Guide
+        </h2>
+        <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition">
+          <X className="w-6 h-6 text-slate-500" />
+        </button>
+      </div>
+
+      <div className="max-w-2xl mx-auto p-6 space-y-8 pb-20">
+        
+        {/* SECTION 1: BASICS & SETTINGS */}
+        <section className="space-y-4">
+          <div className="flex justify-between items-center">
+             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Configuration</h3>
+             <button 
+               onClick={() => onStartTutorial('settings')}
+               className="text-xs bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-200 transition flex items-center gap-1"
+             >
+               <Settings className="w-3 h-3" /> Show me how
+             </button>
+          </div>
+          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+            <div className="flex gap-4">
+               <div className="bg-white p-2 rounded-lg border border-slate-200 h-fit"><Settings className="w-5 h-5 text-slate-400" /></div>
+               <div>
+                <h4 className="font-bold text-slate-800">Allocations & Fixed Bills</h4>
+                <p className="text-sm text-slate-500 mt-1">Configure your savings pots and recurring monthly commitments.</p>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
-      
-      {/* SECTION 2: EXPENSES */}
-      <section className="space-y-4">
-        <div className="flex justify-between items-center">
-           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Managing Expenses</h3>
-           <button 
-             onClick={() => onStartTutorial('add_expense')}
-             className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-200 transition flex items-center gap-1"
-           >
-             <Zap className="w-3 h-3" /> Show me how
-           </button>
-        </div>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <ul className="space-y-4">
-            <li className="flex gap-3">
-              <div className="mt-1"><Plus className="w-4 h-4 text-emerald-500" /></div>
-              <div>
-                <span className="font-bold text-slate-800 text-sm">Adding Bills:</span>
-                <p className="text-sm text-slate-500">Tap "New Expense". Type a brand name to find its logo.</p>
-              </div>
-            </li>
-            <li className="flex gap-3">
-              <div className="mt-1"><Edit2 className="w-4 h-4 text-indigo-500" /></div>
-              <div>
-                <span className="font-bold text-slate-800 text-sm">Editing:</span>
-                <p className="text-sm text-slate-500">Tap any expense amount to change it instantly.</p>
-              </div>
-            </li>
-          </ul>
-        </div>
-      </section>
+        </section>
+        
+        {/* SECTION 2: EXPENSES */}
+        <section className="space-y-4">
+          <div className="flex justify-between items-center">
+             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Managing Expenses</h3>
+             <button 
+               onClick={() => onStartTutorial('add_expense')}
+               className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-200 transition flex items-center gap-1"
+             >
+               <Zap className="w-3 h-3" /> Show me how
+             </button>
+          </div>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <ul className="space-y-4">
+              <li className="flex gap-3">
+                <div className="mt-1"><Plus className="w-4 h-4 text-emerald-500" /></div>
+                <div>
+                  <span className="font-bold text-slate-800 text-sm">Adding Bills:</span>
+                  <p className="text-sm text-slate-500">Tap "New Expense". Type a brand name to find its logo.</p>
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <div className="mt-1"><Edit2 className="w-4 h-4 text-indigo-500" /></div>
+                <div>
+                  <span className="font-bold text-slate-800 text-sm">Editing:</span>
+                  <p className="text-sm text-slate-500">Tap any expense amount to change it instantly.</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </section>
 
-      {/* SECTION 4: ADVANCED */}
-      <section className="space-y-4">
-        <div className="flex justify-between items-center">
-           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Advanced Tools</h3>
-           <button 
-             onClick={() => onStartTutorial('advanced_features')}
-             className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-200 transition flex items-center gap-1"
-           >
-             <Zap className="w-3 h-3" /> Show me how
-           </button>
-        </div>
-        <div className="grid grid-cols-1 gap-3">
-           <div className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 bg-white">
-              <div className="bg-emerald-100 p-2 rounded-lg text-emerald-600"><BarChart3 className="w-5 h-5" /></div>
-              <div>
-                 <h4 className="font-bold text-slate-800 text-sm">Analytics</h4>
-                 <p className="text-xs text-slate-500">View trends and history.</p>
-              </div>
+        {/* SECTION 3: FAQ / PURPOSE */}
+        <section className="space-y-4">
+           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Common Questions</h3>
+           <div className="space-y-2">
+              {faqs.map((item, i) => (
+                <div key={i} className="border border-slate-200 rounded-xl overflow-hidden">
+                   <button 
+                     onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                     className="w-full flex justify-between items-center p-4 bg-slate-50 hover:bg-slate-100 transition text-left"
+                   >
+                      <span className="font-bold text-slate-700 text-sm">{item.question}</span>
+                      <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${openFaq === i ? 'rotate-90' : ''}`} />
+                   </button>
+                   {openFaq === i && (
+                     <div className="p-4 bg-white text-sm text-slate-600 leading-relaxed border-t border-slate-100 animate-in slide-in-from-top-2">
+                        {item.answer.split('\n').map((line, idx) => <p key={idx} className="mb-1 last:mb-0">{line}</p>)}
+                     </div>
+                   )}
+                </div>
+              ))}
            </div>
-           {/* ... sandbox item ... */}
-        </div>
-      </section>
+        </section>
 
+        {/* SECTION 4: ADVANCED */}
+        <section className="space-y-4">
+          <div className="flex justify-between items-center">
+             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Advanced Tools</h3>
+             <button 
+               onClick={() => onStartTutorial('advanced_features')}
+               className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-200 transition flex items-center gap-1"
+             >
+               <Zap className="w-3 h-3" /> Show me how
+             </button>
+          </div>
+          <div className="grid grid-cols-1 gap-3">
+             <div className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 bg-white">
+                <div className="bg-emerald-100 p-2 rounded-lg text-emerald-600"><BarChart3 className="w-5 h-5" /></div>
+                <div>
+                   <h4 className="font-bold text-slate-800 text-sm">Analytics</h4>
+                   <p className="text-xs text-slate-500">View trends and history.</p>
+                </div>
+             </div>
+          </div>
+        </section>
+
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 
 // --- NEW COMPONENT: ONBOARDING WIZARD ---
