@@ -3505,47 +3505,54 @@ export default function App() {
 
   // --- UPDATED LOGIC START ---
   
-  // 1. Calculate Target for Current Account (The Remainder)
+  // 1. Calculate Target for Current Account (The Remainder based on Percentage)
   const allocatedPercent = userSettings.allocationRules.reduce((sum, p) => sum + p.percentage, 0);
   const currentAccountPercent = Math.max(0, 100 - allocatedPercent);
   const currentAccountTarget = remainder * (currentAccountPercent / 100);
+
+  // 2. Calculate ACTUAL Current Account (Physical Cash Remainder)
+  // (Salary - Expenses - Money actually moved to pots)
   const totalDepositedToPots = Object.values(displayActualSavings).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
   const currentAccountActual = Math.max(0, remainder - totalDepositedToPots);
   
-  // 2. Calculate Days Until Next Payday
+  // 3. Calculate Days Until Next Payday
   const calculateDaysUntilPayday = (payDayStr, salaryInputted) => {
-    const today = new Date();
-    const currentDay = today.getDate();
-    const payDay = parseInt(payDayStr) || 1; 
-    
-    // Start with Payday of THIS month
-    let targetDate = new Date(today.getFullYear(), today.getMonth(), payDay);
+      const today = new Date();
+      const currentDay = today.getDate();
+      const payDay = parseInt(payDayStr) || 1; 
+      
+      // Start by looking at the payday in the CURRENT calendar month
+      let targetDate = new Date(today.getFullYear(), today.getMonth(), payDay);
 
-    // Rule 1: If today is AFTER payday (e.g. 29th, Payday 28th), target is Next Month
-    if (currentDay >= payDay) {
-       targetDate.setMonth(targetDate.getMonth() + 1);
-    } else {
-       // Rule 2: Today is BEFORE payday (e.g. 23rd, Payday 28th). 
-       // If Salary IS inputted, we assume the user is prepping for the UPCOMING cycle (Dec 28 - Jan 28).
-       // Therefore, the money needs to last until the payday AFTER (Jan 28).
-       if (salaryInputted && parseFloat(salaryInputted) > 0) {
-          targetDate.setMonth(targetDate.getMonth() + 1);
-       }
-       // If Salary NOT inputted, we are just waiting for the immediate next payday (Dec 28)
-    }
-    
-    const diffTime = targetDate - today;
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-};
+      // SCENARIO 1: Today is AFTER the payday (e.g. Today 29th, Payday 25th)
+      // Result: Next payday is obviously next month (Jan 25th).
+      if (currentDay >= payDay) {
+         targetDate.setMonth(targetDate.getMonth() + 1);
+      } 
+      // SCENARIO 2: Today is BEFORE the payday (e.g. Today 15th, Payday 25th)
+      else {
+         // Logic: If the user has "Filled" the current month (i.e. inputted Salary),
+         // they are actively budgeting for the cycle starting on the 25th.
+         // This money needs to last until the payday AFTER that (Next Month).
+         if (salaryInputted && parseFloat(salaryInputted) > 0) {
+            targetDate.setMonth(targetDate.getMonth() + 1);
+         }
+         // If they haven't inputted salary, they are still waiting for this month's payday.
+      }
+      
+      const diffTime = targetDate - today;
+      return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+  };
 
-const daysUntilPayday = calculateDaysUntilPayday(userSettings.payDay, displaySalary);
-
-// 4. Daily Pace = ACTUAL Current Account Remainder / Days Til Next Payday
-// This tells you: "Based on the cash actually sitting in your main account, here is what you can spend per day."
-const dailyAllowance = daysUntilPayday > 0 ? (currentAccountActual / daysUntilPayday) : 0;
-
-// Label update
-const daysLeftLabel = `Next Payday in`;
+  const daysUntilPayday = calculateDaysUntilPayday(userSettings.payDay, displaySalary);
+  
+  // 4. Daily Pace = ACTUAL Remainder / Days
+  // Rounded to 2 decimal places
+  const rawPace = daysUntilPayday > 0 ? (currentAccountActual / daysUntilPayday) : 0;
+  const dailyAllowance = parseFloat(rawPace.toFixed(2));
+  
+  // Label update
+  const daysLeftLabel = `Next Payday in`;
   // --- UPDATED LOGIC END ---
 
   // Count how many plans have an actual value entered
