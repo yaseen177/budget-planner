@@ -4187,7 +4187,7 @@ export default function App() {
 
                          {/* Actual (Big) */}
                          <div className="bg-black/20 px-5 py-3 rounded-2xl border border-white/5 backdrop-blur-sm shadow-lg">
-                            <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1 text-emerald-200">Actual Remainder</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1 text-emerald-200">Actual to keep</p>
                             <p className="text-3xl font-black tracking-tight text-white">{formatCurrency(currentAccountActual, userSettings.currency)}</p>
                          </div>
                       </div>
