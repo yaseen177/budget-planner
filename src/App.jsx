@@ -1476,13 +1476,14 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Profile & Currency</h3>
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-            <div>
+          <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">Display Name</label>
               <input 
                 type="text" 
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full p-2 rounded-lg border border-slate-300 focus:border-emerald-500 outline-none transition"
+                // CHANGED: Added text-base
+                className="w-full p-2 rounded-lg border border-slate-300 focus:border-emerald-500 outline-none transition text-base"
                 placeholder="Your Name"
                 disabled={isTutorial}
               />
@@ -1538,7 +1539,8 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                   <input 
                     value={plan.name}
                     onChange={(e) => setAllocations(allocations.map(a => a.id === plan.id ? {...a, name: e.target.value} : a))}
-                    className="flex-1 font-bold text-slate-700 bg-transparent border-none outline-none focus:ring-0 text-sm" 
+                    // CHANGED: text-sm -> text-base
+                    className="flex-1 font-bold text-slate-700 bg-transparent border-none outline-none focus:ring-0 text-base" 
                     disabled={isTutorial}
                   />
 
@@ -1548,7 +1550,8 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                       type="number"
                       value={plan.percentage}
                       onChange={(e) => setAllocations(allocations.map(a => a.id === plan.id ? {...a, percentage: parseFloat(e.target.value) || 0} : a))}
-                      className="w-8 bg-transparent text-right font-bold text-slate-800 outline-none p-0 text-sm"
+                      // CHANGED: text-sm -> text-base
+                      className="w-8 bg-transparent text-right font-bold text-slate-800 outline-none p-0 text-base"
                       disabled={isTutorial}
                     />
                     <span className="text-slate-400 text-xs font-bold">%</span>
@@ -1711,7 +1714,8 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                     setNewDefExpName(brandName);
                     setNewDefExpLogo(brandLogo);
                   }}
-                  className="w-full p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
+                  // CHANGED: text-sm -> text-base
+                  className="w-full p-3 text-base border border-slate-200 rounded-xl bg-slate-50"
                 />
               </div>
               
@@ -1724,7 +1728,8 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                     value={newDefExpAmount}
                     onChange={(e) => setNewDefExpAmount(e.target.value)}
                     onBlur={() => setNewDefExpAmount(safeCalculate(newDefExpAmount))}
-                    className="w-24 p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"
+                    // CHANGED: text-sm -> text-base
+                    className="w-24 p-3 text-base border border-slate-200 rounded-xl bg-slate-50"
                 />
               </div>
               <button onClick={addDefaultExpense} className="bg-slate-900 text-white p-3 rounded-xl">
