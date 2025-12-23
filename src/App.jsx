@@ -1120,15 +1120,28 @@ const AllocationCard = ({ title, targetAmount, actualAmount, percentage, hexColo
         </div>
       </div>
 
-      {/* Input Row - NEW DESIGN */}
+      {/* Input Row - NEW DESIGN WITH HELPER */}
       <div className="relative z-10">
-        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Deposit Amount</label>
+        
+        {/* Label with Tooltip */}
+        <div className="group relative flex items-center gap-1.5 mb-1.5 ml-1 w-fit cursor-help">
+           <label className="block text-[10px] font-bold text-slate-400 uppercase">Actual Money Deposited</label>
+           <HelpCircle className="w-3 h-3 text-slate-300" />
+           
+           {/* The Helper Bubble (Appears on Hover) */}
+           <div className="absolute bottom-full left-0 mb-2 w-48 bg-slate-800 text-white text-xs rounded-lg p-3 shadow-xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 font-normal normal-case">
+              <div className="absolute -bottom-1 left-4 w-2 h-2 bg-slate-800 rotate-45"></div>
+              <strong>What is this?</strong><br/>
+              Type the exact amount you just transferred to this pot in your real bank app.
+           </div>
+        </div>
+
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
             <input 
               type="number" 
-              placeholder="Type here..."
+              placeholder="Type amount..."
               value={actualAmount}
               onChange={(e) => onUpdateActual(e.target.value)}
               className="w-full pl-7 pr-3 py-3 bg-white border-2 border-slate-100 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-transparent focus:ring-4 transition shadow-sm placeholder:text-slate-300 placeholder:font-normal"
@@ -3606,24 +3619,68 @@ export default function App() {
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Your Pots</h3>
              </div>
 
-             {/* 2. BIG REMINDER BANNER */}
-             <div className="bg-slate-900 rounded-3xl p-6 mb-8 text-white flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden shadow-xl">
-                {/* Background Decoration */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+             {/* 2. THE UNSORTED POT VISUALIZER */}
+             {(() => {
+                // Calculate Total Disposable (Salary - Fixed Expenses) to determine % of jar filled
+                const totalDisposable = salaryNum - expenses.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
+                const percentRemaining = totalDisposable > 0 ? (remainder / totalDisposable) * 100 : 0;
                 
-                <div className="relative z-10 text-center md:text-left">
-                   <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Money Left to Sort</p>
-                   <div className="text-4xl font-black tracking-tight text-emerald-400">
-                      {formatCurrency(remainder, userSettings.currency)}
-                   </div>
-                   <p className="text-slate-500 text-xs mt-1">Salary minus Expenses</p>
-                </div>
+                return (
+                  <div className="bg-slate-900 rounded-3xl p-6 mb-8 text-white relative overflow-hidden shadow-xl">
+                    
+                    <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
+                       
+                       {/* THE GRAPHIC JAR */}
+                       <div className="relative shrink-0">
+                          {/* Jar Body */}
+                          <div className="w-24 h-32 border-4 border-slate-600 bg-slate-800/50 rounded-b-3xl rounded-t-lg relative overflow-hidden backdrop-blur-sm">
+                             {/* Liquid Level */}
+                             <div 
+                                className="absolute bottom-0 left-0 w-full bg-emerald-500 transition-all duration-1000 ease-in-out opacity-90"
+                                style={{ height: `${percentRemaining}%` }}
+                             >
+                                <div className="absolute top-0 left-0 w-full h-2 bg-emerald-400 opacity-50 animate-pulse"></div>
+                                {/* Bubbles */}
+                                <div className="absolute bottom-2 left-2 w-2 h-2 bg-white/20 rounded-full animate-bounce"></div>
+                                <div className="absolute bottom-6 right-4 w-1 h-1 bg-white/20 rounded-full animate-bounce delay-100"></div>
+                             </div>
+                             {/* Jar Shine */}
+                             <div className="absolute top-0 right-2 w-2 h-full bg-white/5 rounded-full"></div>
+                          </div>
+                          {/* Lid */}
+                          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-28 h-2 bg-slate-500 rounded-full"></div>
+                       </div>
 
-                <div className="relative z-10 flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/5">
-                   <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                   <span className="text-xs font-bold">Ready to Allocate</span>
-                </div>
-             </div>
+                       {/* THE EXPLANATION */}
+                       <div className="text-center md:text-left flex-1">
+                          <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-2 border border-emerald-500/30">
+                             <AlertCircle className="w-3 h-3" />
+                             Unsorted Cash
+                          </div>
+                          
+                          <div className="text-4xl font-black tracking-tight text-white mb-2">
+                             {formatCurrency(remainder, userSettings.currency)}
+                          </div>
+                          
+                          <p className="text-slate-400 text-sm leading-relaxed">
+                             This is your <strong>Leftover Money</strong> (Salary minus Bills). 
+                             It is currently sitting in your main account doing nothing.
+                          </p>
+
+                          <div className="mt-4 p-3 bg-white/5 rounded-xl border border-white/10 flex items-center gap-3">
+                             <div className="bg-white/10 p-2 rounded-full">
+                                <ArrowUpDown className="w-4 h-4 text-emerald-400" />
+                             </div>
+                             <div className="text-left">
+                                <p className="text-[10px] text-slate-400 uppercase font-bold">Your Goal</p>
+                                <p className="text-xs text-white font-bold">Move this money into the pots below until this reaches 0.</p>
+                             </div>
+                          </div>
+                       </div>
+                    </div>
+                  </div>
+                );
+             })()}
 
              {/* 3. Grid of Pots */}
              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
