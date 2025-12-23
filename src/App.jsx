@@ -1139,8 +1139,10 @@ const AllocationCard = ({ title, targetAmount, actualAmount, percentage, hexColo
           </div>
         </div>
         <div className="text-right">
-          <div className="font-bold text-slate-800">{formatCurrency(actualNum, currency)}</div>
-          <div className="text-[10px] text-slate-400 font-medium">of {formatCurrency(targetAmount, currency)}</div>
+          <div className="font-bold text-slate-800 text-lg leading-tight">{formatCurrency(actualNum, currency)}</div>
+          <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wide mt-1">
+            Target: {formatCurrency(targetAmount, currency)}
+          </div>
         </div>
       </div>
 
