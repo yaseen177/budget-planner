@@ -1516,12 +1516,12 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </div>
           
           <div className="space-y-3">
-            {/* --- EXISTING POTS LIST --- */}
+            {/* --- EXISTING POTS LIST (FIXED LAYOUT) --- */}
             {allocations.map(plan => (
               <div key={plan.id} className="relative">
-                <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm z-10 relative">
+                <div className="flex items-center gap-2 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm z-10 relative overflow-hidden">
                   
-                  {/* COLOR BUTTON (Opens Menu) */}
+                  {/* COLOR BUTTON */}
                   <button 
                     onClick={() => setOpenColorMenuId(openColorMenuId === plan.id ? null : plan.id)}
                     className="w-10 h-10 rounded-full border-2 border-slate-50 shadow-sm shrink-0 hover:scale-105 transition active:scale-95 group relative"
@@ -1529,43 +1529,40 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                     title="Change Color"
                     disabled={isTutorial}
                   >
-                    {/* Pencil Icon Overlay */}
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/10 rounded-full">
                       <Edit2 className="w-4 h-4 text-white drop-shadow-md" />
                     </div>
                   </button>
                   
-                  {/* Name Input */}
+                  {/* Name Input (Added min-w-0 to prevent pushing) */}
                   <input 
                     value={plan.name}
                     onChange={(e) => setAllocations(allocations.map(a => a.id === plan.id ? {...a, name: e.target.value} : a))}
-                    // CHANGED: text-sm -> text-base
-                    className="flex-1 font-bold text-slate-700 bg-transparent border-none outline-none focus:ring-0 text-base" 
+                    className="flex-1 min-w-0 font-bold text-slate-700 bg-transparent border-none outline-none focus:ring-0 text-base truncate" 
                     disabled={isTutorial}
                   />
 
-                  {/* Percentage Input */}
-                  <div className="flex items-center gap-1 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100">
+                  {/* Percentage Input (Added shrink-0) */}
+                  <div className="flex items-center gap-1 bg-slate-50 px-2 py-2 rounded-xl border border-slate-100 shrink-0">
                     <input 
                       type="number"
                       value={plan.percentage}
                       onChange={(e) => setAllocations(allocations.map(a => a.id === plan.id ? {...a, percentage: parseFloat(e.target.value) || 0} : a))}
-                      // CHANGED: text-sm -> text-base
-                      className="w-8 bg-transparent text-right font-bold text-slate-800 outline-none p-0 text-base"
+                      className="w-9 bg-transparent text-right font-bold text-slate-800 outline-none p-0 text-base"
                       disabled={isTutorial}
                     />
                     <span className="text-slate-400 text-xs font-bold">%</span>
                   </div>
 
-                  {/* Delete Button */}
+                  {/* Delete Button (Added shrink-0) */}
                   {!isTutorial && (
-                    <button onClick={() => removeAllocation(plan.id)} className="text-slate-300 hover:text-red-500 p-2 hover:bg-red-50 rounded-xl transition">
+                    <button onClick={() => removeAllocation(plan.id)} className="shrink-0 text-slate-300 hover:text-red-500 p-2 hover:bg-red-50 rounded-xl transition">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
 
-                {/* --- POP-OVER COLOR MENU (Visible if openColorMenuId matches) --- */}
+                {/* --- POP-OVER COLOR MENU --- */}
                 {openColorMenuId === plan.id && (
                   <div className="absolute top-14 left-0 z-20 bg-white p-3 rounded-2xl shadow-xl border border-slate-100 animate-in slide-in-from-top-2 fade-in w-full">
                     <div className="text-xs font-bold text-slate-400 uppercase mb-2">Select Color</div>
@@ -1579,7 +1576,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                                 hex: colorOption.hex,
                                 color: colorOption.tailwind
                             } : a));
-                            setOpenColorMenuId(null); // Close menu after selection
+                            setOpenColorMenuId(null);
                           }}
                           className={`w-8 h-8 rounded-full shadow-sm hover:scale-110 transition border-2 ${plan.hex === colorOption.hex ? 'border-slate-800 scale-110' : 'border-transparent'}`}
                           style={{ backgroundColor: colorOption.hex }}
@@ -1593,37 +1590,35 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
               </div>
             ))}
             
-            {/* --- CREATE NEW POT --- */}
-            <div className={`bg-slate-50 rounded-2xl p-4 border border-slate-200/60 ${isTutorial ? 'opacity-50 pointer-events-none' : ''}`}>
-                <div className="flex justify-between items-center mb-3">
+            {/* --- CREATE NEW POT (FIXED LAYOUT) --- */}
+            <div className={`bg-slate-50 rounded-2xl p-3 border border-slate-200/60 ${isTutorial ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className="flex justify-between items-center mb-2">
                    <p className="text-xs font-bold text-slate-400 uppercase">Create New Pot</p>
                 </div>
 
                 <div className="flex gap-2 items-center relative">
-                    {/* Name Input */}
+                    {/* Name Input (Added min-w-0 to prevent pushing) */}
                     <input 
                       placeholder="Name"
                       value={newPlanName}
                       onChange={(e) => setNewPlanName(e.target.value)}
-                      // CHANGED: text-sm -> text-base
-                      className="flex-1 p-3 text-base border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-slate-200 transition font-medium"
+                      className="flex-1 min-w-0 p-3 text-base border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-slate-200 transition font-medium"
                     />
                     
-                    {/* Percent Input */}
+                    {/* Percent Input (shrink-0) */}
                     <div className="relative w-20 shrink-0">
                         <input 
                           type="number"
                           placeholder="0"
                           value={newPlanPercent}
                           onChange={(e) => setNewPlanPercent(e.target.value)}
-                          // CHANGED: text-sm -> text-base
                           className="w-full p-3 text-base border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-slate-200 transition font-bold text-center"
                         />
                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
                     </div>
 
-                    {/* Color Dropdown Trigger */}
-                    <div className="relative">
+                    {/* Color Dropdown Trigger (shrink-0) */}
+                    <div className="relative shrink-0">
                         <button 
                             onClick={() => setShowNewPotColorMenu(!showNewPotColorMenu)}
                             className="w-11 h-11 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center transition hover:scale-105 active:scale-95"
@@ -1635,7 +1630,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                            </div>
                         </button>
                         
-                        {/* THE DROPDOWN MENU */}
+                        {/* THE DROPDOWN MENU (Added right-0 to align it inside the screen) */}
                         {showNewPotColorMenu && (
                             <div className="absolute bottom-full right-0 mb-2 p-3 bg-white rounded-2xl shadow-xl border border-slate-100 w-48 z-50 animate-in zoom-in-95 grid grid-cols-5 gap-2">
                                 {POT_COLORS.map((colorOption) => (
@@ -1653,7 +1648,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                         )}
                     </div>
 
-                    {/* Add Button */}
+                    {/* Add Button (shrink-0) */}
                     <button 
                         onClick={() => {
                              if(!newPlanName || !newPlanPercent) return;
