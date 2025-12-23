@@ -1159,7 +1159,8 @@ const AllocationCard = ({ title, targetAmount, actualAmount, percentage, hexColo
               placeholder="Type amount..."
               value={actualAmount}
               onChange={(e) => onUpdateActual(e.target.value)}
-              className="w-full pl-7 pr-3 py-3 bg-white border-2 border-slate-100 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-transparent focus:ring-4 transition shadow-sm placeholder:text-slate-300 placeholder:font-normal"
+              // CHANGED: text-sm -> text-base (Prevents iOS Zoom)
+              className="w-full pl-7 pr-3 py-3 bg-white border-2 border-slate-100 rounded-xl text-base font-bold text-slate-800 outline-none focus:border-transparent focus:ring-4 transition shadow-sm placeholder:text-slate-300 placeholder:font-normal"
               style={{ '--tw-ring-color': `${activeColor}30` }} 
             />
           </div>
@@ -1601,7 +1602,8 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                       placeholder="Name"
                       value={newPlanName}
                       onChange={(e) => setNewPlanName(e.target.value)}
-                      className="flex-1 p-3 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-slate-200 transition font-medium"
+                      // CHANGED: text-sm -> text-base
+                      className="flex-1 p-3 text-base border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-slate-200 transition font-medium"
                     />
                     
                     {/* Percent Input */}
@@ -1611,7 +1613,8 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                           placeholder="0"
                           value={newPlanPercent}
                           onChange={(e) => setNewPlanPercent(e.target.value)}
-                          className="w-full p-3 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-slate-200 transition font-bold text-center"
+                          // CHANGED: text-sm -> text-base
+                          className="w-full p-3 text-base border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-slate-200 transition font-bold text-center"
                         />
                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
                     </div>
