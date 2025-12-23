@@ -2705,6 +2705,7 @@ export default function App() {
   const [salary, setSalary] = useState('');
   const [expenses, setExpenses] = useState([]);
   const [actualSavings, setActualSavings] = useState({}); // New State for Actuals
+  const [monthAllocations, setMonthAllocations] = useState(null);
   
   // Sandbox Data State
   const [sandboxSalary, setSandboxSalary] = useState('');
@@ -2739,9 +2740,12 @@ export default function App() {
       ? TUTORIAL_EXPENSES 
       : (isSandbox ? sandboxExpenses : expenses);
 
+  // LOGIC: Use the month's locked rules if they exist, otherwise use global settings
+  const activeRules = monthAllocations || userSettings.allocationRules;
+
   const displayAllocations = isTutorialMode 
       ? TUTORIAL_POTS 
-      : userSettings.allocationRules;
+      : activeRules;
 
   const displayDefaultExpenses = isTutorialMode
       ? TUTORIAL_EXPENSES.filter(e => e.type === 'fixed') // Reuse fixed expenses for settings demo
@@ -2821,6 +2825,7 @@ export default function App() {
         setSalary('');
         setExpenses(userSettings.defaultFixedExpenses || DEFAULT_FIXED_EXPENSES);
         setActualSavings({});
+        setMonthAllocations(null);
       }
     }, (error) => {
       console.error("Error fetching data:", error);
@@ -2929,10 +2934,17 @@ export default function App() {
     if (!user || isSandbox) return; // Block saving in Sandbox mode
     const monthId = getMonthId(currentDate);
     const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgetData', monthId);
+    
+    // Determine which rules to lock in:
+    // 1. If we already have locked rules for this month, keep them.
+    // 2. If not (new month), lock in the current global settings.
+    const rulesToSave = monthAllocations || userSettings.allocationRules;
+
     await setDoc(docRef, { 
       salary: newSalary, 
       expenses: newExpenses, 
       actualSavings: newActuals || actualSavings,
+      allocationRules: rulesToSave, // <--- SAVE THE RULES
       lastUpdated: new Date() 
     });
   };
