@@ -873,7 +873,7 @@ const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, classNa
 // --- OTHER COMPONENTS ---
 
 // --- NEW: INTERACTIVE BUDGET WHEEL ---
-const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, activeSlice }) => {
+const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, activeSlice, bankColor }) => {
   if (!salary || parseFloat(salary) <= 0) return null;
 
   const salaryNum = parseFloat(salary);
@@ -883,47 +883,40 @@ const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, ac
   const remainderPercentOfTotal = 100 - expensesPercent;
 
   let currentDegree = 0;
-  
-  // Helper to create slice path
-  // Note: CSS conic-gradients can't easily handle click events per slice. 
-  // To make it truly interactive without complex SVG math, we will use a legend-based interaction 
-  // or overlay invisible buttons. For simplicity and robustness, we will make the LEGEND interactive
-  // and keep the visual wheel as a reference.
-  
   const segments = [];
 
-  // --- CHANGED: Pattern Logic Start ---
   // Define a subtle cross-hatch pattern for inactive areas
   const crossPattern = "repeating-linear-gradient(45deg, #e2e8f0 0, #e2e8f0 1px, transparent 0, transparent 6px), repeating-linear-gradient(-45deg, #e2e8f0 0, #e2e8f0 1px, transparent 0, transparent 6px)";
 
   const addSegment = (id, percent, color) => {
     const degrees = (percent / 100) * 360;
-    // IF activeSlice is set: Only show color if ID matches, otherwise transparent (reveals pattern)
-    // IF NO activeSlice: Show color normally
     const segmentColor = activeSlice ? (activeSlice === id ? color : 'transparent') : color;
-    
     segments.push(`${segmentColor} ${currentDegree}deg ${currentDegree + degrees}deg`);
     currentDegree += degrees;
   };
 
+  // 1. Expenses Slice
   addSegment('expenses', expensesPercent, '#ef4444'); 
+  
+  // 2. Pot Slices
   allocations.forEach(plan => {
     const planPercentOfTotal = (plan.percentage / 100) * remainderPercentOfTotal;
     addSegment(plan.id, planPercentOfTotal, plan.hex || '#10b981');
   });
   
-  // Remainder segment (Transparent if pattern active, else default slate)
+  // 3. Remainder Slice (Current Account)
+  // Use the passed bankColor, or fallback to Slate if none exists
+  const remainderColor = bankColor || '#f1f5f9';
+  
   if (currentDegree < 360) {
-      segments.push(`${activeSlice ? 'transparent' : '#f1f5f9'} ${currentDegree}deg 360deg`);
+      // If a slice is active, remainder is transparent. Otherwise, use Bank Color.
+      segments.push(`${activeSlice ? 'transparent' : remainderColor} ${currentDegree}deg 360deg`);
   }
   
   const conic = `conic-gradient(${segments.join(', ')})`;
-  
-  // Composite Background: Conic Gradient on Top, Pattern on Bottom
   const finalBackground = activeSlice ? `${conic}, ${crossPattern}` : conic;
-  // --- CHANGED: Pattern Logic End ---
 
-  // Dynamic Center Text
+  // ... (Rest of the label logic remains the same) ...
   let centerLabel = "Net Salary";
   let centerAmount = formatCurrency(salaryNum, currency);
   
@@ -951,7 +944,6 @@ const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, ac
       </div>
       
       <div className="relative w-56 h-56 transition-transform duration-500 hover:scale-105">
-        {/* UPDATED STYLE PROP HERE: */}
         <div className="w-full h-full rounded-full transition-all duration-1000 ease-out shadow-inner" style={{ background: finalBackground }}></div>
         <div className="absolute inset-2 bg-white rounded-full flex flex-col items-center justify-center shadow-lg">
            <div className="text-center animate-in fade-in zoom-in duration-300 key={activeSlice}">
@@ -962,7 +954,7 @@ const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, ac
       </div>
       
       <div className="flex flex-wrap justify-center gap-2 mt-8 w-full">
-        {/* Interactive Legend Items */}
+        {/* Buttons remain the same... */}
         <button 
             onClick={() => onSliceClick(activeSlice === 'expenses' ? null : 'expenses')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-200
@@ -3969,6 +3961,7 @@ export default function App() {
                       currency={userSettings.currency}
                       activeSlice={highlightedSlice}
                       onSliceClick={setHighlightedSlice}
+                      bankColor={userSettings.bankDetails?.color}
                     />
                  ) : (
                    <div className="h-48 flex items-center justify-center text-slate-300 font-bold border-2 border-dashed border-slate-100 rounded-full w-48 aspect-square">
