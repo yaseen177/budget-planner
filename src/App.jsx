@@ -2314,6 +2314,11 @@ const SwipeableExpenseRow = ({ children, onEdit, onDelete, isMobile }) => {
 const AdminDashboard = ({ user, onExitAdmin }) => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Filters
+  const [filterUser, setFilterUser] = useState('');
+  const [filterType, setFilterType] = useState('ALL');
+  const [filterDate, setFilterDate] = useState('');
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -2321,12 +2326,14 @@ const AdminDashboard = ({ user, onExitAdmin }) => {
         const q = query(
           collection(db, 'artifacts', 'nuha-budget-app', 'system_logs'),
           orderBy('timestamp', 'desc'),
-          limit(50)
+          limit(100) // Increased limit to see more history
         );
         const snapshot = await getDocs(q);
         setLogs(snapshot.docs.map(doc => ({
             id: doc.id, 
             ...doc.data(), 
+            // Store raw date for sorting/filtering, formatted for display
+            dateObj: doc.data().timestamp?.toDate(),
             timestamp: doc.data().timestamp?.toDate().toLocaleString()
         })));
       } catch (e) {
@@ -2338,29 +2345,146 @@ const AdminDashboard = ({ user, onExitAdmin }) => {
     fetchLogs();
   }, []);
 
+  // Filter Logic
+  const filteredLogs = logs.filter(log => {
+    const matchUser = log.userEmail?.toLowerCase().includes(filterUser.toLowerCase());
+    const matchType = filterType === 'ALL' || log.type === filterType;
+    const matchDate = filterDate ? log.timestamp.includes(filterDate) : true;
+    return matchUser && matchType && matchDate;
+  });
+
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-6 font-mono">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
-          <h1 className="text-xl font-bold text-emerald-400">System Admin</h1>
-          <button onClick={onExitAdmin} className="bg-slate-800 px-4 py-2 rounded text-sm hover:bg-slate-700">Exit</button>
+    <div className="min-h-screen bg-slate-950 text-slate-200 p-4 md:p-6 font-mono">
+      <div className="max-w-6xl mx-auto space-y-6">
+        
+        {/* Header & Actions */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-emerald-500/20 p-2 rounded-lg text-emerald-400">
+              <Shield className="w-8 h-8" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white tracking-tight">System Admin</h1>
+              <p className="text-xs text-slate-500">Monitoring {filteredLogs.length} events</p>
+            </div>
+          </div>
+          <button 
+            onClick={onExitAdmin} 
+            className="w-full md:w-auto px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold transition flex items-center justify-center gap-2"
+          >
+            <LogOut className="w-4 h-4" /> Exit Dashboard
+          </button>
         </div>
-        <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-          {loading ? <div className="p-8 text-center text-slate-500">Loading logs...</div> : (
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-950 text-slate-500 uppercase">
-                <tr><th className="p-3">Time</th><th className="p-3">User</th><th className="p-3">Action</th></tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {logs.map(log => (
-                  <tr key={log.id} className="hover:bg-slate-800/50">
-                    <td className="p-3 text-slate-400">{log.timestamp}</td>
-                    <td className="p-3 text-indigo-300">{log.userEmail}</td>
-                    <td className="p-3 text-emerald-300">{log.action}</td>
-                  </tr>
+
+        {/* Filters Bar */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+           <div>
+             <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Search User</label>
+             <div className="relative">
+               <input 
+                 type="text" 
+                 placeholder="e.g. yaseen..." 
+                 value={filterUser}
+                 onChange={(e) => setFilterUser(e.target.value)}
+                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+               />
+               <Search className="absolute right-3 top-2.5 w-4 h-4 text-slate-500" />
+             </div>
+           </div>
+           
+           <div>
+             <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Action Type</label>
+             <select 
+               value={filterType}
+               onChange={(e) => setFilterType(e.target.value)}
+               className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-emerald-500 outline-none"
+             >
+               <option value="ALL">All Actions</option>
+               <option value="login">Logins</option>
+               <option value="action">User Actions (Salary/Exp)</option>
+               <option value="config">Settings Updates</option>
+             </select>
+           </div>
+
+           <div>
+             <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Filter Date</label>
+             <input 
+                 type="text" 
+                 placeholder="e.g. 23/12/2025" 
+                 value={filterDate}
+                 onChange={(e) => setFilterDate(e.target.value)}
+                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-emerald-500 outline-none"
+               />
+           </div>
+        </div>
+
+        {/* Data Display */}
+        <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+          {loading ? (
+            <div className="p-12 text-center">
+               <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+               <p className="text-slate-500 animate-pulse">Syncing logs...</p>
+            </div>
+          ) : (
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider font-bold">
+                    <tr>
+                      <th className="p-4 w-48">Timestamp</th>
+                      <th className="p-4 w-64">User</th>
+                      <th className="p-4 w-32">Type</th>
+                      <th className="p-4">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {filteredLogs.map(log => (
+                      <tr key={log.id} className="hover:bg-white/5 transition group">
+                        <td className="p-4 text-slate-500 font-mono">{log.timestamp}</td>
+                        <td className="p-4 font-bold text-indigo-300">{log.userEmail}</td>
+                        <td className="p-4">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide
+                            ${log.type === 'login' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 
+                              log.type === 'config' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 
+                              'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}>
+                            {log.type}
+                          </span>
+                        </td>
+                        <td className="p-4 text-slate-300 group-hover:text-white transition">{log.action}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Cards (Visible only on small screens) */}
+              <div className="md:hidden divide-y divide-slate-800">
+                {filteredLogs.map(log => (
+                  <div key={log.id} className="p-4 space-y-2">
+                    <div className="flex justify-between items-start">
+                       <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide
+                            ${log.type === 'login' ? 'bg-emerald-500/10 text-emerald-400' : 
+                              log.type === 'config' ? 'bg-purple-500/10 text-purple-400' : 
+                              'bg-blue-500/10 text-blue-400'}`}>
+                            {log.type}
+                       </span>
+                       <span className="text-[10px] text-slate-500 font-mono">{log.timestamp}</span>
+                    </div>
+                    <div className="text-sm text-slate-200 font-medium">{log.action}</div>
+                    <div className="text-xs text-indigo-400 flex items-center gap-1">
+                      <User className="w-3 h-3" /> {log.userEmail}
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+              
+              {filteredLogs.length === 0 && (
+                <div className="p-12 text-center text-slate-500">
+                  <p>No logs match your filters.</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -2817,9 +2941,9 @@ export default function App() {
     if (isSandbox) {
         setSandboxSalary(val);
     } else {
-      if(val !== salary) logSystemEvent(`Salary updated: ${val}`, 'action');
-        setSalary(val);
-        saveData(val, expenses, actualSavings);
+      // Log removed from here to prevent spamming while typing
+      setSalary(val);
+      saveData(val, expenses, actualSavings);
     }
   };
 
@@ -3285,7 +3409,14 @@ export default function App() {
                       type="text" 
                       value={displaySalary}
                       onChange={(e) => updateSalary(e.target.value)}
-                      onBlur={(e) => updateSalary(safeCalculate(e.target.value))}
+                      onBlur={(e) => {
+                        const finalVal = safeCalculate(e.target.value);
+                        updateSalary(finalVal);
+                        // Only log if not in sandbox and value is valid
+                        if (!isSandbox && finalVal) {
+                           logSystemEvent(`Salary Updated: ${finalVal} for ${MONTH_NAMES[currentDate.getMonth()]}`, 'action');
+                        }
+                      }}
                       placeholder="0.00"
                       className="w-full bg-transparent border-none text-5xl font-bold text-slate-800 placeholder-slate-200 outline-none pl-8 tracking-tight"
                     />
