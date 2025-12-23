@@ -1819,60 +1819,106 @@ const HelpModal = ({ onClose, onStartTutorial }) => {
 
       <div className="max-w-2xl mx-auto p-6 space-y-8 pb-20">
         
-        {/* SECTION 1: BASICS & SETTINGS */}
+        {/* SECTION 1: DASHBOARD VISUALS */}
         <section className="space-y-4">
-          <div className="flex justify-between items-center">
-             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Configuration</h3>
-             <button 
-               onClick={() => onStartTutorial('settings')}
-               className="text-xs bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-200 transition flex items-center gap-1"
-             >
-               <Settings className="w-3 h-3" /> Show me how
-             </button>
+          <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Dashboard Components</h3>
+          
+          {/* The Wheel */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex gap-4">
+             <div className="bg-slate-100 p-3 rounded-full h-fit"><PieChart className="w-5 h-5 text-slate-500" /></div>
+             <div>
+                <h4 className="font-bold text-slate-800 text-sm">The Budget Wheel</h4>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  This pie chart visualizes your Net Salary. The <span className="text-red-500 font-bold">Red</span> slice is your expenses. The other colors are your savings pots. 
+                  <br/><strong>Tip:</strong> Tap any slice to isolate that specific category.
+                </p>
+             </div>
           </div>
-          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
-            <div className="flex gap-4">
-               <div className="bg-white p-2 rounded-lg border border-slate-200 h-fit"><Settings className="w-5 h-5 text-slate-400" /></div>
-               <div>
-                <h4 className="font-bold text-slate-800">Allocations & Fixed Bills</h4>
-                <p className="text-sm text-slate-500 mt-1">Configure your savings pots and recurring monthly commitments.</p>
-              </div>
-            </div>
+
+           {/* The Jar */}
+           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex gap-4">
+             <div className="bg-emerald-100 p-3 rounded-full h-fit"><AlertCircle className="w-5 h-5 text-emerald-600" /></div>
+             <div>
+                <h4 className="font-bold text-slate-800 text-sm">The Cash Jar</h4>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                   This represents <strong>Unsorted Cash</strong> sitting in your bank right now. It is calculated as: 
+                   <br/><em>(Salary - Expenses - Money you already moved to Pots)</em>.
+                   <br/>Your goal is to empty this jar by transferring money to your real savings accounts.
+                </p>
+             </div>
           </div>
         </section>
-        
-        {/* SECTION 2: EXPENSES */}
+
+        {/* SECTION 2: MANAGING MONEY */}
         <section className="space-y-4">
           <div className="flex justify-between items-center">
-             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Managing Expenses</h3>
+             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Managing Money</h3>
              <button 
                onClick={() => onStartTutorial('add_expense')}
                className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-200 transition flex items-center gap-1"
              >
-               <Zap className="w-3 h-3" /> Show me how
+               <Zap className="w-3 h-3" /> Tutorial
              </button>
           </div>
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
             <ul className="space-y-4">
               <li className="flex gap-3">
-                <div className="mt-1"><Plus className="w-4 h-4 text-emerald-500" /></div>
-                <div>
-                  <span className="font-bold text-slate-800 text-sm">Adding Bills:</span>
-                  <p className="text-sm text-slate-500">Tap "New Expense". Type a brand name to find its logo.</p>
-                </div>
+                 <div className="mt-1 bg-white p-1 rounded border border-slate-200"><Search className="w-3 h-3 text-slate-500" /></div>
+                 <div>
+                    <span className="font-bold text-slate-800 text-sm">Smart Add:</span>
+                    <p className="text-xs text-slate-500">When adding a bill, type a brand name (e.g. "Spotify") to automatically find its logo.</p>
+                 </div>
               </li>
               <li className="flex gap-3">
-                <div className="mt-1"><Edit2 className="w-4 h-4 text-indigo-500" /></div>
-                <div>
-                  <span className="font-bold text-slate-800 text-sm">Editing:</span>
-                  <p className="text-sm text-slate-500">Tap any expense amount to change it instantly.</p>
-                </div>
+                 <div className="mt-1 bg-white p-1 rounded border border-slate-200"><ArrowUpDown className="w-3 h-3 text-slate-500" /></div>
+                 <div>
+                    <span className="font-bold text-slate-800 text-sm">Swipe Actions (Mobile):</span>
+                    <p className="text-xs text-slate-500">
+                       On the expenses list: <br/>
+                       • <strong>Swipe Right</strong> to Edit amount.<br/>
+                       • <strong>Swipe Left</strong> to Delete.
+                    </p>
+                 </div>
               </li>
             </ul>
           </div>
         </section>
 
-        {/* SECTION 3: FAQ / PURPOSE */}
+        {/* SECTION 3: TOOLS & REPORTS */}
+        <section className="space-y-4">
+           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Tools & Power Features</h3>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              
+              {/* Analytics */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-white">
+                 <div className="flex items-center gap-2 mb-2">
+                    <BarChart3 className="w-4 h-4 text-emerald-500" />
+                    <span className="font-bold text-sm text-slate-800">Analytics</span>
+                 </div>
+                 <p className="text-xs text-slate-500">View 6-month trends, income variances, and future savings projections.</p>
+              </div>
+
+              {/* Sandbox */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-white">
+                 <div className="flex items-center gap-2 mb-2">
+                    <FlaskConical className="w-4 h-4 text-indigo-500" />
+                    <span className="font-bold text-sm text-slate-800">Sandbox Mode</span>
+                 </div>
+                 <p className="text-xs text-slate-500">A safe simulator. Change salaries or add huge bills to test scenarios without saving data.</p>
+              </div>
+
+              {/* Reports */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-white col-span-full">
+                 <div className="flex items-center gap-2 mb-2">
+                    <Printer className="w-4 h-4 text-slate-500" />
+                    <span className="font-bold text-sm text-slate-800">Reports Center</span>
+                 </div>
+                 <p className="text-xs text-slate-500">Generate printable PDF statements for the current month or your full annual history.</p>
+              </div>
+           </div>
+        </section>
+
+        {/* SECTION 4: FAQ */}
         <section className="space-y-4">
            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Common Questions</h3>
            <div className="space-y-2">
@@ -1886,35 +1932,13 @@ const HelpModal = ({ onClose, onStartTutorial }) => {
                       <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${openFaq === i ? 'rotate-90' : ''}`} />
                    </button>
                    {openFaq === i && (
-                     <div className="p-4 bg-white text-sm text-slate-600 leading-relaxed border-t border-slate-100 animate-in slide-in-from-top-2">
-                        {item.answer.split('\n').map((line, idx) => <p key={idx} className="mb-1 last:mb-0">{line}</p>)}
+                     <div className="p-4 bg-white text-sm text-slate-600 leading-relaxed border-t border-slate-100 animate-in slide-in-from-top-2 whitespace-pre-line">
+                        {item.answer}
                      </div>
                    )}
                 </div>
               ))}
            </div>
-        </section>
-
-        {/* SECTION 4: ADVANCED */}
-        <section className="space-y-4">
-          <div className="flex justify-between items-center">
-             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Advanced Tools</h3>
-             <button 
-               onClick={() => onStartTutorial('advanced_features')}
-               className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-200 transition flex items-center gap-1"
-             >
-               <Zap className="w-3 h-3" /> Show me how
-             </button>
-          </div>
-          <div className="grid grid-cols-1 gap-3">
-             <div className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 bg-white">
-                <div className="bg-emerald-100 p-2 rounded-lg text-emerald-600"><BarChart3 className="w-5 h-5" /></div>
-                <div>
-                   <h4 className="font-bold text-slate-800 text-sm">Analytics</h4>
-                   <p className="text-xs text-slate-500">View trends and history.</p>
-                </div>
-             </div>
-          </div>
         </section>
 
       </div>
