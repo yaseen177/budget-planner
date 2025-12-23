@@ -3576,21 +3576,38 @@ export default function App() {
 
           {/* TILE 2 & 3: STATS STACK - Spans 1 Column */}
           <div className="flex flex-col gap-5">
-             {/* Stat 1: Total Spent */}
-             <div className="flex-1 bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200/60 flex flex-col justify-center relative overflow-hidden group">
-                <div className="absolute bottom-0 right-0 w-32 h-32 bg-rose-50 rounded-full -mr-8 -mb-8 group-hover:scale-110 transition duration-500"></div>
-                <div className="relative z-10">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="p-2 bg-rose-100 text-rose-600 rounded-lg"><TrendingDown className="w-4 h-4" /></div>
-                    <span className="text-xs font-bold text-slate-400 uppercase">Total Spent</span>
+             
+             {/* Stat 1: Total Spent & Remaining (UPDATED) */}
+             <div className="flex-1 bg-white p-5 rounded-[2.5rem] shadow-sm border border-slate-200/60 flex flex-col justify-center relative overflow-hidden group">
+                {/* Subtle Background Blob */}
+                <div className="absolute bottom-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-8 -mb-8 group-hover:scale-110 transition duration-500"></div>
+                
+                <div className="relative z-10 grid grid-cols-2 gap-2 border-slate-100">
+                  {/* Left: Total Bills */}
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <div className="p-1.5 bg-rose-100 text-rose-600 rounded-lg"><TrendingDown className="w-3 h-3" /></div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Bills</span>
+                    </div>
+                    <span className="text-xl md:text-2xl font-black text-slate-800 tracking-tight block">
+                      -{formatCurrency(totalExpenses, userSettings.currency)}
+                    </span>
                   </div>
-                  <span className="text-3xl font-bold text-slate-800 tracking-tight">
-                    {formatCurrency(totalExpenses, userSettings.currency)}
-                  </span>
+
+                  {/* Right: Left from Salary */}
+                  <div className="text-right border-l border-slate-100 pl-4">
+                    <div className="flex items-center justify-end gap-1.5 mb-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Left</span>
+                      <div className="p-1.5 bg-emerald-100 text-emerald-600 rounded-lg"><TrendingUp className="w-3 h-3" /></div>
+                    </div>
+                    <span className="text-xl md:text-2xl font-black text-emerald-500 tracking-tight block">
+                      {formatCurrency(salaryNum - totalExpenses, userSettings.currency)}
+                    </span>
+                  </div>
                 </div>
              </div>
 
-             {/* Stat 2: Days Left (Dynamic) */}
+             {/* Stat 2: Days Left (UNCHANGED) */}
              <div className="flex-1 bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200/60 flex flex-col justify-center relative overflow-hidden group">
                 <div className="absolute bottom-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-8 -mb-8 group-hover:scale-110 transition duration-500"></div>
                 <div className="relative z-10">
@@ -3619,11 +3636,19 @@ export default function App() {
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Your Pots</h3>
              </div>
 
-             {/* 2. THE UNSORTED POT VISUALIZER */}
+             {/* 2. THE UNSORTED POT VISUALIZER (ACTUALS LOGIC) */}
              {(() => {
-                // Calculate Total Disposable (Salary - Fixed Expenses) to determine % of jar filled
+                // 1. Calculate Total Disposable (Salary - Fixed Expenses)
                 const totalDisposable = salaryNum - expenses.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
-                const percentRemaining = totalDisposable > 0 ? (remainder / totalDisposable) * 100 : 0;
+                
+                // 2. Calculate Total Actually Deposited (Sum of user inputs)
+                const totalDeposited = Object.values(displayActualSavings).reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
+                
+                // 3. Calculate Real Unsorted Cash
+                const realUnsorted = Math.max(0, totalDisposable - totalDeposited);
+                
+                // 4. Calculate Percentage (Full jar = lots of unsorted cash)
+                const percentFilled = totalDisposable > 0 ? (realUnsorted / totalDisposable) * 100 : 0;
                 
                 return (
                   <div className="bg-slate-900 rounded-3xl p-6 mb-8 text-white relative overflow-hidden shadow-xl">
@@ -3637,7 +3662,7 @@ export default function App() {
                              {/* Liquid Level */}
                              <div 
                                 className="absolute bottom-0 left-0 w-full bg-emerald-500 transition-all duration-1000 ease-in-out opacity-90"
-                                style={{ height: `${percentRemaining}%` }}
+                                style={{ height: `${percentFilled}%` }}
                              >
                                 <div className="absolute top-0 left-0 w-full h-2 bg-emerald-400 opacity-50 animate-pulse"></div>
                                 {/* Bubbles */}
@@ -3655,25 +3680,25 @@ export default function App() {
                        <div className="text-center md:text-left flex-1">
                           <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-2 border border-emerald-500/30">
                              <AlertCircle className="w-3 h-3" />
-                             Unsorted Cash
+                             Actual Cash Remaining
                           </div>
                           
                           <div className="text-4xl font-black tracking-tight text-white mb-2">
-                             {formatCurrency(remainder, userSettings.currency)}
+                             {formatCurrency(realUnsorted, userSettings.currency)}
                           </div>
                           
                           <p className="text-slate-400 text-sm leading-relaxed">
-                             This is your <strong>Leftover Money</strong> (Salary minus Bills). 
-                             It is currently sitting in your main account doing nothing.
+                             This is the <strong>Physical Cash</strong> still sitting in your main bank account right now.
+                             (Salary minus Expenses minus what you have already transferred).
                           </p>
 
                           <div className="mt-4 p-3 bg-white/5 rounded-xl border border-white/10 flex items-center gap-3">
                              <div className="bg-white/10 p-2 rounded-full">
-                                <ArrowUpDown className="w-4 h-4 text-emerald-400" />
+                                <ArrowRight className="w-4 h-4 text-emerald-400" />
                              </div>
                              <div className="text-left">
-                                <p className="text-[10px] text-slate-400 uppercase font-bold">Your Goal</p>
-                                <p className="text-xs text-white font-bold">Move this money into the pots below until this reaches 0.</p>
+                                <p className="text-[10px] text-slate-400 uppercase font-bold">Action Required</p>
+                                <p className="text-xs text-white font-bold">Transfer this money to your pots and type the amounts below to empty this jar.</p>
                              </div>
                           </div>
                        </div>
