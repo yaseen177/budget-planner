@@ -3500,13 +3500,13 @@ export default function App() {
         <div className={`sticky top-6 z-50 mx-auto max-w-[280px] mb-8 print:hidden relative transition-all duration-500 ease-in-out transform ${showMonthNav ? 'translate-y-0 opacity-100' : '-translate-y-16 opacity-0 pointer-events-none'}`}>
           
           {/* Main Pill Controls */}
-          <div className="flex items-center justify-between bg-white/80 backdrop-blur-xl p-1.5 rounded-full shadow-2xl border border-white/40 ring-1 ring-white/60 transition-all duration-300">
+          <div className="flex items-center justify-between bg-white backdrop-blur-xl p-1.5 rounded-full shadow-2xl border border-white/40 ring-1 ring-white/60 transition-all duration-300">
             <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-500">
               <ChevronLeft className="w-5 h-5" />
             </button>
             
             {/* Clickable Label to toggle Menu */}
-            <button
+            <button 
               onClick={() => {
                 setPickerYear(currentDate.getFullYear()); // Sync year when opening
                 setShowDatePicker(!showDatePicker);
