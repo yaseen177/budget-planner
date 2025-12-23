@@ -1375,6 +1375,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   const [newPlanPercent, setNewPlanPercent] = useState('');
   const [openColorMenuId, setOpenColorMenuId] = useState(null);
   const [newPlanColor, setNewPlanColor] = useState(POT_COLORS[0]);
+  const [showNewPotColorMenu, setShowNewPotColorMenu] = useState(false);
   const [newDefExpName, setNewDefExpName] = useState('');
   const [newDefExpAmount, setNewDefExpAmount] = useState('');
   const [newDefExpLogo, setNewDefExpLogo] = useState(null);
@@ -1562,36 +1563,18 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                 <div className="flex justify-between items-center mb-3">
                    <p className="text-xs font-bold text-slate-400 uppercase">Create New Pot</p>
                 </div>
-                
-                {/* Color Selector */}
-                <div className="flex gap-3 overflow-x-auto pb-4 mb-2 no-scrollbar px-1">
-                    {POT_COLORS.map((colorOption) => (
-                        <button
-                            key={colorOption.id}
-                            onClick={() => setNewPlanColor(colorOption)}
-                            className={`w-10 h-10 rounded-full shadow-sm transition-all duration-200 flex items-center justify-center shrink-0 relative
-                                ${newPlanColor.id === colorOption.id ? 'scale-110 ring-2 ring-offset-2 ring-slate-400' : 'hover:scale-105 hover:opacity-90'}
-                            `}
-                            style={{ backgroundColor: colorOption.hex }}
-                        >
-                            {newPlanColor.id === colorOption.id && (
-                                <div className="bg-white/20 rounded-full p-1">
-                                    <Check className="w-4 h-4 text-white drop-shadow-md" />
-                                </div>
-                            )}
-                        </button>
-                    ))}
-                </div>
 
-                {/* Inputs & Add Button */}
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center relative">
+                    {/* Name Input */}
                     <input 
                       placeholder="Name"
                       value={newPlanName}
                       onChange={(e) => setNewPlanName(e.target.value)}
                       className="flex-1 p-3 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-slate-200 transition font-medium"
                     />
-                    <div className="relative w-24">
+                    
+                    {/* Percent Input */}
+                    <div className="relative w-20 shrink-0">
                         <input 
                           type="number"
                           placeholder="0"
@@ -1599,29 +1582,57 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                           onChange={(e) => setNewPlanPercent(e.target.value)}
                           className="w-full p-3 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-slate-200 transition font-bold text-center"
                         />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
                     </div>
+
+                    {/* Color Dropdown Trigger */}
+                    <div className="relative">
+                        <button 
+                            onClick={() => setShowNewPotColorMenu(!showNewPotColorMenu)}
+                            className="w-11 h-11 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center transition hover:scale-105 active:scale-95"
+                            style={{ backgroundColor: newPlanColor.hex }}
+                            title="Select Color"
+                        >
+                           <div className="bg-black/10 rounded-full p-1">
+                              <Edit2 className="w-3 h-3 text-white" />
+                           </div>
+                        </button>
+                        
+                        {/* THE DROPDOWN MENU */}
+                        {showNewPotColorMenu && (
+                            <div className="absolute bottom-full right-0 mb-2 p-3 bg-white rounded-2xl shadow-xl border border-slate-100 w-48 z-50 animate-in zoom-in-95 grid grid-cols-5 gap-2">
+                                {POT_COLORS.map((colorOption) => (
+                                    <button
+                                        key={colorOption.id}
+                                        onClick={() => {
+                                            setNewPlanColor(colorOption);
+                                            setShowNewPotColorMenu(false);
+                                        }}
+                                        className={`w-7 h-7 rounded-full shadow-sm border transition hover:scale-110 ${newPlanColor.id === colorOption.id ? 'border-slate-800 scale-110' : 'border-transparent'}`}
+                                        style={{ backgroundColor: colorOption.hex }}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Add Button */}
                     <button 
                         onClick={() => {
                              if(!newPlanName || !newPlanPercent) return;
-                             
-                             // 1. Capture the CURRENT selected color immediately
-                             const selectedColor = newPlanColor;
-
                              setAllocations([...allocations, { 
                                id: Date.now().toString(), 
                                name: newPlanName, 
                                percentage: parseFloat(newPlanPercent),
-                               color: selectedColor.tailwind, 
-                               hex: selectedColor.hex 
+                               color: newPlanColor.tailwind, 
+                               hex: newPlanColor.hex 
                              }]);
-                             
                              setNewPlanName('');
                              setNewPlanPercent('');
-                             setNewPlanColor(POT_COLORS[0]); // Reset AFTER adding
+                             setNewPlanColor(POT_COLORS[0]); 
+                             setShowNewPotColorMenu(false);
                         }} 
-                        className="text-white p-3 rounded-xl shadow-lg hover:opacity-90 transition active:scale-95 w-12 flex items-center justify-center"
-                        style={{ backgroundColor: newPlanColor.hex }}
+                        className="bg-slate-900 text-white w-11 h-11 rounded-xl shadow-lg hover:bg-slate-800 transition active:scale-95 flex items-center justify-center shrink-0"
                     >
                       <Plus className="w-5 h-5" />
                     </button>
