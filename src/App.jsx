@@ -3666,7 +3666,7 @@ export default function App() {
         onSave={handleAddExpenseSave}
       />
 
-{showSettings && (
+  {showSettings && (
         <SettingsScreen 
           user={user} 
           currentSettings={isTutorialMode ? {
@@ -4040,101 +4040,76 @@ export default function App() {
           </div>
         </div>
 
-        {/* TILE 3: ALLOCATIONS STRIP */}
+        
+
+        {/* TILE 3: ALLOCATIONS STRIP (UNIFIED GRID) */}
         {salaryNum > 0 && (
-          <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-200/60 mb-6">
+          <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-200/60 mb-6 animate-in slide-in-from-bottom-4">
              
              {/* 1. Header Row */}
              <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 bg-amber-100 text-amber-600 rounded-xl"><Target className="w-4 h-4" /></div>
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Your Pots</h3>
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Your Money Map</h3>
              </div>
 
-             {/* 2. THE UNSORTED POT VISUALIZER (ACTUALS LOGIC) */}
-             {(() => {
-                // 1. Calculate Total Disposable (Salary - Fixed Expenses)
-                const totalDisposable = salaryNum - expenses.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
-                
-                // 2. Calculate Total Actually Deposited (Sum of user inputs)
-                const totalDeposited = Object.values(displayActualSavings).reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
-                
-                // 3. Calculate Real Unsorted Cash
-                const realUnsorted = Math.max(0, totalDisposable - totalDeposited);
-                
-                // 4. Calculate Percentage (Full jar = lots of unsorted cash)
-                const percentFilled = totalDisposable > 0 ? (realUnsorted / totalDisposable) * 100 : 0;
-                
-                return (
-                  <div className="bg-slate-900 rounded-3xl p-6 mb-8 text-white relative overflow-hidden shadow-xl">
-                    
-                    <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
-                       
-                       {/* THE GRAPHIC JAR */}
-                       <div className="relative shrink-0">
-                          {/* Jar Body */}
-                          <div className="w-24 h-32 border-4 border-slate-600 bg-slate-800/50 rounded-b-3xl rounded-t-lg relative overflow-hidden backdrop-blur-sm">
-                             {/* Liquid Level */}
-                             <div 
-                                className="absolute bottom-0 left-0 w-full bg-emerald-500 transition-all duration-1000 ease-in-out opacity-90"
-                                style={{ height: `${percentFilled}%` }}
-                             >
-                                <div className="absolute top-0 left-0 w-full h-2 bg-emerald-400 opacity-50 animate-pulse"></div>
-                                {/* Bubbles */}
-                                <div className="absolute bottom-2 left-2 w-2 h-2 bg-white/20 rounded-full animate-bounce"></div>
-                                <div className="absolute bottom-6 right-4 w-1 h-1 bg-white/20 rounded-full animate-bounce delay-100"></div>
-                             </div>
-                             {/* Jar Shine */}
-                             <div className="absolute top-0 right-2 w-2 h-full bg-white/5 rounded-full"></div>
-                          </div>
-                          {/* Lid */}
-                          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-28 h-2 bg-slate-500 rounded-full"></div>
-                       </div>
-
-                       {/* THE EXPLANATION */}
-                       <div className="text-center md:text-left flex-1">
-                          <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-2 border border-emerald-500/30">
-                             <AlertCircle className="w-3 h-3" />
-                             Actual Cash Remaining
-                          </div>
-                          
-                          <div className="text-4xl font-black tracking-tight text-white mb-2">
-                             {formatCurrency(realUnsorted, userSettings.currency)}
-                          </div>
-                          
-                          <p className="text-slate-400 text-sm leading-relaxed">
-                             This is the <strong>Physical Cash</strong> still sitting in your main bank account right now.
-                             (Salary minus Expenses minus what you have already transferred).
-                          </p>
-
-                          <div className="mt-4 p-3 bg-white/5 rounded-xl border border-white/10 flex items-center gap-3">
-                             <div className="bg-white/10 p-2 rounded-full">
-                                <ArrowRight className="w-4 h-4 text-emerald-400" />
-                             </div>
-                             <div className="text-left">
-                                <p className="text-[10px] text-slate-400 uppercase font-bold">Action Required</p>
-                                <p className="text-xs text-white font-bold">Transfer this money to your pots and type the amounts below to empty this jar.</p>
-                             </div>
-                          </div>
-                       </div>
-                    </div>
-                  </div>
-                );
-             })()}
-
-             {/* 3. Grid of Pots */}
+             {/* 2. UNIFIED MONEY GRID */}
              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {/* --- NEW: EMPTY POTS STATE --- */}
-                {displayAllocations.length === 0 && (
-                   <div className="col-span-full py-10 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
-                      <div className="bg-white p-4 rounded-full shadow-sm mb-3">
-                         <Target className="w-8 h-8 text-slate-300" />
+                
+                {/* A. MASTER CARD: CURRENT ACCOUNT (Replaces the Jar) */}
+                <div 
+                   className="col-span-1 sm:col-span-2 md:col-span-3 relative overflow-hidden rounded-[2.5rem] p-6 text-white shadow-xl transition-transform hover:scale-[1.005] group"
+                   style={{ backgroundColor: userSettings.bankDetails?.color || '#1e293b' }}
+                >
+                   {/* Background Decoration */}
+                   {userSettings.bankDetails?.logo && (
+                      <div className="absolute -right-8 -bottom-8 opacity-10 rotate-12 group-hover:rotate-6 group-hover:scale-110 transition duration-700">
+                         <img src={userSettings.bankDetails.logo} className="w-56 h-56 object-contain invert" />
                       </div>
-                      <p className="font-bold text-sm">No savings pots yet</p>
-                      <button onClick={() => setShowSettings(true)} className="text-xs text-indigo-500 font-bold mt-2 hover:underline">
-                        Create a Pot in Settings
-                      </button>
+                   )}
+
+                   <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                      
+                      {/* Left: Identity */}
+                      <div className="flex items-center gap-4 w-full md:w-auto">
+                         <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md shadow-inner border border-white/10 shrink-0">
+                            {userSettings.bankDetails?.logo ? (
+                               <img src={userSettings.bankDetails.logo} className="w-8 h-8 object-contain rounded-full bg-white p-0.5" />
+                            ) : (
+                               <Wallet className="w-8 h-8 text-white" />
+                            )}
+                         </div>
+                         <div>
+                            <h3 className="text-xl font-bold leading-tight">Keep in {userSettings.bankDetails?.name || 'Current Account'}</h3>
+                            <div className="flex items-center gap-2 text-sm font-medium opacity-70">
+                               <span>Do not transfer</span>
+                               <span className="w-1 h-1 bg-white rounded-full"></span>
+                               <span>{currentAccountPercent.toFixed(0)}% Allocation</span>
+                            </div>
+                         </div>
+                      </div>
+
+                      {/* Right: Stats (Target vs Actual) */}
+                      <div className="flex items-center gap-2 md:gap-6 w-full md:w-auto justify-between md:justify-end">
+                         
+                         {/* Target (Small) */}
+                         <div className="opacity-80 text-right">
+                            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5">Target</p>
+                            <p className="text-xl font-bold">{formatCurrency(currentAccountTarget, userSettings.currency)}</p>
+                         </div>
+
+                         {/* Divider */}
+                         <div className="w-px h-10 bg-white/20"></div>
+
+                         {/* Actual (Big) */}
+                         <div className="bg-black/20 px-5 py-3 rounded-2xl border border-white/5 backdrop-blur-sm shadow-lg text-right">
+                            <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1 text-emerald-200">Actual Remainder</p>
+                            <p className="text-3xl font-black tracking-tight text-white">{formatCurrency(currentAccountActual, userSettings.currency)}</p>
+                         </div>
+                      </div>
                    </div>
-                )}
+                </div>
+
+                {/* B. REGULAR SAVINGS POTS */}
                 {displayAllocations.map(plan => {
                   const target = remainder * (plan.percentage / 100);
                   const isLastToFill = (displayAllocations.length - filledPlansCount === 1);
@@ -4154,61 +4129,20 @@ export default function App() {
                     />
                   );
                 })}
+
+                {/* C. EMPTY STATE BUTTON (If no pots exist) */}
+                {displayAllocations.length === 0 && (
+                   <button 
+                     onClick={() => setShowSettings(true)}
+                     className="col-span-1 sm:col-span-2 min-h-[160px] flex flex-col items-center justify-center gap-3 rounded-[2.5rem] border-2 border-dashed border-slate-200 text-slate-400 hover:border-indigo-300 hover:bg-indigo-50/50 hover:text-indigo-500 transition-all group bg-slate-50/50"
+                   >
+                      <div className="bg-white group-hover:bg-indigo-100 p-4 rounded-full shadow-sm transition-colors duration-300">
+                         <Plus className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                      </div>
+                      <span className="font-bold text-sm">Create your first Pot</span>
+                   </button>
+                )}
              </div>
-
-             {/* --- NEW SECTION: KEEP IN CURRENT ACCOUNT --- */}
-             <div className="mt-6">
-                <div 
-                   className="rounded-[2rem] p-6 text-white shadow-lg relative overflow-hidden"
-                   style={{ backgroundColor: userSettings.bankDetails?.color || '#1e293b' }}
-                >
-                   {/* Background Logo Decoration (Faded) */}
-                   {userSettings.bankDetails?.logo && (
-                      <div className="absolute -right-6 -bottom-6 opacity-10 rotate-12">
-                         <img src={userSettings.bankDetails.logo} className="w-48 h-48 object-contain invert" />
-                      </div>
-                   )}
-                   
-                   <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-4">
-                      {/* Left: Identity */}
-                      <div className="flex items-center gap-4">
-                         <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm shadow-inner border border-white/10">
-                            {userSettings.bankDetails?.logo ? (
-                               <img src={userSettings.bankDetails.logo} className="w-8 h-8 object-contain rounded-full bg-white p-0.5" />
-                            ) : (
-                               <Wallet className="w-8 h-8 text-white" />
-                            )}
-                         </div>
-                         <div>
-                            <h3 className="text-lg font-bold opacity-90">Keep in {userSettings.bankDetails?.name || 'Current Account'}</h3>
-                            <div className="flex items-center gap-2 text-sm font-medium opacity-70">
-                               <span>Do not transfer</span>
-                            </div>
-                         </div>
-                      </div>
-
-                      {/* Right: Stats (Target vs Actual) */}
-                      <div className="flex items-center gap-2 md:gap-6 text-right">
-                         
-                         {/* Target (Small) */}
-                         <div className="opacity-80">
-                            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5">Target ({currentAccountPercent.toFixed(0)}%)</p>
-                            <p className="text-xl font-bold">{formatCurrency(currentAccountTarget, userSettings.currency)}</p>
-                         </div>
-
-                         {/* Divider */}
-                         <div className="w-px h-10 bg-white/20 hidden md:block"></div>
-
-                         {/* Actual (Big) */}
-                         <div className="bg-black/20 px-5 py-3 rounded-2xl border border-white/5 backdrop-blur-sm shadow-lg">
-                            <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1 text-emerald-200">Actual to keep</p>
-                            <p className="text-3xl font-black tracking-tight text-white">{formatCurrency(currentAccountActual, userSettings.currency)}</p>
-                         </div>
-                      </div>
-                   </div>
-                </div>
-             </div>
-             {/* ------------------------------------------- */}
           </div>
         )}
 
