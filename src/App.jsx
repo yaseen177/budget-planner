@@ -4044,7 +4044,7 @@ export default function App() {
                 </div>
                 
                 <p className="text-[10px] text-indigo-400 mt-2 font-medium opacity-80 px-2">
-                   Spend less than this today to stay on track.
+                   Daily spend limit. On average do not spend more than this per day to stay afloat.
                 </p>
              </div>
              {/* ----------------------------------- */}
