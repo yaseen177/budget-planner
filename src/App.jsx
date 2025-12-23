@@ -3509,6 +3509,8 @@ export default function App() {
   const allocatedPercent = userSettings.allocationRules.reduce((sum, p) => sum + p.percentage, 0);
   const currentAccountPercent = Math.max(0, 100 - allocatedPercent);
   const currentAccountTarget = remainder * (currentAccountPercent / 100);
+  const totalDepositedToPots = Object.values(displayActualSavings).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+  const currentAccountActual = Math.max(0, remainder - totalDepositedToPots);
   
   // 2. Calculate Days Until Next Payday
   const calculateDaysUntilPayday = (payDayStr, salaryInputted) => {
@@ -4154,6 +4156,7 @@ export default function App() {
                    )}
                    
                    <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-4">
+                      {/* Left: Identity */}
                       <div className="flex items-center gap-4">
                          <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm shadow-inner border border-white/10">
                             {userSettings.bankDetails?.logo ? (
@@ -4165,16 +4168,28 @@ export default function App() {
                          <div>
                             <h3 className="text-lg font-bold opacity-90">Keep in {userSettings.bankDetails?.name || 'Current Account'}</h3>
                             <div className="flex items-center gap-2 text-sm font-medium opacity-70">
-                               <span>Remainder Pot</span>
-                               <span>•</span>
-                               <span>{currentAccountPercent.toFixed(0)}% Allocation</span>
+                               <span>Do not transfer</span>
                             </div>
                          </div>
                       </div>
 
-                      <div className="text-center md:text-right bg-black/20 px-6 py-3 rounded-2xl border border-white/5 backdrop-blur-sm">
-                         <p className="text-xs font-bold uppercase tracking-widest opacity-60 mb-1">Do not transfer</p>
-                         <p className="text-3xl font-black tracking-tight">{formatCurrency(currentAccountTarget, userSettings.currency)}</p>
+                      {/* Right: Stats (Target vs Actual) */}
+                      <div className="flex items-center gap-2 md:gap-6 text-right">
+                         
+                         {/* Target (Small) */}
+                         <div className="opacity-80">
+                            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5">Target ({currentAccountPercent.toFixed(0)}%)</p>
+                            <p className="text-xl font-bold">{formatCurrency(currentAccountTarget, userSettings.currency)}</p>
+                         </div>
+
+                         {/* Divider */}
+                         <div className="w-px h-10 bg-white/20 hidden md:block"></div>
+
+                         {/* Actual (Big) */}
+                         <div className="bg-black/20 px-5 py-3 rounded-2xl border border-white/5 backdrop-blur-sm shadow-lg">
+                            <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1 text-emerald-200">Actual Remainder</p>
+                            <p className="text-3xl font-black tracking-tight text-white">{formatCurrency(currentAccountActual, userSettings.currency)}</p>
+                         </div>
                       </div>
                    </div>
                 </div>
