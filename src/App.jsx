@@ -2098,6 +2098,7 @@ const UK_BANKS = [
 
 
 // --- ADMIN TEST LAB SCENARIOS ---
+// --- ADMIN TEST LAB SCENARIOS ---
 const DEMO_SCENARIOS = {
   'ONBOARDING_NEW': {
     label: 'Fresh User (Onboarding)',
@@ -2108,9 +2109,10 @@ const DEMO_SCENARIOS = {
       salary: '', expenses: [], actualSavings: {}
     }
   },
-  'LEGACY_NO_PAYDAY': {
-    label: 'Legacy (Missing Payday)',
-    description: 'Simulates an old user who needs to update Payday settings.',
+  // --- MERGED SCENARIO HERE ---
+  'LEGACY_UPDATE': {
+    label: 'Legacy User (Update Required)',
+    description: 'Simulates an existing user who needs to add Bank & Payday to continue.',
     overrides: {
       onboardingComplete: true,
       userSettings: { 
@@ -2118,24 +2120,13 @@ const DEMO_SCENARIOS = {
         currency: 'GBP', 
         allocationRules: DEFAULT_ALLOCATIONS, 
         defaultFixedExpenses: DEFAULT_FIXED_EXPENSES,
-        bankDetails: { name: 'Monzo', color: '#14213d' },
-        payDay: null // <--- CAUSES LEGACY PROMPT
-      }
-    }
-  },
-  'LEGACY_NO_BANK': {
-    label: 'Legacy (Missing Bank)',
-    description: 'Simulates an old user who needs to update Bank details.',
-    overrides: {
-      onboardingComplete: true,
-      userSettings: { 
-        displayName: 'Old User', 
-        currency: 'GBP', 
-        allocationRules: DEFAULT_ALLOCATIONS, 
-        defaultFixedExpenses: DEFAULT_FIXED_EXPENSES,
-        payDay: '25',
-        bankDetails: null // <--- CAUSES LEGACY PROMPT
-      }
+        // BOTH MISSING: This triggers the "Complete Setup" modal
+        bankDetails: null,
+        payDay: null 
+      },
+      salary: '2500', 
+      expenses: DEFAULT_FIXED_EXPENSES, 
+      actualSavings: {}
     }
   },
   'EMPTY_MONTH': {
@@ -3462,11 +3453,21 @@ export default function App() {
   };
 
   const saveSettings = async (newSettings) => {
-    if (!user || activeDemoId) return; // <--- ADD activeDemoId HERE
-    triggerHaptic(); // Haptic
+    // GUARD: Block saving in Demo Mode
+    if (activeDemoId) {
+       showToast("Demo Mode: Settings NOT saved to database.");
+       // Optional: You could locally update 'userSettings' state here if you wanted 
+       // the UI to update instantly, but for a "safe" test, just blocking is best.
+       return;
+    }
+    
+    if (!user) return;
+    triggerHaptic(); 
     logSystemEvent('Settings & Pots Configuration Saved', 'config');
     const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
     await setDoc(settingsRef, newSettings);
+    // Update local state immediately so the UI reflects changes
+    setUserSettings(newSettings); 
     showToast("Settings saved!");
   };
 
