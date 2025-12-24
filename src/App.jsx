@@ -139,6 +139,37 @@ const DEFAULT_ALLOCATIONS = [
 
 // --- HELPER FUNCTIONS ---
 
+// --- NEW HELPER: PAYDAY LOGIC ---
+const calculatePaydayLogic = (payDayStr, salaryInputted) => {
+  const today = new Date();
+  // Reset time to midnight to ensure clean day calculations
+  today.setHours(0,0,0,0);
+  
+  const currentDay = today.getDate();
+  const payDay = parseInt(payDayStr) || 1; 
+  
+  // Start with Payday of THIS month
+  let targetDate = new Date(today.getFullYear(), today.getMonth(), payDay);
+  targetDate.setHours(0,0,0,0);
+
+  const hasSalary = salaryInputted && parseFloat(salaryInputted) > 0;
+
+  // LOGIC:
+  // If Today >= Payday: We passed it. Next one is Next Month.
+  // If Today < Payday AND We have Salary: We are currently IN the cycle, so the money needs to last until the NEXT NEXT Payday.
+  
+  if (currentDay >= payDay) {
+     targetDate.setMonth(targetDate.getMonth() + 1);
+  } else if (hasSalary) {
+     targetDate.setMonth(targetDate.getMonth() + 1);
+  }
+  
+  const diffTime = targetDate - today;
+  const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return { days, targetDate };
+};
+
 const safeCalculate = (expression) => {
   try {
     // 1. Remove characters that aren't numbers or math operators
