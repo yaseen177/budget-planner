@@ -3278,6 +3278,10 @@ export default function App() {
       await setPersistence(auth, browserSessionPersistence);
       
       const provider = new GoogleAuthProvider();
+
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
       
       // 2. Wait for the popup to finish
       const result = await signInWithPopup(auth, provider);
@@ -3291,7 +3295,6 @@ export default function App() {
       // Pass 'result.user' as the 3rd argument so it logs immediately
       logSystemEvent('User Logged In', 'login', result.user);
       
-      logSystemEvent('User Logged In', 'login');
     } catch (error) {
       console.error("Login Failed:", error);
       if (!YOUR_FIREBASE_KEYS.apiKey) {
