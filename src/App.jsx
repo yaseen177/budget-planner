@@ -3712,7 +3712,7 @@ export default function App() {
   if (!user) return <LoginScreen onLogin={handleLogin} />;
 
   // --- ADMIN RENDER CHECK ---
-  if (user && isAdminMode && user.email === "yaseen.hussain2001@gmail.com") {
+  if (user && isAdminMode && user.email === "budgetplanneryas@gmail.com") {
     return (
       <AdminDashboard 
         user={user} 
@@ -3769,7 +3769,7 @@ export default function App() {
 
       {/* Admin Demo Banner */}
       {activeDemoId && (
-        <div className="bg-slate-900 text-white px-4 py-3 text-center text-sm font-bold sticky top-0 z-50 shadow-md flex justify-between items-center animate-in slide-in-from-top-full border-b border-white/10">
+        <div className="bg-slate-900 text-white px-4 py-3 text-center text-sm font-bold sticky top-0 z-[300] shadow-md flex justify-between items-center animate-in slide-in-from-top-full border-b border-white/10">
             <span className="flex items-center gap-2 text-indigo-300">
                <Shield className="w-4 h-4" /> 
                Test Lab: {DEMO_SCENARIOS[activeDemoId].label}
@@ -3856,10 +3856,19 @@ export default function App() {
         />
       )}
       
-      {!loading && !effectiveOnboardingComplete && user && ( // <--- CHANGED
+      {/* Onboarding Wizard Logic */}
+      {!loading && !effectiveOnboardingComplete && user && ( 
         <OnboardingWizard 
           user={user}
           onComplete={async (newSettings) => {
+             // GUARD: If in Demo Mode, DO NOT SAVE. Just exit the demo.
+             if (activeDemoId) {
+                showToast("Demo Completed! No data was saved.");
+                setActiveDemoId(null); // Exit demo mode
+                return;
+             }
+
+             // Real Save Logic
              const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
              await setDoc(settingsRef, newSettings);
              setUserSettings(newSettings);
@@ -3929,7 +3938,7 @@ export default function App() {
           {/* DESKTOP ACTIONS */}
           <div className="hidden md:flex gap-2">
              {/* --- PASTE HERE: ADMIN BUTTON --- */}
-            {user.email === "yaseen.hussain2001@gmail.com" && (
+            {user.email === "budgetplanneryas@gmail.com" && (
                <button 
                  onClick={() => setIsAdminMode(true)} 
                  className="p-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-400 transition shadow-lg shadow-indigo-500/20 border border-white/10"
@@ -4506,7 +4515,7 @@ export default function App() {
             
             <div className="absolute top-20 right-6 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 grid grid-cols-2 gap-2 animate-in slide-in-from-top-4 fade-in">
                 {/* --- PASTE HERE: ADMIN BUTTON (MOBILE) --- */}
-                {user.email === "yaseen.hussain2001@gmail.com" && (
+                {user.email === "budgetplanneryas@gmail.com" && (
                     <button 
                       onClick={() => { setMobileMenuOpen(false); setIsAdminMode(true); }}
                       className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl bg-indigo-50 hover:scale-95 transition"
