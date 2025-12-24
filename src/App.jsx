@@ -3713,7 +3713,7 @@ export default function App() {
   if (!user) return <LoginScreen onLogin={handleLogin} />;
 
   // --- ADMIN RENDER CHECK ---
-  if (user && isAdminMode && user.email === "budgetplanneryas@gmail.com") {
+  if (user && isAdminMode && user.email === "yaseen.hussain2001@gmail.com") {
     return (
       <AdminDashboard 
         user={user} 
@@ -3939,7 +3939,7 @@ export default function App() {
           {/* DESKTOP ACTIONS */}
           <div className="hidden md:flex gap-2">
              {/* --- PASTE HERE: ADMIN BUTTON --- */}
-            {user.email === "budgetplanneryas@gmail.com" && (
+            {user.email === "yaseen.hussain2001@gmail.com" && (
                <button 
                  onClick={() => setIsAdminMode(true)} 
                  className="p-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-400 transition shadow-lg shadow-indigo-500/20 border border-white/10"
@@ -4516,7 +4516,7 @@ export default function App() {
             
             <div className="absolute top-20 right-6 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 grid grid-cols-2 gap-2 animate-in slide-in-from-top-4 fade-in">
                 {/* --- PASTE HERE: ADMIN BUTTON (MOBILE) --- */}
-                {user.email === "budgetplanneryas@gmail.com" && (
+                {user.email === "yaseen.hussain2001@gmail.com" && (
                     <button 
                       onClick={() => { setMobileMenuOpen(false); setIsAdminMode(true); }}
                       className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl bg-indigo-50 hover:scale-95 transition"
