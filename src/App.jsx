@@ -3166,13 +3166,19 @@ export default function App() {
 
   const [highlightedSlice, setHighlightedSlice] = useState(null); // 'expenses' or pot ID
 
-  // Derived state variables
   // --- DATA SOURCE LOGIC (Real vs Sandbox vs Admin Demo) ---
-  
-  // 1. Get the Mock Data if in Admin Demo Mode
+
+  // 1. Define Tutorial Mode First (Fixes ReferenceError)
+  const isTutorialMode = activeTutorial !== null;
+
+  // 2. Define Tutorial Fallbacks
+  const tutorialAllocations = TUTORIAL_POTS;
+  const tutorialDefaultExpenses = TUTORIAL_EXPENSES.filter(e => e.type === 'fixed');
+
+  // 3. Get the Mock Data if in Admin Demo Mode
   const demoData = activeDemoId ? DEMO_SCENARIOS[activeDemoId].overrides : null;
 
-  // 2. Determine "Effective" Data
+  // 4. Determine "Effective" Data
   // If Demo: Use Demo Data. If Sandbox: Use Sandbox Data. Else: Use Real DB Data.
   const effectiveSalary = demoData?.salary !== undefined ? demoData.salary : (isSandbox ? sandboxSalary : salary);
   
@@ -3184,31 +3190,29 @@ export default function App() {
      isTutorialMode ? { t1: 400, t2: 240 } : (isSandbox ? sandboxActualSavings : actualSavings)
   );
 
-  // 3. Settings & Onboarding Overrides
+  // 5. Settings & Onboarding Overrides
   const effectiveSettings = demoData?.userSettings || (
-     isTutorialMode ? { ...userSettings, allocationRules: displayAllocations, defaultFixedExpenses: displayDefaultExpenses } : userSettings
+     isTutorialMode ? { 
+       ...userSettings, 
+       allocationRules: tutorialAllocations, 
+       defaultFixedExpenses: tutorialDefaultExpenses 
+     } : userSettings
   );
 
   const effectiveOnboardingComplete = demoData?.onboardingComplete !== undefined ? demoData.onboardingComplete : onboardingComplete;
   
-  // 4. Legacy Check Logic (Must check the EFFECTIVE settings, not real ones)
+  // 6. Legacy Check Logic
   const isEffectiveLegacyUser = !effectiveSettings.bankDetails || !effectiveSettings.payDay;
 
-  // 5. Allocations (Pots)
+  // 7. Allocations (Pots)
   const activeRules = monthAllocations || effectiveSettings.allocationRules;
-  const effectiveAllocations = isTutorialMode ? TUTORIAL_POTS : activeRules;
+  const effectiveAllocations = isTutorialMode ? tutorialAllocations : activeRules;
 
-  const displayAllocations = isTutorialMode 
-      ? TUTORIAL_POTS 
-      : activeRules;
-
-  const displayDefaultExpenses = isTutorialMode
-      ? TUTORIAL_EXPENSES.filter(e => e.type === 'fixed') // Reuse fixed expenses for settings demo
-      : userSettings.defaultFixedExpenses;
-      
-  const displayActualSavings = isTutorialMode
-      ? { t1: 400, t2: 240 } // Mock savings so bars look partially full
-      : (isSandbox ? sandboxActualSavings : actualSavings);
+  // 8. Display Variables (Legacy support for UI components that might still use these names)
+  const displayAllocations = effectiveAllocations;
+  const displayDefaultExpenses = effectiveSettings.defaultFixedExpenses;
+  const displayActualSavings = effectiveActuals;
+  const displayExpenses = effectiveExpenses; // Add this to be safe
 
   // Toast Helper
   const showToast = (msg) => {
