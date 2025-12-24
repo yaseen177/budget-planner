@@ -77,12 +77,12 @@ import {
 
 // --- FIREBASE CONFIGURATION AREA ---
 const YOUR_FIREBASE_KEYS = {
-  apiKey: "AIzaSyA6K0QPohae3zLl2z9yqVwblJCfaAmEVlQ",
-  authDomain: "budget-planner-d36b4.firebaseapp.com",
-  projectId: "budget-planner-d36b4",
-  storageBucket: "budget-planner-d36b4.firebasestorage.app",
-  messagingSenderId: "420578928126",
-  appId: "1:420578928126:web:9f016701869b92fb0f0caf"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 // --- APP INITIALIZATION ---
@@ -761,8 +761,8 @@ const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, classNa
   const [isFocused, setIsFocused] = useState(false); // NEW: Track focus to prevent "spazzing"
   
   // Use the keys provided
-  const SECRET_KEY = "sk_EYBVfqJ-SQm1aE9boQ7uzg"; 
-  const PUBLIC_KEY = "pk_IlDYZIBjQZOkL2hI7rtHmA";
+  const SECRET_KEY = import.meta.env.VITE_LOGO_DEV_SECRET_KEY;
+  const PUBLIC_KEY = import.meta.env.VITE_LOGO_DEV_PUBLIC_KEY;
 
   useEffect(() => {
     // Debounce search to save API calls
@@ -2640,8 +2640,10 @@ const SwipeableExpenseRow = ({ children, onEdit, onDelete, isMobile }) => {
 
 const BankSelector = ({ selectedBank, onSelect }) => {
   const [isSearching, setIsSearching] = useState(false);
-  // FIX: Added local state for the search input
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Get key from env
+  const LOGO_PUBLIC_KEY = import.meta.env.VITE_LOGO_DEV_PUBLIC_KEY;
 
   return (
     <div className="space-y-4">
@@ -2651,11 +2653,13 @@ const BankSelector = ({ selectedBank, onSelect }) => {
             {UK_BANKS.map(bank => (
               <button
                 key={bank.id}
-                onClick={() => onSelect({ name: bank.name, logo: `https://img.logo.dev/${bank.domain}?token=pk_IlDYZIBjQZOkL2hI7rtHmA`, color: bank.color })}
+                // UPDATED: Used LOGO_PUBLIC_KEY variable here
+                onClick={() => onSelect({ name: bank.name, logo: `https://img.logo.dev/${bank.domain}?token=${LOGO_PUBLIC_KEY}`, color: bank.color })}
                 className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${selectedBank?.name === bank.name ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-200 hover:border-slate-300 bg-white'}`}
               >
                 <img 
-                  src={`https://img.logo.dev/${bank.domain}?token=pk_IlDYZIBjQZOkL2hI7rtHmA`} 
+                  // UPDATED: Used LOGO_PUBLIC_KEY variable here
+                  src={`https://img.logo.dev/${bank.domain}?token=${LOGO_PUBLIC_KEY}`} 
                   alt={bank.name} 
                   className="w-8 h-8 object-contain rounded-full"
                 />
