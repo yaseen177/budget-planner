@@ -2065,6 +2065,60 @@ const UK_BANKS = [
   { id: 'nationwide', name: 'Nationwide', domain: 'nationwide.co.uk', color: '#D2112C' },
 ];
 
+
+// --- ADMIN TEST LAB SCENARIOS ---
+const DEMO_SCENARIOS = {
+  'ONBOARDING_NEW': {
+    label: 'Fresh User (Onboarding)',
+    description: 'Simulates a user who just signed up. No settings, no data.',
+    overrides: {
+      onboardingComplete: false,
+      userSettings: { displayName: '', currency: 'GBP', allocationRules: [], defaultFixedExpenses: [] },
+      salary: '', expenses: [], actualSavings: {}
+    }
+  },
+  'LEGACY_NO_PAYDAY': {
+    label: 'Legacy (Missing Payday)',
+    description: 'Simulates an old user who needs to update Payday settings.',
+    overrides: {
+      onboardingComplete: true,
+      userSettings: { 
+        displayName: 'Old User', 
+        currency: 'GBP', 
+        allocationRules: DEFAULT_ALLOCATIONS, 
+        defaultFixedExpenses: DEFAULT_FIXED_EXPENSES,
+        bankDetails: { name: 'Monzo', color: '#14213d' },
+        payDay: null // <--- CAUSES LEGACY PROMPT
+      }
+    }
+  },
+  'LEGACY_NO_BANK': {
+    label: 'Legacy (Missing Bank)',
+    description: 'Simulates an old user who needs to update Bank details.',
+    overrides: {
+      onboardingComplete: true,
+      userSettings: { 
+        displayName: 'Old User', 
+        currency: 'GBP', 
+        allocationRules: DEFAULT_ALLOCATIONS, 
+        defaultFixedExpenses: DEFAULT_FIXED_EXPENSES,
+        payDay: '25',
+        bankDetails: null // <--- CAUSES LEGACY PROMPT
+      }
+    }
+  },
+  'EMPTY_MONTH': {
+    label: 'Month Reset (No Data)',
+    description: 'User is set up, but has added no data for this month yet.',
+    overrides: {
+      onboardingComplete: true,
+      salary: '', 
+      expenses: [], 
+      actualSavings: {}
+    }
+  }
+};
+
 // --- NEW HELPER: PAYDAY CALCULATOR ---
 const calculateDaysUntilPayday = (payDayStr, salaryInputted) => {
   const today = new Date();
@@ -2740,55 +2794,48 @@ const BankSelector = ({ selectedBank, onSelect }) => {
   );
 };
 
-// --- INTERNAL ADMIN DASHBOARD COMPONENT ---
-const AdminDashboard = ({ user, onExitAdmin }) => {
+// --- UPDATED ADMIN DASHBOARD ---
+const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
+  const [view, setView] = useState('logs'); // 'logs' or 'simulator'
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   
   // Filters
   const [filterUser, setFilterUser] = useState('');
   const [filterType, setFilterType] = useState('ALL');
-  const [filterDate, setFilterDate] = useState('');
 
-  
   useEffect(() => {
+    if (view !== 'logs') return;
     const fetchLogs = async () => {
       try {
         const q = query(
-          collection(db, 'artifacts', 'nuha-budget-app', 'system_logs'),
+          collection(db, 'artifacts', appId, 'system_logs'),
           orderBy('timestamp', 'desc'),
-          limit(100) // Increased limit to see more history
+          limit(50)
         );
         const snapshot = await getDocs(q);
         setLogs(snapshot.docs.map(doc => ({
             id: doc.id, 
             ...doc.data(), 
-            // Store raw date for sorting/filtering, formatted for display
-            dateObj: doc.data().timestamp?.toDate(),
             timestamp: doc.data().timestamp?.toDate().toLocaleString()
         })));
-      } catch (e) {
-        console.error("Admin Log Error:", e);
-      } finally {
-        setLoading(false);
-      }
+      } catch (e) { console.error(e); } finally { setLoading(false); }
     };
     fetchLogs();
-  }, []);
+  }, [view]);
 
   // Filter Logic
   const filteredLogs = logs.filter(log => {
     const matchUser = log.userEmail?.toLowerCase().includes(filterUser.toLowerCase());
     const matchType = filterType === 'ALL' || log.type === filterType;
-    const matchDate = filterDate ? log.timestamp.includes(filterDate) : true;
-    return matchUser && matchType && matchDate;
+    return matchUser && matchType;
   });
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 p-4 md:p-6 font-mono">
       <div className="max-w-6xl mx-auto space-y-6">
         
-        {/* Header & Actions */}
+        {/* Header & Tabs */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
           <div className="flex items-center gap-3">
             <div className="bg-emerald-500/20 p-2 rounded-lg text-emerald-400">
@@ -2796,128 +2843,78 @@ const AdminDashboard = ({ user, onExitAdmin }) => {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white tracking-tight">System Admin</h1>
-              <p className="text-xs text-slate-500">Monitoring {filteredLogs.length} events</p>
+              <div className="flex gap-4 text-xs font-bold uppercase tracking-wider mt-1">
+                 <button onClick={() => setView('logs')} className={view === 'logs' ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}>System Logs</button>
+                 <button onClick={() => setView('simulator')} className={view === 'simulator' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}>Test Lab</button>
+              </div>
             </div>
           </div>
-          <button 
-            onClick={onExitAdmin} 
-            className="w-full md:w-auto px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold transition flex items-center justify-center gap-2"
-          >
-            <LogOut className="w-4 h-4" /> Exit Dashboard
+          <button onClick={onExitAdmin} className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold transition flex items-center gap-2">
+            <LogOut className="w-4 h-4" /> Exit
           </button>
         </div>
 
-        {/* Filters Bar */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-           <div>
-             <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Search User</label>
-             <div className="relative">
-               <input 
-                 type="text" 
-                 placeholder="e.g. yaseen..." 
-                 value={filterUser}
-                 onChange={(e) => setFilterUser(e.target.value)}
-                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-               />
-               <Search className="absolute right-3 top-2.5 w-4 h-4 text-slate-500" />
-             </div>
-           </div>
-           
-           <div>
-             <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Action Type</label>
-             <select 
-               value={filterType}
-               onChange={(e) => setFilterType(e.target.value)}
-               className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-emerald-500 outline-none"
-             >
-               <option value="ALL">All Actions</option>
-               <option value="login">Logins</option>
-               <option value="action">User Actions (Salary/Exp)</option>
-               <option value="config">Settings Updates</option>
-             </select>
-           </div>
-
-           <div>
-             <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Filter Date</label>
-             <input 
-                 type="text" 
-                 placeholder="e.g. 23/12/2025" 
-                 value={filterDate}
-                 onChange={(e) => setFilterDate(e.target.value)}
-                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-emerald-500 outline-none"
-               />
-           </div>
-        </div>
-
-        {/* Data Display */}
-        <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
-          {loading ? (
-            <div className="p-12 text-center">
-               <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-               <p className="text-slate-500 animate-pulse">Syncing logs...</p>
-            </div>
-          ) : (
-            <>
-              {/* Desktop Table */}
-              <div className="hidden md:block overflow-x-auto">
+        {/* VIEW: LOGS */}
+        {view === 'logs' && (
+           <div className="space-y-4 animate-in fade-in">
+              {/* Filters */}
+              <div className="grid grid-cols-2 gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+                <div>
+                   <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Search User</label>
+                   <input type="text" placeholder="e.g. yaseen..." value={filterUser} onChange={(e) => setFilterUser(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-white" />
+                </div>
+                <div>
+                   <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Action Type</label>
+                   <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-white">
+                     <option value="ALL">All Actions</option>
+                     <option value="login">Logins</option>
+                     <option value="action">User Actions</option>
+                     <option value="config">Settings Updates</option>
+                   </select>
+                </div>
+              </div>
+              {/* Log Table */}
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider font-bold">
-                    <tr>
-                      <th className="p-4 w-48">Timestamp</th>
-                      <th className="p-4 w-64">User</th>
-                      <th className="p-4 w-32">Type</th>
-                      <th className="p-4">Details</th>
-                    </tr>
+                  <thead className="bg-slate-950 text-slate-400 uppercase font-bold">
+                    <tr><th className="p-4">Time</th><th className="p-4">User</th><th className="p-4">Type</th><th className="p-4">Action</th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
                     {filteredLogs.map(log => (
-                      <tr key={log.id} className="hover:bg-white/5 transition group">
-                        <td className="p-4 text-slate-500 font-mono">{log.timestamp}</td>
+                      <tr key={log.id} className="hover:bg-white/5">
+                        <td className="p-4 text-slate-500">{log.timestamp}</td>
                         <td className="p-4 font-bold text-indigo-300">{log.userEmail}</td>
-                        <td className="p-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide
-                            ${log.type === 'login' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 
-                              log.type === 'config' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 
-                              'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}>
-                            {log.type}
-                          </span>
-                        </td>
-                        <td className="p-4 text-slate-300 group-hover:text-white transition">{log.action}</td>
+                        <td className="p-4">{log.type}</td>
+                        <td className="p-4 text-slate-300">{log.action}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+           </div>
+        )}
 
-              {/* Mobile Cards (Visible only on small screens) */}
-              <div className="md:hidden divide-y divide-slate-800">
-                {filteredLogs.map(log => (
-                  <div key={log.id} className="p-4 space-y-2">
-                    <div className="flex justify-between items-start">
-                       <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide
-                            ${log.type === 'login' ? 'bg-emerald-500/10 text-emerald-400' : 
-                              log.type === 'config' ? 'bg-purple-500/10 text-purple-400' : 
-                              'bg-blue-500/10 text-blue-400'}`}>
-                            {log.type}
-                       </span>
-                       <span className="text-[10px] text-slate-500 font-mono">{log.timestamp}</span>
+        {/* VIEW: SIMULATOR */}
+        {view === 'simulator' && (
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-right-4">
+              {Object.entries(DEMO_SCENARIOS).map(([key, scenario]) => (
+                 <button 
+                   key={key}
+                   onClick={() => onSelectDemo(key)}
+                   className="bg-slate-900 border border-slate-800 hover:border-indigo-500 hover:bg-slate-800 p-6 rounded-2xl text-left transition group relative overflow-hidden"
+                 >
+                    <div className="relative z-10">
+                       <h3 className="font-bold text-white text-lg mb-1 group-hover:text-indigo-400 transition">{scenario.label}</h3>
+                       <p className="text-sm text-slate-400">{scenario.description}</p>
                     </div>
-                    <div className="text-sm text-slate-200 font-medium">{log.action}</div>
-                    <div className="text-xs text-indigo-400 flex items-center gap-1">
-                      <User className="w-3 h-3" /> {log.userEmail}
+                    <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition transform translate-x-4 group-hover:translate-x-0">
+                       <ArrowRight className="w-6 h-6 text-indigo-500" />
                     </div>
-                  </div>
-                ))}
-              </div>
-              
-              {filteredLogs.length === 0 && (
-                <div className="p-12 text-center text-slate-500">
-                  <p>No logs match your filters.</p>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+                 </button>
+              ))}
+           </div>
+        )}
+
       </div>
     </div>
   );
@@ -2939,6 +2936,9 @@ export default function App() {
   const [tutorialStep, setTutorialStep] = useState(0);
 
   const [isLegacyUser, setIsLegacyUser] = useState(false);
+
+  // --- ADMIN DEMO STATE ---
+  const [activeDemoId, setActiveDemoId] = useState(null);
 
   const isMobile = window.innerWidth < 768;
 
@@ -3167,19 +3167,36 @@ export default function App() {
   const [highlightedSlice, setHighlightedSlice] = useState(null); // 'expenses' or pot ID
 
   // Derived state variables
-  const displaySalary = isSandbox ? sandboxSalary : salary;
+  // --- DATA SOURCE LOGIC (Real vs Sandbox vs Admin Demo) ---
   
-  // --- TUTORIAL DATA SWITCH LOGIC ---
-  // If a tutorial is active, we OVERRIDE the data with short, generic lists.
-  // This ensures the screen isn't cluttered and the tutorial box fits perfectly.
-  const isTutorialMode = activeTutorial !== null;
+  // 1. Get the Mock Data if in Admin Demo Mode
+  const demoData = activeDemoId ? DEMO_SCENARIOS[activeDemoId].overrides : null;
 
-  const displayExpenses = isTutorialMode 
-      ? TUTORIAL_EXPENSES 
-      : (isSandbox ? sandboxExpenses : expenses);
+  // 2. Determine "Effective" Data
+  // If Demo: Use Demo Data. If Sandbox: Use Sandbox Data. Else: Use Real DB Data.
+  const effectiveSalary = demoData?.salary !== undefined ? demoData.salary : (isSandbox ? sandboxSalary : salary);
+  
+  const effectiveExpenses = demoData?.expenses !== undefined ? demoData.expenses : (
+     isTutorialMode ? TUTORIAL_EXPENSES : (isSandbox ? sandboxExpenses : expenses)
+  );
 
-  // LOGIC: Use the month's locked rules if they exist, otherwise use global settings
-  const activeRules = monthAllocations || userSettings.allocationRules;
+  const effectiveActuals = demoData?.actualSavings !== undefined ? demoData.actualSavings : (
+     isTutorialMode ? { t1: 400, t2: 240 } : (isSandbox ? sandboxActualSavings : actualSavings)
+  );
+
+  // 3. Settings & Onboarding Overrides
+  const effectiveSettings = demoData?.userSettings || (
+     isTutorialMode ? { ...userSettings, allocationRules: displayAllocations, defaultFixedExpenses: displayDefaultExpenses } : userSettings
+  );
+
+  const effectiveOnboardingComplete = demoData?.onboardingComplete !== undefined ? demoData.onboardingComplete : onboardingComplete;
+  
+  // 4. Legacy Check Logic (Must check the EFFECTIVE settings, not real ones)
+  const isEffectiveLegacyUser = !effectiveSettings.bankDetails || !effectiveSettings.payDay;
+
+  // 5. Allocations (Pots)
+  const activeRules = monthAllocations || effectiveSettings.allocationRules;
+  const effectiveAllocations = isTutorialMode ? TUTORIAL_POTS : activeRules;
 
   const displayAllocations = isTutorialMode 
       ? TUTORIAL_POTS 
@@ -3391,7 +3408,7 @@ export default function App() {
   };
 
   const saveData = async (newSalary, newExpenses, newActuals) => {
-    if (!user || isSandbox) return; // Block saving in Sandbox mode
+    if (!user || isSandbox || activeDemoId) return; // <--- ADD activeDemoId HERE
     const monthId = getMonthId(currentDate);
     const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgetData', monthId);
     
@@ -3410,7 +3427,7 @@ export default function App() {
   };
 
   const saveSettings = async (newSettings) => {
-    if (!user) return;
+    if (!user || activeDemoId) return; // <--- ADD activeDemoId HERE
     triggerHaptic(); // Haptic
     logSystemEvent('Settings & Pots Configuration Saved', 'config');
     const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
@@ -3595,69 +3612,39 @@ export default function App() {
       showToast("Entered Sandbox Mode.");
   };
 
-  const totalExpenses = displayExpenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-  const salaryNum = parseFloat(displaySalary) || 0;
+  // --- UPDATED MATH USING EFFECTIVE DATA ---
+  const totalExpenses = effectiveExpenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+  const salaryNum = parseFloat(effectiveSalary) || 0;
   const remainder = Math.max(0, salaryNum - totalExpenses);
 
-  // --- UPDATED LOGIC START ---
-  
   // 1. Calculate Target for Current Account
-  const allocatedPercent = userSettings.allocationRules.reduce((sum, p) => sum + p.percentage, 0);
+  // Note: We use effectiveSettings here
+  const allocatedPercent = effectiveSettings.allocationRules.reduce((sum, p) => sum + p.percentage, 0);
   const currentAccountPercent = Math.max(0, 100 - allocatedPercent);
   const currentAccountTarget = remainder * (currentAccountPercent / 100);
 
   // 2. Calculate ACTUAL Current Account
-  const totalDepositedToPots = Object.values(displayActualSavings).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+  // Note: We use effectiveActuals here
+  const totalDepositedToPots = Object.values(effectiveActuals).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
   const currentAccountActual = Math.max(0, remainder - totalDepositedToPots);
   
-  // 3. Calculate Days Until Next Payday
-  const calculatePaydayLogic = (payDayStr, salaryInputted) => {
-      const today = new Date();
-      // Reset time to midnight to ensure clean day calculations
-      today.setHours(0,0,0,0);
-      
-      const currentDay = today.getDate();
-      const payDay = parseInt(payDayStr) || 1; 
-      
-      // Start with Payday of THIS month
-      let targetDate = new Date(today.getFullYear(), today.getMonth(), payDay);
-      targetDate.setHours(0,0,0,0);
-
-      const hasSalary = salaryInputted && parseFloat(salaryInputted) > 0;
-
-      // LOGIC:
-      // If Today >= Payday: We passed it. Next one is Next Month.
-      // If Today < Payday AND We have Salary: We are currently IN the cycle, so the money needs to last until the NEXT NEXT Payday.
-      
-      if (currentDay >= payDay) {
-         targetDate.setMonth(targetDate.getMonth() + 1);
-      } else if (hasSalary) {
-         targetDate.setMonth(targetDate.getMonth() + 1);
-      }
-      
-      const diffTime = targetDate - today;
-      const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      return { days, targetDate };
-  };
-
-  const { days: daysUntilPayday, targetDate: targetPaydayDate } = calculatePaydayLogic(userSettings.payDay, displaySalary);
+  // 3. Payday Logic
+  // Note: We pass effectiveSettings.payDay and effectiveSalary
+  const { days: daysUntilPayday, targetDate: targetPaydayDate } = calculatePaydayLogic(effectiveSettings.payDay, effectiveSalary);
   
   // 4. Daily Pace
   const rawPace = daysUntilPayday > 0 ? (currentAccountActual / daysUntilPayday) : 0;
   const dailyAllowance = parseFloat(rawPace.toFixed(2));
-  
   const daysLeftLabel = `Next Payday`;
-  // --- UPDATED LOGIC END ---
 
-  // Count how many plans have an actual value entered
-  const filledPlansCount = userSettings.allocationRules.filter(plan => {
-      const val = displayActualSavings[plan.id];
+  // Count filled plans using effectiveSettings & effectiveActuals
+  const filledPlansCount = effectiveSettings.allocationRules.filter(plan => {
+      const val = effectiveActuals[plan.id];
       return val !== undefined && val !== '';
   }).length;
 
-  // Filter and Group Expenses
-  let filteredExpenses = displayExpenses.filter(e => 
+  // Filter Expenses using effectiveExpenses
+  let filteredExpenses = effectiveExpenses.filter(e => 
     e.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
@@ -3689,13 +3676,18 @@ export default function App() {
   if (loading) return <DashboardSkeleton />;
   if (!user) return <LoginScreen onLogin={handleLogin} />;
 
-  // --- PASTE HERE: ADMIN RENDER CHECK ---
+  // --- ADMIN RENDER CHECK ---
   if (user && isAdminMode && user.email === "yaseen.hussain2001@gmail.com") {
     return (
       <AdminDashboard 
         user={user} 
-        onLogout={handleLogout} 
         onExitAdmin={() => setIsAdminMode(false)} 
+        // Pass the selector function
+        onSelectDemo={(id) => {
+           setActiveDemoId(id);
+           setIsAdminMode(false);
+           showToast(`Entered Test State: ${DEMO_SCENARIOS[id].label}`);
+        }}
       />
     );
   }
@@ -3740,6 +3732,19 @@ export default function App() {
         </div>
       )}
 
+      {/* Admin Demo Banner */}
+      {activeDemoId && (
+        <div className="bg-slate-900 text-white px-4 py-3 text-center text-sm font-bold sticky top-0 z-50 shadow-md flex justify-between items-center animate-in slide-in-from-top-full border-b border-white/10">
+            <span className="flex items-center gap-2 text-indigo-300">
+               <Shield className="w-4 h-4" /> 
+               Test Lab: {DEMO_SCENARIOS[activeDemoId].label}
+            </span>
+            <button onClick={() => setActiveDemoId(null)} className="bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-xs transition">
+               Exit Test
+            </button>
+        </div>
+      )}
+
       {/* Floating Action Button (FAB) */}
       <button 
         id="fab-add-expense"
@@ -3781,7 +3786,7 @@ export default function App() {
              setShowHelp(true);
           }}
           // --- ADD THIS LINE ---
-          isLegacyMode={isLegacyUser}
+          isLegacyMode={isEffectiveLegacyUser} // <--- CHANGED
           // --------------------
         />
       )}
@@ -3816,7 +3821,7 @@ export default function App() {
         />
       )}
       
-      {!loading && !onboardingComplete && user && (
+      {!loading && !effectiveOnboardingComplete && user && ( // <--- CHANGED
         <OnboardingWizard 
           user={user}
           onComplete={async (newSettings) => {
@@ -3833,8 +3838,8 @@ export default function App() {
         <AnalyticsDashboard 
           user={user} 
           onClose={() => setShowAnalytics(false)}
-          currency={userSettings.currency}
-          allocationRules={userSettings.allocationRules}
+          currency={effectiveSettings.currency} // <--- CHANGED
+          allocationRules={effectiveSettings.allocationRules} // <--- CHANGED
         />
       )}
 
@@ -3848,21 +3853,21 @@ export default function App() {
       {activeReport === 'month' && (
         <MonthReportView 
           date={currentDate}
-          salary={salary}
-          expenses={expenses}
-          allocations={userSettings.allocationRules}
-          actuals={actualSavings}
+          salary={effectiveSalary} // <--- CHANGED
+          expenses={effectiveExpenses} // <--- CHANGED
+          allocations={effectiveSettings.allocationRules} // <--- CHANGED
+          actuals={effectiveActuals} // <--- CHANGED
           onClose={() => setActiveReport(null)}
-          currency={userSettings.currency}
+          currency={effectiveSettings.currency} // <--- CHANGED
         />
       )}
 
       {activeReport === 'history' && (
         <HistoryReportView 
           data={reportData}
-          allocations={userSettings.allocationRules}
+          allocations={effectiveSettings.allocationRules} // <--- CHANGED
           onClose={() => setActiveReport(null)}
-          currency={userSettings.currency}
+          currency={effectiveSettings.currency} // <--- CHANGED
         />
       )}
 
@@ -3877,7 +3882,8 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-white leading-tight">
-                {userSettings.displayName || (user.displayName ? user.displayName.split(' ')[0] : 'Guest')}
+                {/* CHANGED: effectiveSettings.displayName */}
+                {effectiveSettings.displayName || (user.displayName ? user.displayName.split(' ')[0] : 'Guest')}
               </h1>
               <p className={`text-xs font-bold tracking-wide uppercase opacity-80 ${isSandbox ? 'text-indigo-200' : 'text-emerald-200'}`}>
                 {isSandbox ? 'Simulation Mode' : 'Wealth Planner'}
@@ -4013,11 +4019,12 @@ export default function App() {
                  
                  <div className="relative">
                     <span className="absolute left-0 top-1/2 -translate-y-1/2 text-3xl font-medium text-slate-300">
-                        {userSettings.currency === 'GBP' ? '£' : userSettings.currency === 'USD' ? '$' : '€'}
+                        {/* CHANGED: effectiveSettings.currency */}
+                        {effectiveSettings.currency === 'GBP' ? '£' : effectiveSettings.currency === 'USD' ? '$' : '€'}
                     </span>
                     <input 
                       type="text" 
-                      value={displaySalary}
+                      value={effectiveSalary} // <--- CHANGED
                       onChange={(e) => updateSalary(e.target.value)}
                       onBlur={(e) => {
                         const finalVal = safeCalculate(e.target.value);
@@ -4038,15 +4045,15 @@ export default function App() {
 
                {/* Right: The Wheel */}
                <div className="w-full md:w-1/2 flex justify-center scale-110">
-                 {parseFloat(displaySalary) > 0 ? (
+                 {parseFloat(effectiveSalary) > 0 ? ( // <--- CHANGED
                     <BudgetWheel 
-                      salary={displaySalary} 
-                      expenses={displayExpenses} 
-                      allocations={displayAllocations}
-                      currency={userSettings.currency}
+                      salary={effectiveSalary} // <--- CHANGED
+                      expenses={effectiveExpenses} // <--- CHANGED
+                      allocations={effectiveAllocations} // <--- CHANGED
+                      currency={effectiveSettings.currency} // <--- CHANGED
                       activeSlice={highlightedSlice}
                       onSliceClick={setHighlightedSlice}
-                      bankColor={userSettings.bankDetails?.color}
+                      bankColor={effectiveSettings.bankDetails?.color} // <--- CHANGED
                     />
                  ) : (
                    <div className="h-48 flex items-center justify-center text-slate-300 font-bold border-2 border-dashed border-slate-100 rounded-full w-48 aspect-square">
@@ -4073,7 +4080,8 @@ export default function App() {
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Bills</span>
                     </div>
                     <span className="text-xl md:text-2xl font-black text-slate-800 tracking-tight block">
-                      -{formatCurrency(totalExpenses, userSettings.currency)}
+                      {/* CHANGED: effectiveSettings.currency */}
+                      -{formatCurrency(totalExpenses, effectiveSettings.currency)}
                     </span>
                   </div>
 
@@ -4084,7 +4092,8 @@ export default function App() {
                       <div className="p-1.5 bg-emerald-100 text-emerald-600 rounded-lg"><TrendingUp className="w-3 h-3" /></div>
                     </div>
                     <span className="text-xl md:text-2xl font-black text-emerald-500 tracking-tight block">
-                      {formatCurrency(salaryNum - totalExpenses, userSettings.currency)}
+                      {/* CHANGED: effectiveSettings.currency */}
+                      {formatCurrency(salaryNum - totalExpenses, effectiveSettings.currency)}
                     </span>
                   </div>
                 </div>
@@ -4198,9 +4207,10 @@ export default function App() {
                      style={{ backgroundColor: userSettings.bankDetails?.color || '#1e293b' }}
                   >
                      {/* Background Decoration */}
-                     {userSettings.bankDetails?.logo && (
+                     {/* CHANGED: effectiveSettings.bankDetails */}
+                     {effectiveSettings.bankDetails?.logo && (
                         <div className="absolute -right-8 -bottom-8 opacity-10 rotate-12 group-hover:rotate-6 group-hover:scale-110 transition duration-700">
-                           <img src={userSettings.bankDetails.logo} className="w-56 h-56 object-contain invert" />
+                           <img src={effectiveSettings.bankDetails.logo} className="w-56 h-56 object-contain invert" />
                         </div>
                      )}
 
@@ -4208,14 +4218,15 @@ export default function App() {
                         {/* Left: Identity */}
                         <div className="flex items-center gap-4 w-full md:w-auto">
                            <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md shadow-inner border border-white/10 shrink-0">
-                              {userSettings.bankDetails?.logo ? (
-                                 <img src={userSettings.bankDetails.logo} className="w-8 h-8 object-contain rounded-full bg-white p-0.5" />
+                              {/* CHANGED: effectiveSettings.bankDetails */}
+                              {effectiveSettings.bankDetails?.logo ? (
+                                 <img src={effectiveSettings.bankDetails.logo} className="w-8 h-8 object-contain rounded-full bg-white p-0.5" />
                               ) : (
                                  <Wallet className="w-8 h-8 text-white" />
                               )}
                            </div>
                            <div>
-                              <h3 className="text-xl font-bold leading-tight">Keep in {userSettings.bankDetails?.name || 'Current Account'}</h3>
+                              <h3 className="text-xl font-bold leading-tight">Keep in {effectiveSettings.bankDetails?.name || 'Current Account'}</h3>
                               <div className="flex items-center gap-2 text-sm font-medium opacity-70">
                                  <span>Do not transfer</span>
                                  <span className="w-1 h-1 bg-white rounded-full"></span>
@@ -4228,12 +4239,12 @@ export default function App() {
                         <div className="flex items-center gap-2 md:gap-6 w-full md:w-auto justify-between md:justify-end">
                            <div className="opacity-80 text-right">
                               <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5">Target</p>
-                              <p className="text-xl font-bold">{formatCurrency(currentAccountTarget, userSettings.currency)}</p>
+                              <p className="text-xl font-bold">{formatCurrency(currentAccountTarget, effectiveSettings.currency)}</p>
                            </div>
                            <div className="w-px h-10 bg-white/20"></div>
                            <div className="bg-black/20 px-5 py-3 rounded-2xl border border-white/5 backdrop-blur-sm shadow-lg text-right">
                               <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1 text-emerald-200">Actual</p>
-                              <p className="text-3xl font-black tracking-tight text-white">{formatCurrency(currentAccountActual, userSettings.currency)}</p>
+                              <p className="text-3xl font-black tracking-tight text-white">{formatCurrency(currentAccountActual, effectiveSettings.currency)}</p>
                            </div>
                         </div>
                      </div>
@@ -4242,7 +4253,7 @@ export default function App() {
 
                 {/* B. REGULAR SAVINGS POTS */}
                 {/* Logic: Filter the list based on highlightedSlice */}
-                {displayAllocations
+                {effectiveAllocations
                   .filter(plan => !highlightedSlice || highlightedSlice === plan.id)
                   .map(plan => {
                     const target = remainder * (plan.percentage / 100);
@@ -4253,10 +4264,10 @@ export default function App() {
                         <AllocationCard 
                           title={plan.name} 
                           targetAmount={target}
-                          actualAmount={displayActualSavings[plan.id]}
+                          actualAmount={effectiveActuals[plan.id]}
                           percentage={plan.percentage}
                           hexColor={plan.hex || '#10b981'} 
-                          currency={userSettings.currency}
+                          currency={effectiveSettings.currency}
                           onUpdateActual={(val) => updateActualSavings(plan.id, val)}
                           showRemainderButton={isLastToFill}
                           onFillRemainder={() => fillRemainder(plan.id)}
@@ -4266,7 +4277,7 @@ export default function App() {
                 })}
 
                 {/* C. EMPTY STATE BUTTON (If no pots exist) */}
-                {displayAllocations.length === 0 && (
+                {effectiveAllocations.length === 0 && (
                    <button 
                      onClick={() => setShowSettings(true)}
                      className="col-span-1 sm:col-span-2 min-h-[160px] flex flex-col items-center justify-center gap-3 rounded-[2.5rem] border-2 border-dashed border-slate-200 text-slate-400 hover:border-indigo-300 hover:bg-indigo-50/50 hover:text-indigo-500 transition-all group bg-slate-50/50"
@@ -4390,7 +4401,7 @@ export default function App() {
                                   Set Amount <Edit2 className="w-3 h-3" />
                                 </span>
                               ) : (
-                                <span className="font-bold text-lg">{formatCurrency(expense.amount, userSettings.currency)}</span>
+                                <span className="font-bold text-lg">{formatCurrency(expense.amount, effectiveSettings.currency)}</span>
                               )}
                             </button>
                           )}
@@ -4435,7 +4446,7 @@ export default function App() {
            {/* Footer Summary */}
            <div className="p-6 bg-slate-50/50 text-right border-t border-slate-100">
              <span className="text-sm font-medium text-slate-500 mr-3">Total Outgoings:</span>
-             <span className="text-xl font-bold text-slate-800 tracking-tight">{formatCurrency(totalExpenses, userSettings.currency)}</span>
+             <span className="text-xl font-bold text-slate-800 tracking-tight">{formatCurrency(totalExpenses, effectiveSettings.currency)}</span>
           </div>
         </div>
         
