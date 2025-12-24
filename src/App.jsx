@@ -905,29 +905,38 @@ const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, ac
   });
   
   // 3. Remainder Slice (Current Account)
-  // Use the passed bankColor, or fallback to Slate if none exists
-  const remainderColor = bankColor || '#f1f5f9';
+  const remainderColor = bankColor || '#64748b'; // Default to Slate if no bank color
+  const isCurrentAccountActive = activeSlice === 'current_account';
   
   if (currentDegree < 360) {
-      // If a slice is active, remainder is transparent. Otherwise, use Bank Color.
-      segments.push(`${activeSlice ? 'transparent' : remainderColor} ${currentDegree}deg 360deg`);
+      // Logic: If ANY slice is active, this one goes transparent UNLESS it is the active one.
+      const remainderSegmentColor = activeSlice ? (isCurrentAccountActive ? remainderColor : 'transparent') : remainderColor;
+      segments.push(`${remainderSegmentColor} ${currentDegree}deg 360deg`);
   }
   
   const conic = `conic-gradient(${segments.join(', ')})`;
   const finalBackground = activeSlice ? `${conic}, ${crossPattern}` : conic;
 
-  // ... (Rest of the label logic remains the same) ...
+  // Labels
   let centerLabel = "Net Salary";
   let centerAmount = formatCurrency(salaryNum, currency);
   
   if (activeSlice === 'expenses') {
       centerLabel = "Total Expenses";
       centerAmount = formatCurrency(totalExpenses, currency);
+  } else if (activeSlice === 'current_account') {
+      centerLabel = "Current Account";
+      // Calculate Remainder (Salary - Expenses)
+      const remainder = salaryNum - totalExpenses;
+      // Subtract allocated pots from remainder to get "True" Current Account value
+      const allocatedAmount = allocations.reduce((sum, p) => sum + (remainder * (p.percentage / 100)), 0);
+      centerAmount = formatCurrency(remainder - allocatedAmount, currency);
   } else if (activeSlice) {
       const plan = allocations.find(p => p.id === activeSlice);
       if (plan) {
           centerLabel = plan.name;
-          const amount = (parseFloat(salary) - totalExpenses) * (plan.percentage / 100);
+          const remainder = salaryNum - totalExpenses;
+          const amount = remainder * (plan.percentage / 100);
           centerAmount = formatCurrency(amount, currency);
       }
   }
@@ -954,7 +963,7 @@ const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, ac
       </div>
       
       <div className="flex flex-wrap justify-center gap-2 mt-8 w-full">
-        {/* Buttons remain the same... */}
+        {/* Expenses Button */}
         <button 
             onClick={() => onSliceClick(activeSlice === 'expenses' ? null : 'expenses')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-200
@@ -966,6 +975,19 @@ const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, ac
           <span className={`text-xs font-bold ${activeSlice === 'expenses' ? 'text-rose-700' : 'text-slate-600'}`}>Expenses</span>
         </button>
 
+        {/* Current Account Button (NEW) */}
+        <button 
+            onClick={() => onSliceClick(activeSlice === 'current_account' ? null : 'current_account')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-200
+                ${activeSlice === 'current_account' 
+                    ? 'bg-slate-100 border-slate-300 ring-2 ring-slate-200 scale-105 shadow-sm' 
+                    : activeSlice ? 'opacity-40 grayscale border-transparent' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}
+        >
+          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: remainderColor }}></div>
+          <span className={`text-xs font-bold ${activeSlice === 'current_account' ? 'text-slate-800' : 'text-slate-600'}`}>Current Account</span>
+        </button>
+
+        {/* Pot Buttons */}
         {allocations.map(plan => (
             <button 
                 key={plan.id}
@@ -1338,6 +1360,22 @@ const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose
                   </tr>
                 );
               })}
+
+              {/* <--- PASTE THE FIRST SNIPPET HERE ---> */}
+              {/* --- NEW: Current Account Row --- */}
+              <tr className="bg-slate-50 border-t border-slate-100">
+                  <td className="py-2 pl-2 text-slate-800 font-bold">Current Account <span className="text-xs text-slate-400 font-normal">(Remainder)</span></td>
+                  {/* Calculate Target */}
+                  <td className="py-2 text-right font-medium text-slate-500">
+                    {formatCurrency(remainder * (Math.max(0, 100 - allocations.reduce((s,p)=>s+p.percentage,0)) / 100), currency)}
+                  </td>
+                  {/* Calculate Actual */}
+                  <td className="py-2 text-right font-bold text-slate-800">
+                    {formatCurrency(Math.max(0, remainder - Object.values(actuals || {}).reduce((s,v)=>s+(parseFloat(v)||0),0)), currency)}
+                  </td>
+              </tr>
+
+              
               </tbody>
             </table>
              <div className="border-t border-slate-200 pt-3 flex justify-between font-bold text-slate-900 mt-2">
@@ -1403,7 +1441,14 @@ const HistoryReportView = ({ data, allocations, onClose, currency }) => {
                     <td className="py-3 px-2 font-medium text-slate-800">{row.id}</td>
                     <td className="py-3 px-2 text-right font-mono font-bold text-emerald-600">{formatCurrency(salary, currency)}</td>
                     <td className="py-3 px-2 text-right font-mono text-rose-500">{formatCurrency(totalExpenses, currency)}</td>
-                    <td className="py-3 px-2 text-right font-mono font-bold text-slate-900 border-r border-slate-200 pr-4">{formatCurrency(remainder, currency)}</td>
+                    {/* --- NEW: Current Account Actual Logic --- */}
+                    <td className="py-3 px-2 text-right font-mono font-bold text-indigo-600 border-r border-slate-200 pr-4">
+                      {/* Remainder - Sum of all pot actuals */}
+                      {formatCurrency(Math.max(0, remainder - Object.values(actuals).reduce((sum, val) => sum + (parseFloat(val) || 0), 0)), currency)}
+                    </td>
+  
+                    {/* <--- END PASTE ---> */}
+
                     {allocations.map(plan => {
                       const actual = actuals[plan.id] ? parseFloat(actuals[plan.id]) : 0;
                       const target = remainder * (plan.percentage / 100);
@@ -4141,81 +4186,82 @@ export default function App() {
                 </div>
              </div>
 
-             {/* 2. UNIFIED MONEY GRID */}
+             {/* 2. UNIFIED MONEY GRID (With Isolation Logic) */}
              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 
-                {/* A. MASTER CARD: CURRENT ACCOUNT (Replaces the Jar) */}
-                <div 
-                   className="col-span-1 sm:col-span-2 md:col-span-3 relative overflow-hidden rounded-[2.5rem] p-6 text-white shadow-xl transition-transform hover:scale-[1.005] group"
-                   style={{ backgroundColor: userSettings.bankDetails?.color || '#1e293b' }}
-                >
-                   {/* Background Decoration */}
-                   {userSettings.bankDetails?.logo && (
-                      <div className="absolute -right-8 -bottom-8 opacity-10 rotate-12 group-hover:rotate-6 group-hover:scale-110 transition duration-700">
-                         <img src={userSettings.bankDetails.logo} className="w-56 h-56 object-contain invert" />
-                      </div>
-                   )}
+                {/* A. MASTER CARD: CURRENT ACCOUNT */}
+                {/* Logic: Show if NO slice selected OR if 'current_account' is selected. Hide if a Pot or Expenses are selected. */}
+                {(!highlightedSlice || highlightedSlice === 'current_account') && (
+                  <div 
+                     className={`col-span-1 sm:col-span-2 md:col-span-3 relative overflow-hidden rounded-[2.5rem] p-6 text-white shadow-xl transition-all duration-500 group animate-in zoom-in-95
+                        ${highlightedSlice === 'current_account' ? 'ring-4 ring-offset-2 ring-slate-200 scale-[1.02]' : ''}`}
+                     style={{ backgroundColor: userSettings.bankDetails?.color || '#1e293b' }}
+                  >
+                     {/* Background Decoration */}
+                     {userSettings.bankDetails?.logo && (
+                        <div className="absolute -right-8 -bottom-8 opacity-10 rotate-12 group-hover:rotate-6 group-hover:scale-110 transition duration-700">
+                           <img src={userSettings.bankDetails.logo} className="w-56 h-56 object-contain invert" />
+                        </div>
+                     )}
 
-                   <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
-                      
-                      {/* Left: Identity */}
-                      <div className="flex items-center gap-4 w-full md:w-auto">
-                         <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md shadow-inner border border-white/10 shrink-0">
-                            {userSettings.bankDetails?.logo ? (
-                               <img src={userSettings.bankDetails.logo} className="w-8 h-8 object-contain rounded-full bg-white p-0.5" />
-                            ) : (
-                               <Wallet className="w-8 h-8 text-white" />
-                            )}
-                         </div>
-                         <div>
-                            <h3 className="text-xl font-bold leading-tight">Keep in {userSettings.bankDetails?.name || 'Current Account'}</h3>
-                            <div className="flex items-center gap-2 text-sm font-medium opacity-70">
-                               <span>Do not transfer</span>
-                               <span className="w-1 h-1 bg-white rounded-full"></span>
-                               <span>{currentAccountPercent.toFixed(0)}% Allocation</span>
-                            </div>
-                         </div>
-                      </div>
+                     <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                        {/* Left: Identity */}
+                        <div className="flex items-center gap-4 w-full md:w-auto">
+                           <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md shadow-inner border border-white/10 shrink-0">
+                              {userSettings.bankDetails?.logo ? (
+                                 <img src={userSettings.bankDetails.logo} className="w-8 h-8 object-contain rounded-full bg-white p-0.5" />
+                              ) : (
+                                 <Wallet className="w-8 h-8 text-white" />
+                              )}
+                           </div>
+                           <div>
+                              <h3 className="text-xl font-bold leading-tight">Keep in {userSettings.bankDetails?.name || 'Current Account'}</h3>
+                              <div className="flex items-center gap-2 text-sm font-medium opacity-70">
+                                 <span>Do not transfer</span>
+                                 <span className="w-1 h-1 bg-white rounded-full"></span>
+                                 <span>{currentAccountPercent.toFixed(0)}% Allocation</span>
+                              </div>
+                           </div>
+                        </div>
 
-                      {/* Right: Stats (Target vs Actual) */}
-                      <div className="flex items-center gap-2 md:gap-6 w-full md:w-auto justify-between md:justify-end">
-                         
-                         {/* Target (Small) */}
-                         <div className="opacity-80 text-right">
-                            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5">Target</p>
-                            <p className="text-xl font-bold">{formatCurrency(currentAccountTarget, userSettings.currency)}</p>
-                         </div>
-
-                         {/* Divider */}
-                         <div className="w-px h-10 bg-white/20"></div>
-
-                         {/* Actual (Big) */}
-                         <div className="bg-black/20 px-5 py-3 rounded-2xl border border-white/5 backdrop-blur-sm shadow-lg text-right">
-                            <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1 text-emerald-200">Actual Remainder</p>
-                            <p className="text-3xl font-black tracking-tight text-white">{formatCurrency(currentAccountActual, userSettings.currency)}</p>
-                         </div>
-                      </div>
-                   </div>
-                </div>
+                        {/* Right: Stats (Target vs Actual) */}
+                        <div className="flex items-center gap-2 md:gap-6 w-full md:w-auto justify-between md:justify-end">
+                           <div className="opacity-80 text-right">
+                              <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5">Target</p>
+                              <p className="text-xl font-bold">{formatCurrency(currentAccountTarget, userSettings.currency)}</p>
+                           </div>
+                           <div className="w-px h-10 bg-white/20"></div>
+                           <div className="bg-black/20 px-5 py-3 rounded-2xl border border-white/5 backdrop-blur-sm shadow-lg text-right">
+                              <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1 text-emerald-200">Actual</p>
+                              <p className="text-3xl font-black tracking-tight text-white">{formatCurrency(currentAccountActual, userSettings.currency)}</p>
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+                )}
 
                 {/* B. REGULAR SAVINGS POTS */}
-                {displayAllocations.map(plan => {
-                  const target = remainder * (plan.percentage / 100);
-                  const isLastToFill = (displayAllocations.length - filledPlansCount === 1);
-                  
-                  return (
-                    <AllocationCard 
-                      key={plan.id}
-                      title={plan.name} 
-                      targetAmount={target}
-                      actualAmount={displayActualSavings[plan.id]}
-                      percentage={plan.percentage}
-                      hexColor={plan.hex || '#10b981'} 
-                      currency={userSettings.currency}
-                      onUpdateActual={(val) => updateActualSavings(plan.id, val)}
-                      showRemainderButton={isLastToFill}
-                      onFillRemainder={() => fillRemainder(plan.id)}
-                    />
+                {/* Logic: Filter the list based on highlightedSlice */}
+                {displayAllocations
+                  .filter(plan => !highlightedSlice || highlightedSlice === plan.id)
+                  .map(plan => {
+                    const target = remainder * (plan.percentage / 100);
+                    const isLastToFill = (displayAllocations.length - filledPlansCount === 1);
+                    
+                    return (
+                      <div key={plan.id} className="animate-in zoom-in-95 duration-300">
+                        <AllocationCard 
+                          title={plan.name} 
+                          targetAmount={target}
+                          actualAmount={displayActualSavings[plan.id]}
+                          percentage={plan.percentage}
+                          hexColor={plan.hex || '#10b981'} 
+                          currency={userSettings.currency}
+                          onUpdateActual={(val) => updateActualSavings(plan.id, val)}
+                          showRemainderButton={isLastToFill}
+                          onFillRemainder={() => fillRemainder(plan.id)}
+                        />
+                      </div>
                   );
                 })}
 
