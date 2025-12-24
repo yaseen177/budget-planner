@@ -11,7 +11,7 @@ import {
   signInWithCustomToken,
   signInAnonymously,
   setPersistence,           // <--- ADDED
-  browserLocalPersistence
+  browserSessionPersistence
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -3274,8 +3274,8 @@ export default function App() {
 
   const handleLogin = async () => {
     try {
-      // 1. Force persistence (Session = keep me logged in until I close the tab/browser)
-      await setPersistence(auth, browserLocalPersistence);
+      // CHANGED: Session Persistence (Logs out when tab/window is closed)
+      await setPersistence(auth, browserSessionPersistence);
       
       const provider = new GoogleAuthProvider();
       
