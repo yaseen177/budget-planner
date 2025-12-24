@@ -1862,15 +1862,47 @@ const HelpModal = ({ onClose, onStartTutorial }) => {
              </div>
           </div>
 
-           {/* The Jar */}
-           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex gap-4">
-             <div className="bg-emerald-100 p-3 rounded-full h-fit"><AlertCircle className="w-5 h-5 text-emerald-600" /></div>
-             <div>
-                <h4 className="font-bold text-slate-800 text-sm">The Cash Jar</h4>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                   This represents <strong>Unsorted Cash</strong> sitting in your bank right now. It is calculated as: 
-                   <br/><em>(Salary - Expenses - Money you already moved to Pots)</em>.
-                   <br/>Your goal is to empty this jar by transferring money to your real savings accounts.
+           {/* --- NEW: MONEY MAP EXPLANATION WITH DUMMY DASHBOARD --- */}
+           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+             <div className="flex gap-4">
+               <div className="bg-indigo-100 p-3 rounded-full h-fit"><Target className="w-5 h-5 text-indigo-600" /></div>
+               <div>
+                  <h4 className="font-bold text-slate-800 text-sm">The Money Map</h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed mb-3">
+                     Once your bills are deducted, this map shows you exactly where your <strong>remaining money</strong> lives.
+                  </p>
+               </div>
+             </div>
+
+             {/* DUMMY DASHBOARD VISUAL */}
+             <div className="bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300">
+                <p className="text-[10px] font-bold text-slate-400 uppercase mb-2 text-center">How it works</p>
+                <div className="flex flex-col gap-2">
+                   {/* Dummy Current Account Card */}
+                   <div className="bg-slate-800 text-white p-3 rounded-lg shadow-md flex justify-between items-center opacity-90">
+                      <div className="flex items-center gap-2">
+                         <div className="bg-white/20 p-1.5 rounded"><Wallet className="w-3 h-3" /></div>
+                         <div>
+                            <div className="text-[10px] font-bold opacity-70">Current Account</div>
+                            <div className="text-xs font-bold">Safe to Spend</div>
+                         </div>
+                      </div>
+                      <div className="text-right">
+                         <div className="text-xs font-bold">£450.00</div>
+                      </div>
+                   </div>
+                   {/* Dummy Pot Card */}
+                   <div className="bg-white border border-slate-200 p-3 rounded-lg shadow-sm flex justify-between items-center opacity-60">
+                      <div className="flex items-center gap-2">
+                         <div className="bg-emerald-100 text-emerald-600 p-1.5 rounded"><Target className="w-3 h-3" /></div>
+                         <div className="text-[10px] font-bold text-slate-600">Savings Pot</div>
+                      </div>
+                      <div className="text-xs font-bold text-slate-400">£200.00</div>
+                   </div>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-3 text-center leading-relaxed">
+                   The dark card is your <strong>Safe-to-Spend</strong> daily money. The light cards are your Pots. 
+                   Move money physically in your bank, then update the Pots here to match.
                 </p>
              </div>
           </div>
@@ -2849,6 +2881,7 @@ export default function App() {
   
   // UI State
   const [showSettings, setShowSettings] = useState(false);
+  const [showMoneyMapTooltip, setShowMoneyMapTooltip] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showReportSelector, setShowReportSelector] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(true);
@@ -4058,10 +4091,47 @@ export default function App() {
         {salaryNum > 0 && (
           <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-200/60 mb-6 animate-in slide-in-from-bottom-4">
              
-             {/* 1. Header Row */}
-             <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-amber-100 text-amber-600 rounded-xl"><Target className="w-4 h-4" /></div>
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Your Money Map</h3>
+             {/* 1. Header Row (Updated with Help) */}
+             <div className="flex items-center justify-between mb-6 relative z-30">
+                <div className="flex items-center gap-3">
+                   <div className="p-2 bg-amber-100 text-amber-600 rounded-xl"><Target className="w-4 h-4" /></div>
+                   <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Your Money Map</h3>
+                </div>
+                
+                {/* Help Icon Wrapper */}
+                <div className="relative">
+                   <button 
+                     onClick={() => setShowMoneyMapTooltip(!showMoneyMapTooltip)}
+                     className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-indigo-500 transition"
+                   >
+                     <HelpCircle className="w-5 h-5" />
+                   </button>
+
+                   {/* The Tooltip Popup */}
+                   {showMoneyMapTooltip && (
+                      <>
+                        <div className="fixed inset-0 z-40 cursor-default" onClick={() => setShowMoneyMapTooltip(false)}></div>
+                        <div className="absolute right-0 top-full mt-2 w-64 bg-slate-800 text-white text-xs rounded-2xl p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 origin-top-right">
+                           <div className="absolute -top-1.5 right-3 w-3 h-3 bg-slate-800 rotate-45"></div>
+                           
+                           <h4 className="font-bold text-sm mb-2 text-white">What is this?</h4>
+                           <p className="text-slate-300 leading-relaxed mb-3">
+                              This map lets you decide what to do with your remaining money once bills are paid.
+                           </p>
+                           
+                           <button 
+                             onClick={() => {
+                               setShowMoneyMapTooltip(false);
+                               setShowHelp(true); // Open the main Help Modal
+                             }}
+                             className="w-full bg-white text-slate-900 py-2 rounded-lg font-bold hover:bg-indigo-50 transition"
+                           >
+                             Learn More
+                           </button>
+                        </div>
+                      </>
+                   )}
+                </div>
              </div>
 
              {/* 2. UNIFIED MONEY GRID */}
