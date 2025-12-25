@@ -248,6 +248,57 @@ const VacuumItem = ({ children, onRemove, className = '' }) => {
     </div>
   );
 };
+
+// HELPER 5: MORPH BUTTON (The Success Morph)
+const MorphButton = ({ children, onClick, className = '', ...props }) => {
+  const [status, setStatus] = useState('idle'); // idle, loading, success
+
+  const handleClick = async (e) => {
+     if (status !== 'idle') return;
+     
+     // 1. Start Loading (Visual feedback)
+     setStatus('loading');
+     
+     // 2. Artificial processing wait (600ms) to give it "weight"
+     await new Promise(r => setTimeout(r, 600));
+     
+     // 3. Show Success State
+     setStatus('success');
+     if (window.navigator.vibrate) window.navigator.vibrate([50, 50, 50]);
+
+     // 4. Wait for user to admire the checkmark (700ms), THEN fire the actual action
+     setTimeout(() => {
+        onClick(e); // This executes the save & close logic
+        // Reset after action is done (in case component doesn't unmount)
+        setTimeout(() => setStatus('idle'), 500);
+     }, 700);
+  };
+
+  return (
+    <button 
+       onClick={handleClick}
+       disabled={status !== 'idle'}
+       className={`relative transition-all duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center justify-center overflow-hidden shadow-xl ${status === 'idle' ? className : 'w-14 rounded-full bg-emerald-500 text-white border-transparent'}`}
+       style={{ minHeight: '56px' }} // Keeps height consistent during morph
+       {...props}
+    >
+       {/* Original Button Text */}
+       <div className={`absolute w-full transition-all duration-300 transform ${status === 'idle' ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-12 scale-50'}`}>
+          {children}
+       </div>
+
+       {/* Loading Spinner (CSS only, no new imports needed) */}
+       <div className={`absolute transition-all duration-300 transform ${status === 'loading' ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}>
+          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+       </div>
+
+       {/* Success Checkmark */}
+       <div className={`absolute transition-all duration-300 delay-100 transform ${status === 'success' ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}>
+          <Check className="w-6 h-6 stroke-[4] text-white" />
+       </div>
+    </button>
+  );
+};
 // --- JUICE ENHANCEMENTS END ---
 
 // --- FIREBASE CONFIGURATION AREA ---
@@ -976,7 +1027,7 @@ const Toast = ({ message, onClose }) => (
   </div>
 );
 
-// --- ADD EXPENSE MODAL ---
+// --- ADD EXPENSE MODAL (WITH JUICE MORPH BUTTON) ---
 const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
@@ -984,19 +1035,16 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  // We keep this just in case, but we prevent default so the button handles the logic
+  const handleFormSubmit = (e) => {
     e.preventDefault();
-    if (!name || !amount) return;
-    onSave(name, safeCalculate(amount), logo);
-    setName('');
-    setAmount('');
-    setLogo(null);
   };
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4 animate-in fade-in">
-      {/* 1. ADD ID HERE: Used for 'The Form' step */}
       <div id="modal-add-expense" className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-spring duration-200">
+        
+        {/* Header */}
         <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
           <h3 className="font-bold text-lg text-slate-800">New Expense</h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition">
@@ -1004,11 +1052,10 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        {/* Form Inputs (No Submit Button Here anymore) */}
+        <form onSubmit={handleFormSubmit} className="p-6 space-y-4 pb-2">
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Bill Name</label>
-            
-            {/* 2. ADD ID HERE: Used for 'Smart Search' step */}
             <div id="input-expense-name">
               <BrandSearchInput 
                 autoFocus={true}
@@ -1025,8 +1072,6 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Amount</label>
-            
-            {/* 3. ADD ID HERE: Used for 'The Cost' step */}
             <div className="relative" id="input-expense-amount">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-400">£</span>
               <input 
@@ -1038,14 +1083,35 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
               />
             </div>
           </div>
-          
-          <button 
-            type="submit"
-            className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 active:scale-95 transition-all mt-2"
-          >
-            Add Expense
-          </button>
         </form>
+
+        {/* JUICE FOOTER: Cancel + Morph Button */}
+        <div className="p-6 border-t border-slate-100 bg-slate-50 flex gap-3">
+             <button 
+               onClick={onClose}
+               className="flex-1 py-4 rounded-xl font-bold text-slate-500 hover:bg-slate-200 transition"
+             >
+               Cancel
+             </button>
+             
+             <MorphButton 
+               disabled={!name || !amount} // Disable if empty
+               onClick={() => {
+                  // This runs AFTER the checkmark animation finishes
+                  onSave(name, safeCalculate(amount), logo);
+                  // Optional: Clear state slightly after to ensure smooth exit
+                  setTimeout(() => {
+                    setName('');
+                    setAmount('');
+                    setLogo(null);
+                  }, 500);
+               }}
+               className={`flex-[2] py-4 rounded-xl font-bold text-white shadow-lg transition-all ${(!name || !amount) ? 'bg-slate-300 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800 hover:shadow-2xl'}`}
+             >
+               Save Bill
+             </MorphButton>
+        </div>
+
       </div>
     </div>
   );
