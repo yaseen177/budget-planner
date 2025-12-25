@@ -4148,7 +4148,128 @@ const DailyPaceModal = ({ isOpen, onClose, currentTargets, onSave, currency }) =
   );
 };
 
+// --- NEW: MARKETING LANDING PAGE ---
+const LandingPage = ({ onGetStarted, onLogin }) => {
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 overflow-x-hidden">
+      
+      {/* 1. NAVBAR */}
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
+        <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+             <div className="bg-slate-900 text-white p-2 rounded-xl"><Wallet className="w-6 h-6" /></div>
+             <span className="font-bold text-xl tracking-tight">Budget Planner</span>
+          </div>
+          <div className="flex items-center gap-4">
+             <button onClick={onLogin} className="text-sm font-bold text-slate-500 hover:text-slate-900 transition hidden sm:block">
+               Log In
+             </button>
+             <button onClick={onGetStarted} className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-full font-bold text-sm transition shadow-lg shadow-emerald-500/20 active:scale-95">
+               Launch App
+             </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* 2. HERO SECTION */}
+      <header className="relative pt-20 pb-32 px-6 overflow-hidden">
+         {/* Background Blobs */}
+         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-emerald-300/20 rounded-full blur-[100px] -z-10 animate-pulse"></div>
+         <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-indigo-300/20 rounded-full blur-[100px] -z-10"></div>
+
+         <div className="max-w-4xl mx-auto text-center space-y-8 relative z-10">
+            <div className="inline-flex items-center gap-2 bg-slate-900 text-white px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider animate-in slide-in-from-bottom-4 fade-in duration-700">
+               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+               Live Demo Available
+            </div>
+            <h1 className="text-5xl md:text-7xl font-black tracking-tight text-slate-900 leading-[1.1] animate-in slide-in-from-bottom-8 fade-in duration-700 delay-100">
+               Stop Tracking. <br/>
+               <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-500 to-indigo-600">Start Forecasting.</span>
+            </h1>
+            <p className="text-xl md:text-2xl text-slate-500 max-w-2xl mx-auto leading-relaxed animate-in slide-in-from-bottom-8 fade-in duration-700 delay-200">
+               Most apps tell you where your money <em>went</em>. We tell you exactly what is safe to spend <em>today</em>.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4 animate-in zoom-in-50 fade-in duration-700 delay-300">
+               <button onClick={onGetStarted} className="w-full sm:w-auto px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-slate-800 transition shadow-xl hover:shadow-2xl active:scale-95 flex items-center justify-center gap-2">
+                  Get Started for Free <ArrowRight className="w-5 h-5" />
+               </button>
+               <button onClick={() => {
+                   document.getElementById('features').scrollIntoView({ behavior: 'smooth' });
+               }} className="w-full sm:w-auto px-8 py-4 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold text-lg hover:bg-slate-50 transition flex items-center justify-center gap-2">
+                  How it works
+               </button>
+            </div>
+         </div>
+      </header>
+
+      {/* 3. APP PREVIEW (Tilt Card) */}
+      <section className="px-4 mb-24 relative z-20 -mt-10">
+         <div className="max-w-5xl mx-auto bg-white rounded-[2.5rem] p-4 shadow-2xl border border-slate-200/50 transform md:rotate-1 hover:rotate-0 transition duration-500">
+            <div className="bg-slate-50 rounded-[2rem] overflow-hidden border border-slate-100 relative aspect-[16/9] group">
+               {/* This represents a screenshot of the app */}
+               <div className="absolute inset-0 flex items-center justify-center bg-slate-100 text-slate-300">
+                  {/* You can replace this with an actual screenshot <img> tag later */}
+                  <div className="text-center">
+                     <PieChart className="w-20 h-20 mx-auto mb-4 opacity-20" />
+                     <p className="font-bold text-lg">App Dashboard Preview</p>
+                  </div>
+               </div>
+               {/* Overlay Content */}
+               <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-slate-900/50 to-transparent p-8 flex items-end justify-between text-white">
+                  <div>
+                    <p className="font-bold text-lg">The Dashboard</p>
+                    <p className="text-sm opacity-80">See your financial health in one glance.</p>
+                  </div>
+               </div>
+            </div>
+         </div>
+      </section>
+
+      {/* 4. FEATURES GRID */}
+      <section id="features" className="py-24 bg-white">
+         <div className="max-w-6xl mx-auto px-6">
+            <div className="text-center max-w-2xl mx-auto mb-16">
+               <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-4">Your Financial GPS</h2>
+               <p className="text-lg text-slate-500">We don't just show you numbers. We show you the future of your bank balance.</p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8">
+               {[
+                  { icon: PieChart, title: 'Visual Budgeting', desc: 'See your salary split into clear slices. Know exactly where every penny goes before you spend it.', color: 'text-purple-500', bg: 'bg-purple-50' },
+                  { icon: TrendingUp, title: 'Daily Pace', desc: 'We calculate a "Safe-to-Spend" daily limit. Stay below it, and you will never run out of money.', color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                  { icon: FlaskConical, title: 'Sandbox Mode', desc: 'Want to buy a car? Enter "Simulation Mode" to test huge purchases without messing up your real data.', color: 'text-indigo-500', bg: 'bg-indigo-50' }
+               ].map((f, i) => (
+                  <div key={i} className="p-8 rounded-[2rem] border border-slate-100 bg-slate-50 hover:bg-white hover:shadow-xl transition duration-300">
+                     <div className={`w-14 h-14 rounded-2xl ${f.bg} ${f.color} flex items-center justify-center mb-6`}>
+                        <f.icon className="w-7 h-7" />
+                     </div>
+                     <h3 className="text-xl font-bold text-slate-900 mb-3">{f.title}</h3>
+                     <p className="text-slate-500 leading-relaxed">{f.desc}</p>
+                  </div>
+               ))}
+            </div>
+         </div>
+      </section>
+
+      {/* 5. FOOTER */}
+      <footer className="bg-slate-900 text-slate-400 py-12 border-t border-slate-800">
+         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-2 text-white">
+               <Wallet className="w-5 h-5" />
+               <span className="font-bold text-lg">Budget Planner</span>
+            </div>
+            <p className="text-sm">© {new Date().getFullYear()} Designed & Built by Yaseen Hussain</p>
+         </div>
+      </footer>
+    </div>
+  );
+};
+
+
 export default function App() {
+
+  const [showLandingPage, setShowLandingPage] = useState(true);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -4995,8 +5116,23 @@ export default function App() {
   const fixedExpenses = finalExpenses.filter(e => e.type === 'fixed');
   const variableExpenses = finalExpenses.filter(e => e.type === 'variable');
 
-  if (loading) return <DashboardSkeleton />;
-  if (!user) return <LoginScreen onLogin={handleLogin} />;
+  // 1. If Loading, show nothing or a spinner (optional)
+  if (loading) return <DashboardSkeleton />; // (I kept your Skeleton here as it looks better than null)
+
+  // 2. If User is NOT logged in...
+  if (!user) {
+     // ...and we are showing the Landing Page
+     if (showLandingPage) {
+        return (
+           <LandingPage 
+              onGetStarted={() => setShowLandingPage(false)} 
+              onLogin={() => setShowLandingPage(false)} 
+           />
+        );
+     }
+     // ...otherwise show the Login Screen (The existing "App" login)
+     return <LoginScreen onLogin={handleLogin} />;
+  }
 
   // --- ADMIN RENDER CHECK ---
   if (user && isAdminMode && user.email === "yaseen.hussain2001@gmail.com") {
