@@ -833,7 +833,7 @@ const MultiBarChart = ({ data, keys, colors }) => {
     );
 };
 
-// --- ANALYTICS DASHBOARD (FIXED) ---
+// --- ANALYTICS DASHBOARD (FIXED WITH SMART MATCHING) ---
 const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
   const [history, setHistory] = useState([]);
   const [timeRange, setTimeRange] = useState('6M'); // 3M, 6M, 12M, ALL
@@ -857,11 +857,31 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
           const remainder = Math.max(0, salary - expensesTotal);
           const actuals = val.actualSavings || {};
           
-          // Calculate target vs actual for each pot
+          // --- SMART MAPPING LOGIC ---
+          // 1. Create a map of Name -> ID from this specific month's saved rules
+          // This allows us to link data even if Pot IDs have changed over time.
+          const monthRules = val.allocationRules || [];
+          const nameToIdMap = {};
+          monthRules.forEach(r => {
+             if (r.name && r.id) nameToIdMap[r.name.toLowerCase().trim()] = r.id;
+          });
+
+          // 2. Calculate target vs actual for each CURRENT pot
           const potData = {};
           allocationRules.forEach(rule => {
-             // Robustly handle missing IDs or data
-             const actualVal = actuals[rule.id] !== undefined ? parseFloat(actuals[rule.id]) : 0;
+             let actualVal = 0;
+             
+             // Try A: Direct ID Match (Best)
+             if (actuals[rule.id] !== undefined) {
+                actualVal = parseFloat(actuals[rule.id]);
+             } 
+             // Try B: Name Match (Fallback)
+             else {
+                const historicalId = nameToIdMap[rule.name.toLowerCase().trim()];
+                if (historicalId && actuals[historicalId] !== undefined) {
+                   actualVal = parseFloat(actuals[historicalId]);
+                }
+             }
              
              potData[rule.id] = {
                  target: remainder * (rule.percentage / 100),
@@ -893,7 +913,7 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
     };
 
     fetchHistory();
-  }, [user, allocationRules]); // <--- FIX: Added allocationRules here to force recalculation
+  }, [user, allocationRules]); // Recalculate when rules change
 
   // Filter Data based on Time Range
   const filteredData = useMemo(() => {
@@ -909,7 +929,6 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
 
     allocationRules.forEach(rule => {
       const totalActualForPot = filteredData.reduce((sum, m) => {
-        // Safe access in case history has old data structure
         const val = m.pots[rule.id]?.actual || 0;
         return sum + val;
       }, 0);
@@ -986,7 +1005,7 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                     const proj = potProjections[rule.id] || { avg: 0, sixMonths: 0, oneYear: 0, fiveYears: 0 };
                     
                     let colorHex = '#64748b'; 
-                    if (rule.hex) colorHex = rule.hex; // Use exact hex if available
+                    if (rule.hex) colorHex = rule.hex; 
 
                     return (
                        <div key={rule.id} className="min-w-[280px] bg-slate-900 text-white p-5 rounded-2xl shadow-lg relative overflow-hidden snap-center flex-shrink-0 border border-slate-800">
@@ -1085,7 +1104,6 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
               <h3 className="text-sm font-bold text-slate-800 mb-3 px-2">Savings Performance</h3>
               <div className="grid grid-cols-2 gap-3">
                  {allocationRules.map(rule => {
-                    // Prepare mini data for this pot
                     const potHistory = filteredData.map(d => ({ 
                         label: d.label, 
                         value: d.pots[rule.id]?.actual || 0 
@@ -1139,7 +1157,7 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                           actual: d.pots[selectedPot.id]?.actual || 0
                        }))}
                        keys={['target', 'actual']}
-                       colors={['bg-slate-300', selectedPot.color ? selectedPot.color.split(' ')[0] : 'bg-emerald-500']}
+                       colors={['bg-slate-300', selectedPot.colorCode]} 
                     />
                  </div>
                  <div className="flex justify-center gap-6 mt-6">
@@ -1147,7 +1165,7 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                        <div className="w-3 h-3 bg-slate-300 rounded-sm"></div> Target
                     </div>
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                       <div className={`w-3 h-3 rounded-sm ${selectedPot.color ? selectedPot.color.split(' ')[0] : 'bg-emerald-500'}`}></div> Actual
+                       <div className={`w-3 h-3 rounded-sm`} style={{ backgroundColor: selectedPot.colorCode }}></div> Actual
                     </div>
                  </div>
               </div>
