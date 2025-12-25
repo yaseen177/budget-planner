@@ -184,6 +184,35 @@ const safeCalculate = (expression) => {
   }
 };
 
+// 1. Currency Formatter for Inputs
+const formatNumberWithCommas = (value) => {
+  if (!value) return '';
+  // Remove existing commas to get raw number
+  const rawValue = value.toString().replace(/,/g, '');
+  // formatting
+  return rawValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};
+
+// 2. Spring Animation Styles (Add this to your existing auroraStyles string or create a new one)
+const springStyles = `
+  @keyframes spring-popup {
+    0% { transform: scale(0.9); opacity: 0; }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .animate-spring {
+    animation: spring-popup 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+  /* Active Scale Class for Buttons */
+  .btn-press {
+    transition: transform 0.1s;
+  }
+  .btn-press:active {
+    transform: scale(0.95);
+  }
+`;
+
+
 // --- UPDATED PRINT HELPER (Auto-Landscape & Virtual Paper) ---
 const handlePrint = (elementId, title, isLandscape = false) => {
   const content = document.getElementById(elementId);
@@ -790,7 +819,7 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4 animate-in fade-in">
       {/* 1. ADD ID HERE: Used for 'The Form' step */}
-      <div id="modal-add-expense" className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
+      <div id="modal-add-expense" className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-spring duration-200">
         <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
           <h3 className="font-bold text-lg text-slate-800">New Expense</h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition">
@@ -990,21 +1019,26 @@ const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, classNa
 const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, activeSlice, bankColor }) => {
   if (!salary || parseFloat(salary) <= 0) return null;
 
+  // NEW: State for Hover Effects
+  const [hoveredSlice, setHoveredSlice] = useState(null);
+
   const salaryNum = parseFloat(salary);
   const totalExpenses = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-
   const expensesPercent = Math.min(100, (totalExpenses / salaryNum) * 100);
   const remainderPercentOfTotal = 100 - expensesPercent;
 
+  // ... (Keep existing segment calculation logic) ...
   let currentDegree = 0;
   const segments = [];
-
-  // Define a subtle cross-hatch pattern for inactive areas
   const crossPattern = "repeating-linear-gradient(45deg, #e2e8f0 0, #e2e8f0 1px, transparent 0, transparent 6px), repeating-linear-gradient(-45deg, #e2e8f0 0, #e2e8f0 1px, transparent 0, transparent 6px)";
 
   const addSegment = (id, percent, color) => {
     const degrees = (percent / 100) * 360;
-    const segmentColor = activeSlice ? (activeSlice === id ? color : 'transparent') : color;
+    // Highlight logic: if hovering, dim others. If active, hide others.
+    let segmentColor = color;
+    if (activeSlice && activeSlice !== id) segmentColor = 'transparent';
+    else if (hoveredSlice && hoveredSlice !== id && !activeSlice) segmentColor = `${color}80`; // Dim colors not hovered
+    
     segments.push(`${segmentColor} ${currentDegree}deg ${currentDegree + degrees}deg`);
     currentDegree += degrees;
   };
@@ -1018,35 +1052,39 @@ const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, ac
     addSegment(plan.id, planPercentOfTotal, plan.hex || '#10b981');
   });
   
-  // 3. Remainder Slice (Current Account)
-  const remainderColor = bankColor || '#64748b'; // Default to Slate if no bank color
-  const isCurrentAccountActive = activeSlice === 'current_account';
-  
+  // 3. Remainder Slice
+  const remainderColor = bankColor || '#64748b';
   if (currentDegree < 360) {
-      // Logic: If ANY slice is active, this one goes transparent UNLESS it is the active one.
-      const remainderSegmentColor = activeSlice ? (isCurrentAccountActive ? remainderColor : 'transparent') : remainderColor;
-      segments.push(`${remainderSegmentColor} ${currentDegree}deg 360deg`);
+      const isCurrentAccountActive = activeSlice === 'current_account';
+      const isCurrentAccountHovered = hoveredSlice === 'current_account';
+      
+      let color = remainderColor;
+      if (activeSlice && !isCurrentAccountActive) color = 'transparent';
+      else if (hoveredSlice && !isCurrentAccountHovered && !activeSlice) color = `${remainderColor}80`;
+
+      segments.push(`${color} ${currentDegree}deg 360deg`);
   }
   
   const conic = `conic-gradient(${segments.join(', ')})`;
   const finalBackground = activeSlice ? `${conic}, ${crossPattern}` : conic;
 
-  // Labels
+  // --- DYNAMIC LABEL LOGIC ---
+  // Priority: Hovered > Active > Default
+  const targetSlice = hoveredSlice || activeSlice;
+  
   let centerLabel = "Net Salary";
   let centerAmount = formatCurrency(salaryNum, currency);
   
-  if (activeSlice === 'expenses') {
+  if (targetSlice === 'expenses') {
       centerLabel = "Total Expenses";
       centerAmount = formatCurrency(totalExpenses, currency);
-  } else if (activeSlice === 'current_account') {
+  } else if (targetSlice === 'current_account') {
       centerLabel = "Current Account";
-      // Calculate Remainder (Salary - Expenses)
       const remainder = salaryNum - totalExpenses;
-      // Subtract allocated pots from remainder to get "True" Current Account value
       const allocatedAmount = allocations.reduce((sum, p) => sum + (remainder * (p.percentage / 100)), 0);
       centerAmount = formatCurrency(remainder - allocatedAmount, currency);
-  } else if (activeSlice) {
-      const plan = allocations.find(p => p.id === activeSlice);
+  } else if (targetSlice) {
+      const plan = allocations.find(p => p.id === targetSlice);
       if (plan) {
           centerLabel = plan.name;
           const remainder = salaryNum - totalExpenses;
@@ -1059,28 +1097,33 @@ const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, ac
     <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden h-full">
       <div className="flex justify-between w-full mb-6">
          <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Where your money goes</h3>
-         {activeSlice && (
+         {(activeSlice || hoveredSlice) && (
              <button onClick={() => onSliceClick(null)} className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500 font-bold hover:bg-slate-200">
-                 Reset View
+                 {activeSlice ? 'Reset View' : 'Peek View'}
              </button>
          )}
       </div>
       
+      {/* WHEEL INTERACTION AREA */}
       <div className="relative w-56 h-56 transition-transform duration-500 hover:scale-105">
-        <div className="w-full h-full rounded-full transition-all duration-1000 ease-out shadow-inner" style={{ background: finalBackground }}></div>
+        <div className="w-full h-full rounded-full transition-all duration-300 ease-out shadow-inner" style={{ background: finalBackground }}></div>
+        
+        {/* CENTER TEXT */}
         <div className="absolute inset-2 bg-white rounded-full flex flex-col items-center justify-center shadow-lg">
-           <div className="text-center animate-in fade-in zoom-in duration-300 key={activeSlice}">
+           <div className="text-center animate-in fade-in zoom-in duration-200 key={targetSlice}">
               <span className="text-xs text-slate-400 font-bold uppercase tracking-wide block mb-1">{centerLabel}</span>
               <span className="text-2xl font-black text-slate-800 tracking-tight">{centerAmount}</span>
            </div>
         </div>
       </div>
       
+      {/* LEGEND BUTTONS (Update onMouseEnter to set hover) */}
       <div className="flex flex-wrap justify-center gap-2 mt-8 w-full">
-        {/* Expenses Button */}
         <button 
+            onMouseEnter={() => setHoveredSlice('expenses')}
+            onMouseLeave={() => setHoveredSlice(null)}
             onClick={() => onSliceClick(activeSlice === 'expenses' ? null : 'expenses')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-200
+            className={`btn-press flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-200
                 ${activeSlice === 'expenses' 
                     ? 'bg-rose-50 border-rose-200 ring-2 ring-rose-100 scale-105 shadow-sm' 
                     : activeSlice ? 'opacity-40 grayscale border-transparent' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}
@@ -1089,10 +1132,11 @@ const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, ac
           <span className={`text-xs font-bold ${activeSlice === 'expenses' ? 'text-rose-700' : 'text-slate-600'}`}>Expenses</span>
         </button>
 
-        {/* Current Account Button (NEW) */}
         <button 
+            onMouseEnter={() => setHoveredSlice('current_account')}
+            onMouseLeave={() => setHoveredSlice(null)}
             onClick={() => onSliceClick(activeSlice === 'current_account' ? null : 'current_account')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-200
+            className={`btn-press flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-200
                 ${activeSlice === 'current_account' 
                     ? 'bg-slate-100 border-slate-300 ring-2 ring-slate-200 scale-105 shadow-sm' 
                     : activeSlice ? 'opacity-40 grayscale border-transparent' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}
@@ -1101,12 +1145,13 @@ const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, ac
           <span className={`text-xs font-bold ${activeSlice === 'current_account' ? 'text-slate-800' : 'text-slate-600'}`}>Current Account</span>
         </button>
 
-        {/* Pot Buttons */}
         {allocations.map(plan => (
             <button 
                 key={plan.id}
+                onMouseEnter={() => setHoveredSlice(plan.id)}
+                onMouseLeave={() => setHoveredSlice(null)}
                 onClick={() => onSliceClick(activeSlice === plan.id ? null : plan.id)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-200
+                className={`btn-press flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-200
                     ${activeSlice === plan.id 
                         ? 'bg-emerald-50 border-emerald-200 ring-2 ring-emerald-100 scale-105 shadow-sm' 
                         : activeSlice ? 'opacity-40 grayscale border-transparent' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}
@@ -1249,7 +1294,12 @@ const AllocationCard = ({ title, targetAmount, actualAmount, percentage, hexColo
   const activeColor = hexColor || '#10b981';
 
   return (
-    <div className="bg-white p-5 rounded-[1.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 group relative overflow-hidden">
+    <div
+      className="bg-white p-5 rounded-[1.5rem] border border-slate-100 transition-all duration-300 group relative overflow-hidden btn-press"
+      style={{
+        boxShadow: `0 10px 15px -3px ${activeColor}20, 0 4px 6px -2px ${activeColor}10`
+      }}
+    >
       
       {/* Header */}
       <div className="flex justify-between items-start mb-4 relative z-10">
@@ -3191,6 +3241,8 @@ export default function App() {
     .animate-aurora-3 { animation: drift 12s infinite ease-in-out; }
   `;
 
+  
+
   // --- DAYS LEFT CALCULATION ---
   const getDaysLeft = () => {
     const now = new Date();
@@ -3957,7 +4009,9 @@ export default function App() {
       {/* --- 1. AURORA BACKGROUND (FULL PAGE) --- */}
       {!isSandbox && (
         <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-          <style>{auroraStyles}</style>
+          
+          {/* UPDATE THIS LINE HERE: */}
+          <style>{auroraStyles + springStyles}</style>
           
           {/* Base Layer (White/Slate) */}
           <div className="absolute inset-0 bg-slate-50"></div>
@@ -4272,39 +4326,46 @@ export default function App() {
              {/* Subtle background mesh for the "Cockpit" feel */}
              <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 rounded-full -mr-16 -mt-16 group-hover:bg-emerald-50/50 transition duration-700"></div>
              
-             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between h-full gap-8">
-               {/* Left: Salary Input */}
-               <div className="w-full md:w-1/2 space-y-2">
-                 <div className="flex items-center gap-2 mb-4">
-                   <div className="bg-slate-900 text-white p-2 rounded-xl"><Wallet className="w-4 h-4" /></div>
-                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Monthly Income</span>
-                 </div>
-                 
-                 <div className="relative">
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 text-3xl font-medium text-slate-300">
-                        {/* CHANGED: effectiveSettings.currency */}
-                        {effectiveSettings.currency === 'GBP' ? '£' : effectiveSettings.currency === 'USD' ? '$' : '€'}
-                    </span>
-                    <input 
+            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between h-full gap-8">
+              {/* Left: Salary Input */}
+              <div className="w-full md:w-1/2 space-y-2">
+                  <div className="flex items-center gap-2 mb-4">
+                  <div className="bg-slate-900 text-white p-2 rounded-xl"><Wallet className="w-4 h-4" /></div>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Monthly Income</span>
+                  </div>
+                  
+                  <div className="relative">
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 text-3xl font-medium text-slate-300">
+                      {effectiveSettings.currency === 'GBP' ? '£' : effectiveSettings.currency === 'USD' ? '$' : '€'}
+                  </span>
+                  
+                  {/* UPDATED INPUT: Auto-Formatting */}
+                  <input 
                       type="text" 
-                      value={effectiveSalary} // <--- CHANGED
-                      onChange={(e) => updateSalary(e.target.value)}
+                      // Use format helper for display
+                      value={formatNumberWithCommas(effectiveSalary)} 
+                      onChange={(e) => {
+                          // Strip commas before saving to state
+                          const rawVal = e.target.value.replace(/,/g, '');
+                          if (!isNaN(rawVal)) {
+                            updateSalary(rawVal);
+                          }
+                      }}
                       onBlur={(e) => {
-                        const finalVal = safeCalculate(e.target.value);
-                        updateSalary(finalVal);
-                        // Only log if not in sandbox and value is valid
-                        if (!isSandbox && finalVal) {
-                           logSystemEvent(`Salary Updated: ${finalVal} for ${MONTH_NAMES[currentDate.getMonth()]}`, 'action');
-                        }
+                          const finalVal = safeCalculate(e.target.value.replace(/,/g, ''));
+                          updateSalary(finalVal);
+                          if (!isSandbox && finalVal) {
+                              logSystemEvent(`Salary Updated: ${finalVal}`, 'action');
+                          }
                       }}
                       placeholder="0.00"
                       className="w-full bg-transparent border-none text-5xl font-bold text-slate-800 placeholder-slate-200 outline-none pl-8 tracking-tight"
-                    />
-                 </div>
-                 <p className="text-sm text-slate-400 font-medium pl-1">
-                   Tap to edit your budget limit
-                 </p>
-               </div>
+                  />
+                  </div>
+                  <p className="text-sm text-slate-400 font-medium pl-1">
+                  Tap to edit your budget limit
+                  </p>
+              </div>
 
                {/* Right: The Wheel */}
                <div className="w-full md:w-1/2 flex justify-center scale-110">
