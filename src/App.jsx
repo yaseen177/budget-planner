@@ -408,6 +408,44 @@ const playJuiceSound = (type) => {
   // Play and catch errors (e.g. if user hasn't interacted with page yet)
   audio.play().catch(e => console.log('Audio play blocked:', e));
 };
+
+// HELPER 8: SPOTLIGHT CARD
+const SpotlightCard = ({ children, className = "", spotlightColor = "rgba(16, 185, 129, 0.25)" }) => {
+  const divRef = React.useRef(null);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [opacity, setOpacity] = useState(0);
+
+  const handleMouseMove = (e) => {
+    if (!divRef.current) return;
+    const rect = divRef.current.getBoundingClientRect();
+    setPosition({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    setOpacity(1);
+  };
+
+  const handleMouseLeave = () => {
+    setOpacity(0);
+  };
+
+  return (
+    <div
+      ref={divRef}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      className={`relative overflow-hidden bg-white rounded-[2.5rem] border border-slate-200/60 shadow-sm ${className}`}
+    >
+      {/* The Moving Spotlight Glow */}
+      <div
+        className="pointer-events-none absolute -inset-px opacity-0 transition-opacity duration-300"
+        style={{
+          opacity,
+          background: `radial-gradient(600px circle at ${position.x}px ${position.y}px, ${spotlightColor}, transparent 40%)`,
+        }}
+      />
+      {/* Content */}
+      <div className="relative z-10 h-full">{children}</div>
+    </div>
+  );
+};
 // --- JUICE ENHANCEMENTS END ---
 
 // --- FIREBASE CONFIGURATION AREA ---
@@ -4580,6 +4618,11 @@ export default function App() {
           
           {/* Bottom Blobs (Anchoring the bottom of the screen) */}
           <div className="absolute bottom-[-10%] right-[10%] w-[500px] h-[500px] bg-emerald-300 rounded-full mix-blend-multiply filter blur-[90px] opacity-50 animate-aurora-2"></div>
+
+          {/* >>> INSERT THIS NEW NOISE LAYER <<< */}
+          <div className="absolute inset-0 opacity-[0.03] mix-blend-overlay pointer-events-none" 
+              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}>
+          </div>
         </div>
       )}
 
@@ -5240,7 +5283,7 @@ export default function App() {
         )}
 
         {/* TILE 4: EXPENSES LIST (The Wide Rectangle) */}
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200/60 overflow-hidden min-h-[400px]">
+        <SpotlightCard className="overflow-hidden min-h-[400px]">
           {/* Header */}
           <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-white/50 backdrop-blur-sm sticky top-0 z-20">
              <div className="flex items-center gap-3 w-full md:w-auto">
@@ -5403,7 +5446,7 @@ export default function App() {
              <span className="text-sm font-medium text-slate-500 mr-3">Total Outgoings:</span>
              <span className="text-xl font-bold text-slate-800 tracking-tight">{formatCurrency(totalExpenses, effectiveSettings.currency)}</span>
           </div>
-        </div>
+        </SpotlightCard>
         
         {/* Creator Footer (Boxed) */}
         <div className="py-12 flex justify-center print:hidden relative z-10">
