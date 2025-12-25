@@ -213,6 +213,137 @@ const springStyles = `
 `;
 
 
+// --- JUICE ENHANCEMENTS START ---
+
+const juiceStyles = `
+  /* 1. HEARTBEAT ANIMATIONS */
+  @keyframes throb-red {
+    0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.4); transform: scale(1); }
+    70% { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); transform: scale(1.02); }
+    100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); transform: scale(1); }
+  }
+  @keyframes breathe-green {
+    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.3); }
+    50% { box-shadow: 0 0 20px 0 rgba(16, 185, 129, 0.4); border-color: rgba(16, 185, 129, 0.6); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.3); }
+  }
+  .animate-throb { animation: throb-red 1s infinite; }
+  .animate-breathe { animation: breathe-green 3s infinite ease-in-out; }
+
+  /* 2. CONFETTI PARTICLES */
+  @keyframes confetti-fall {
+    0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(60px) rotate(720deg); opacity: 0; }
+  }
+  .confetti-piece {
+    position: absolute;
+    top: -20px;
+    width: 8px;
+    height: 8px;
+    animation: confetti-fall 2.5s ease-out forwards;
+    z-index: 0;
+  }
+`;
+
+// HELPER 1: ROLLING NUMBER
+const RollingNumber = ({ value, currency = 'GBP', decimals = 0 }) => {
+  const [displayValue, setDisplayValue] = useState(0);
+  
+  useEffect(() => {
+    let start = displayValue;
+    let end = parseFloat(value) || 0;
+    if (start === end) return;
+
+    let duration = 800;
+    let startTime = null;
+
+    const animate = (currentTime) => {
+      if (!startTime) startTime = currentTime;
+      const progress = Math.min((currentTime - startTime) / duration, 1);
+      
+      // EaseOutQuart function for smooth landing
+      const ease = 1 - Math.pow(1 - progress, 4);
+      
+      const current = start + (end - start) * ease;
+      setDisplayValue(current);
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    requestAnimationFrame(animate);
+  }, [value]);
+
+  return formatCurrency(displayValue, currency, decimals);
+};
+
+// HELPER 2: TILT CARD
+const TiltCard = ({ children, className }) => {
+  const [transform, setTransform] = useState('');
+  const [glare, setGlare] = useState('');
+
+  const handleMouseMove = (e) => {
+    const card = e.currentTarget;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    // Calculate rotation (max 5 degrees)
+    const rotateX = ((y - centerY) / centerY) * -3; 
+    const rotateY = ((x - centerX) / centerX) * 3;
+
+    setTransform(`perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`);
+    setGlare(`radial-gradient(circle at ${x}px ${y}px, rgba(255,255,255,0.2), transparent 40%)`);
+  };
+
+  const handleMouseLeave = () => {
+    setTransform('perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)');
+    setGlare('none');
+  };
+
+  return (
+    <div 
+      className={`relative transition-transform duration-200 ease-out ${className}`}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{ transform, transformStyle: 'preserve-3d' }}
+    >
+      <div 
+        className="absolute inset-0 rounded-[inherit] pointer-events-none z-20 mix-blend-overlay"
+        style={{ background: glare }}
+      />
+      {children}
+    </div>
+  );
+};
+
+// HELPER 3: CONFETTI EXPLOSION
+const ConfettiExplosion = () => {
+  const particles = Array.from({ length: 30 });
+  const colors = ['#10b981', '#fbbf24', '#6366f1', '#f43f5e'];
+  
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[inherit]">
+      {particles.map((_, i) => (
+        <div 
+          key={i} 
+          className="confetti-piece"
+          style={{
+            left: `${Math.random() * 100}%`,
+            backgroundColor: colors[Math.floor(Math.random() * colors.length)],
+            animationDelay: `${Math.random() * 0.5}s`,
+            animationDuration: `${1.5 + Math.random()}s`
+          }} 
+        />
+      ))}
+    </div>
+  );
+};
+// --- JUICE ENHANCEMENTS END ---
+
 // --- UPDATED PRINT HELPER (Auto-Landscape & Virtual Paper) ---
 const handlePrint = (elementId, title, isLandscape = false) => {
   const content = document.getElementById(elementId);
@@ -1286,11 +1417,12 @@ const StatCard = ({ label, amount, icon: Icon, colorClass, subText, currency }) 
 
 const AllocationCard = ({ title, targetAmount, actualAmount, percentage, hexColor, currency, onUpdateActual, showRemainderButton, onFillRemainder }) => {
   const actualNum = parseFloat(actualAmount) || 0;
-  // Calculate progress bar width (max 100%)
   const progressPercent = Math.min(100, Math.max(0, (actualNum / targetAmount) * 100));
   const [showHelp, setShowHelp] = useState(false);
   
-  // Use the passed Hex Color or fallback to Emerald Green
+  // JUICE: Confetti Trigger
+  const isComplete = progressPercent >= 100 && targetAmount > 0;
+  
   const activeColor = hexColor || '#10b981';
 
   return (
@@ -1300,16 +1432,17 @@ const AllocationCard = ({ title, targetAmount, actualAmount, percentage, hexColo
         boxShadow: `0 10px 15px -3px ${activeColor}20, 0 4px 6px -2px ${activeColor}10`
       }}
     >
+      {/* JUICE: Confetti restricted to card */}
+      {isComplete && <ConfettiExplosion />}
       
       {/* Header */}
       <div className="flex justify-between items-start mb-4 relative z-10">
         <div className="flex items-center gap-3">
-          {/* 1. Icon Background: Uses Hex with 15% opacity */}
           <div 
             className="w-10 h-10 rounded-xl flex items-center justify-center transition-colors"
             style={{ backgroundColor: `${activeColor}20`, color: activeColor }}
           >
-            <Target className="w-5 h-5" />
+            {isComplete ? <Check className="w-5 h-5 animate-bounce" /> : <Target className="w-5 h-5" />}
           </div>
           <div>
             <h4 className="font-bold text-slate-800 text-sm leading-tight">{title}</h4>
@@ -1317,46 +1450,40 @@ const AllocationCard = ({ title, targetAmount, actualAmount, percentage, hexColo
           </div>
         </div>
         <div className="text-right">
-          <div className="font-bold text-slate-800 text-lg leading-tight">{formatCurrency(actualNum, currency)}</div>
+          <div className="font-bold text-slate-800 text-lg leading-tight">
+             <RollingNumber value={actualNum} currency={currency} />
+          </div>
           <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wide mt-1">
             Target: {formatCurrency(targetAmount, currency)}
           </div>
         </div>
       </div>
 
-      {/* 2. Progress Bar Background */}
+      {/* Progress Bar Background */}
       <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden mb-4 relative z-10">
-        {/* 3. The Actual Colored Bar */}
         <div 
           className="h-full rounded-full transition-all duration-1000 ease-out relative"
           style={{ width: `${progressPercent}%`, backgroundColor: activeColor }}
         >
-             {/* Subtle shine effect */}
              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-50"></div>
         </div>
       </div>
 
-      {/* Input Row - NEW DESIGN WITH CLICKABLE HELPER */}
+      {/* Input Row */}
       <div className="relative z-10">
-        
-        {/* CLICK BACKDROP: This invisible layer catches clicks anywhere else to close the popup */}
         {showHelp && (
             <div className="fixed inset-0 z-40 cursor-default" onClick={() => setShowHelp(false)}></div>
         )}
 
-        {/* Label with Clickable Tooltip */}
         <div className="relative flex items-center gap-1.5 mb-1.5 ml-1 w-fit">
            <label className="block text-[10px] font-bold text-slate-400 uppercase">Actual Money Deposited</label>
-           
            <button 
              onClick={() => setShowHelp(!showHelp)}
              className="focus:outline-none transition hover:scale-110 active:scale-95"
            >
-             {/* Icon Darkened (text-slate-500 instead of 300) */}
              <HelpCircle className="w-3 h-3 text-slate-500" />
            </button>
            
-           {/* The Helper Bubble (Shows only when clicked) */}
            {showHelp && (
              <div className="absolute bottom-full left-0 mb-2 w-48 bg-slate-800 text-white text-xs rounded-lg p-3 shadow-xl z-50 animate-in fade-in zoom-in-95 origin-bottom-left font-normal normal-case">
                 <div className="absolute -bottom-1 left-4 w-2 h-2 bg-slate-800 rotate-45"></div>
@@ -1371,16 +1498,14 @@ const AllocationCard = ({ title, targetAmount, actualAmount, percentage, hexColo
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
             <input 
               type="number" 
-              placeholder="Type amount..."
+              placeholder="0"
               value={actualAmount}
               onChange={(e) => onUpdateActual(e.target.value)}
-              // CHANGED: text-sm -> text-base (Prevents iOS Zoom)
               className="w-full pl-7 pr-3 py-3 bg-white border-2 border-slate-100 rounded-xl text-base font-bold text-slate-800 outline-none focus:border-transparent focus:ring-4 transition shadow-sm placeholder:text-slate-300 placeholder:font-normal"
               style={{ '--tw-ring-color': `${activeColor}30` }} 
             />
           </div>
           
-          {/* Dynamic Button Color */}
           {showRemainderButton ? (
             <button 
               onClick={onFillRemainder}
@@ -4011,7 +4136,7 @@ export default function App() {
         <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
           
           {/* UPDATE THIS LINE HERE: */}
-          <style>{auroraStyles + springStyles}</style>
+          <style>{auroraStyles + springStyles + juiceStyles}</style>
           
           {/* Base Layer (White/Slate) */}
           <div className="absolute inset-0 bg-slate-50"></div>
@@ -4322,7 +4447,7 @@ export default function App() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
           
           {/* TILE 1: THE COCKPIT (Salary + Wheel) - Spans 2 Columns */}
-          <div className="md:col-span-2 bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60 relative overflow-hidden group">
+          <TiltCard className="md:col-span-2 bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200/60 relative overflow-hidden group">
              {/* Subtle background mesh for the "Cockpit" feel */}
              <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 rounded-full -mr-16 -mt-16 group-hover:bg-emerald-50/50 transition duration-700"></div>
              
@@ -4342,21 +4467,15 @@ export default function App() {
                   {/* UPDATED INPUT: Auto-Formatting */}
                   <input 
                       type="text" 
-                      // Use format helper for display
                       value={formatNumberWithCommas(effectiveSalary)} 
                       onChange={(e) => {
-                          // Strip commas before saving to state
                           const rawVal = e.target.value.replace(/,/g, '');
-                          if (!isNaN(rawVal)) {
-                            updateSalary(rawVal);
-                          }
+                          if (!isNaN(rawVal)) updateSalary(rawVal);
                       }}
                       onBlur={(e) => {
                           const finalVal = safeCalculate(e.target.value.replace(/,/g, ''));
                           updateSalary(finalVal);
-                          if (!isSandbox && finalVal) {
-                              logSystemEvent(`Salary Updated: ${finalVal}`, 'action');
-                          }
+                          if (!isSandbox && finalVal) logSystemEvent(`Salary Updated: ${finalVal}`, 'action');
                       }}
                       placeholder="0.00"
                       className="w-full bg-transparent border-none text-5xl font-bold text-slate-800 placeholder-slate-200 outline-none pl-8 tracking-tight"
@@ -4369,15 +4488,15 @@ export default function App() {
 
                {/* Right: The Wheel */}
                <div className="w-full md:w-1/2 flex justify-center scale-110">
-                 {parseFloat(effectiveSalary) > 0 ? ( // <--- CHANGED
+                 {parseFloat(effectiveSalary) > 0 ? (
                     <BudgetWheel 
-                      salary={effectiveSalary} // <--- CHANGED
-                      expenses={effectiveExpenses} // <--- CHANGED
-                      allocations={effectiveAllocations} // <--- CHANGED
-                      currency={effectiveSettings.currency} // <--- CHANGED
+                      salary={effectiveSalary}
+                      expenses={effectiveExpenses}
+                      allocations={effectiveAllocations}
+                      currency={effectiveSettings.currency}
                       activeSlice={highlightedSlice}
                       onSliceClick={setHighlightedSlice}
-                      bankColor={effectiveSettings.bankDetails?.color} // <--- CHANGED
+                      bankColor={effectiveSettings.bankDetails?.color}
                     />
                  ) : (
                    <div className="h-48 flex items-center justify-center text-slate-300 font-bold border-2 border-dashed border-slate-100 rounded-full w-48 aspect-square">
@@ -4386,7 +4505,7 @@ export default function App() {
                  )}
                </div>
              </div>
-          </div>
+          </TiltCard>
 
           {/* TILE 2 & 3: STATS STACK - Spans 1 Column */}
           <div className="flex flex-col gap-5">
@@ -4404,8 +4523,7 @@ export default function App() {
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Bills</span>
                     </div>
                     <span className="text-xl md:text-2xl font-black text-slate-800 tracking-tight block">
-                      {/* CHANGED: effectiveSettings.currency */}
-                      -{formatCurrency(totalExpenses, effectiveSettings.currency)}
+                      -<RollingNumber value={totalExpenses} currency={effectiveSettings.currency} />
                     </span>
                   </div>
 
@@ -4416,8 +4534,7 @@ export default function App() {
                       <div className="p-1.5 bg-emerald-100 text-emerald-600 rounded-lg"><TrendingUp className="w-3 h-3" /></div>
                     </div>
                     <span className="text-xl md:text-2xl font-black text-emerald-500 tracking-tight block">
-                      {/* CHANGED: effectiveSettings.currency */}
-                      {formatCurrency(salaryNum - totalExpenses, effectiveSettings.currency)}
+                      <RollingNumber value={salaryNum - totalExpenses} currency={effectiveSettings.currency} />
                     </span>
                   </div>
                 </div>
@@ -4447,22 +4564,26 @@ export default function App() {
              </div>
              
              {/* --- PASTE THIS NEW WIDGET BELOW --- */}
-             {/* Stat 3: Daily Allowance Widget */}
-             <div className="flex-1 bg-indigo-50 p-6 rounded-[2.5rem] shadow-sm border border-indigo-100 flex flex-col justify-center text-center relative overflow-hidden group">
+             {/* Stat 3: Daily Allowance Widget (HEARTBEAT ENHANCED) */}
+             <div className={`flex-1 p-6 rounded-[2.5rem] shadow-sm border flex flex-col justify-center text-center relative overflow-hidden group transition-all duration-500
+                ${dailyAllowance < 10 && dailyAllowance > 0 ? 'bg-rose-50 border-rose-200 animate-throb' : 
+                  dailyAllowance > 30 ? 'bg-emerald-50 border-emerald-200 animate-breathe' : 
+                  'bg-indigo-50 border-indigo-100'}`}
+             >
                 {/* Decorative Top Bar */}
-                <div className="absolute top-0 left-0 w-full h-1.5 bg-indigo-200/50"></div>
+                <div className={`absolute top-0 left-0 w-full h-1.5 ${dailyAllowance < 10 && dailyAllowance > 0 ? 'bg-rose-400' : dailyAllowance > 30 ? 'bg-emerald-400' : 'bg-indigo-200/50'}`}></div>
                 
-                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Daily Pace</span>
+                <span className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${dailyAllowance < 10 && dailyAllowance > 0 ? 'text-rose-600' : dailyAllowance > 30 ? 'text-emerald-600' : 'text-indigo-400'}`}>Daily Pace</span>
                 
                 <div className="flex items-baseline justify-center gap-1">
-                   <span className="text-3xl font-black text-indigo-700 tracking-tight">
-                     {formatCurrency(dailyAllowance, userSettings.currency, 2)}
+                   <span className={`text-3xl font-black tracking-tight ${dailyAllowance < 10 && dailyAllowance > 0 ? 'text-rose-700' : dailyAllowance > 30 ? 'text-emerald-700' : 'text-indigo-700'}`}>
+                     <RollingNumber value={dailyAllowance} currency={userSettings.currency} decimals={2} />
                    </span>
-                   <span className="text-sm font-bold text-indigo-400">/ day</span>
+                   <span className={`text-sm font-bold ${dailyAllowance < 10 && dailyAllowance > 0 ? 'text-rose-400' : dailyAllowance > 30 ? 'text-emerald-500' : 'text-indigo-400'}`}>/ day</span>
                 </div>
                 
-                <p className="text-[10px] text-indigo-400 mt-2 font-medium opacity-80 px-2">
-                   Daily spend limit. On average do not spend more than this per day to stay afloat.
+                <p className={`text-[10px] mt-2 font-medium opacity-80 px-2 ${dailyAllowance < 10 && dailyAllowance > 0 ? 'text-rose-600' : dailyAllowance > 30 ? 'text-emerald-600' : 'text-indigo-400'}`}>
+                   {dailyAllowance < 10 && dailyAllowance > 0 ? 'Running Low! Be careful.' : dailyAllowance > 30 ? 'Healthy budget. You are doing great!' : 'Daily spend limit.'}
                 </p>
              </div>
              {/* ----------------------------------- */}
