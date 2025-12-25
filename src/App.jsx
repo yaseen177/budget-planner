@@ -106,6 +106,26 @@ const juiceStyles = `
     animation: confetti-fall 2.5s ease-out forwards;
     z-index: 0;
   }
+
+  /* 3. VACUUM LIST ANIMATIONS */
+  .vacuum-item {
+    transition: all 400ms cubic-bezier(0.25, 0.8, 0.25, 1);
+    max-height: 200px; /* Adjust if your items are huge */
+    opacity: 1;
+    transform: translate(0, 0);
+    overflow: hidden;
+  }
+  
+  .vacuum-out {
+    opacity: 0;
+    max-height: 0 !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    transform: translateX(-100px);
+    border: none !important;
+  }
 `;
 
 // HELPER 1: ROLLING NUMBER
@@ -200,6 +220,31 @@ const ConfettiExplosion = () => {
           }} 
         />
       ))}
+    </div>
+  );
+};
+
+// HELPER 4: VACUUM LIST ITEM
+const VacuumItem = ({ children, onRemove, className = '' }) => {
+  const [isExiting, setIsExiting] = useState(false);
+
+  const triggerExit = (e) => {
+    // Stop click from bubbling up
+    if (e) e.stopPropagation();
+    
+    // Start animation
+    setIsExiting(true);
+    
+    // Wait for animation (400ms) then actually delete
+    setTimeout(() => {
+      onRemove();
+    }, 400); 
+  };
+
+  return (
+    <div className={`vacuum-item ${isExiting ? 'vacuum-out' : ''} ${className}`}>
+      {/* We pass the triggerExit function to the child component */}
+      {typeof children === 'function' ? children(triggerExit) : children}
     </div>
   );
 };
@@ -5037,7 +5082,7 @@ export default function App() {
 
           <div className="divide-y divide-slate-50">
              {/* ... (Keep existing Expense List mapping logic exactly as before) ... */}
-            {[
+             {[
               { title: 'Fixed Bills', items: fixedExpenses },
               { title: 'Variable Spending', items: variableExpenses }
             ].map(group => (
@@ -5054,88 +5099,96 @@ export default function App() {
                     const isEditing = editingExpenseId === expense.id;
                     
                     return (
-                    <SwipeableExpenseRow 
+                    <VacuumItem 
                        key={expense.id} 
-                       isMobile={isMobile}
-                       onEdit={() => { triggerHaptic(); setEditingExpenseId(expense.id); }}
-                       onDelete={() => removeExpense(expense.id)}
+                       onRemove={() => removeExpense(expense.id)} // The REAL delete happens here after animation
                     >
-                      <div className="p-4 sm:px-6 flex justify-between items-center group hover:bg-slate-50/80 transition-all duration-200">
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className={`p-2.5 rounded-2xl bg-slate-50 text-slate-400 w-12 h-12 flex items-center justify-center border border-slate-100 shadow-sm group-hover:scale-110 transition duration-300`}>
-                             {expense.logo ? (
-                               <img src={expense.logo} alt={expense.name} className="w-full h-full object-contain mix-blend-multiply" />
-                             ) : (
-                               <Icon className="w-5 h-5" />
-                             )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            {isEditing ? (
-                              <input 
-                                autoFocus
-                                type="text"
-                                defaultValue={expense.name}
-                                className="font-medium text-slate-800 w-full bg-white border border-emerald-200 rounded px-2 py-1 outline-none ring-2 ring-emerald-100"
-                                onBlur={(e) => updateExpenseName(expense.id, e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
-                              />
-                            ) : (
-                              <p className="font-bold text-slate-700 truncate">{expense.name}</p>
-                            )}
-                            <p className="text-xs text-slate-400 capitalize flex items-center gap-1">
-                               <span className={`w-1.5 h-1.5 rounded-full ${expense.type === 'fixed' ? 'bg-indigo-400' : 'bg-emerald-400'}`}></span>
-                               {expense.type}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                        {isEditing ? (
-                            <div className="flex items-center gap-1">
-                              <input 
-                                autoFocus
-                                type="text"
-                                defaultValue={expense.amount}
-                                onBlur={(e) => updateExpenseAmount(expense.id, safeCalculate(e.target.value))}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                     updateExpenseAmount(expense.id, safeCalculate(e.currentTarget.value));
-                                     setEditingExpenseId(null);
-                                  }
-                                }}
-                                className="w-24 p-2 border border-emerald-200 rounded-lg bg-white text-right font-bold text-slate-800 ring-2 ring-emerald-100 outline-none"
-                              />
+                      {(handleVacuum) => (
+                        <SwipeableExpenseRow 
+                           isMobile={isMobile}
+                           onEdit={() => { triggerHaptic(); setEditingExpenseId(expense.id); }}
+                           onDelete={handleVacuum} // Connects Swipe-to-Delete to Vacuum animation
+                        >
+                          <div className="p-4 sm:px-6 flex justify-between items-center group hover:bg-slate-50/80 transition-all duration-200">
+                            <div className="flex items-center gap-4 flex-1">
+                              <div className={`p-2.5 rounded-2xl bg-slate-50 text-slate-400 w-12 h-12 flex items-center justify-center border border-slate-100 shadow-sm group-hover:scale-110 transition duration-300`}>
+                                 {expense.logo ? (
+                                   <img src={expense.logo} alt={expense.name} className="w-full h-full object-contain mix-blend-multiply" />
+                                 ) : (
+                                   <Icon className="w-5 h-5" />
+                                 )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                {isEditing ? (
+                                  <input 
+                                    autoFocus
+                                    type="text"
+                                    defaultValue={expense.name}
+                                    className="font-medium text-slate-800 w-full bg-white border border-emerald-200 rounded px-2 py-1 outline-none ring-2 ring-emerald-100"
+                                    onBlur={(e) => updateExpenseName(expense.id, e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
+                                  />
+                                ) : (
+                                  <p className="font-bold text-slate-700 truncate">{expense.name}</p>
+                                )}
+                                <p className="text-xs text-slate-400 capitalize flex items-center gap-1">
+                                   <span className={`w-1.5 h-1.5 rounded-full ${expense.type === 'fixed' ? 'bg-indigo-400' : 'bg-emerald-400'}`}></span>
+                                   {expense.type}
+                                </p>
+                              </div>
                             </div>
-                          ) : (
-                            <button 
-                              onClick={() => {
-                                triggerHaptic();
-                                setEditingExpenseId(expense.id);
-                              }}
-                              className={`flex items-center gap-2 hover:bg-white px-3 py-1.5 rounded-xl transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200 text-orange-600' : 'text-slate-700'} print:hover:bg-transparent print:p-0 print:ring-0`}
-                            >
-                              {expense.amount === 0 ? (
-                                <span className="text-sm font-bold flex items-center gap-1">
-                                  Set Amount <Edit2 className="w-3 h-3" />
-                                </span>
+                            <div className="flex items-center gap-3">
+                            {isEditing ? (
+                                <div className="flex items-center gap-1">
+                                  <input 
+                                    autoFocus
+                                    type="text"
+                                    defaultValue={expense.amount}
+                                    onBlur={(e) => updateExpenseAmount(expense.id, safeCalculate(e.target.value))}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                         updateExpenseAmount(expense.id, safeCalculate(e.currentTarget.value));
+                                         setEditingExpenseId(null);
+                                      }
+                                    }}
+                                    className="w-24 p-2 border border-emerald-200 rounded-lg bg-white text-right font-bold text-slate-800 ring-2 ring-emerald-100 outline-none"
+                                  />
+                                </div>
                               ) : (
-                                <span className="font-bold text-lg">{formatCurrency(expense.amount, effectiveSettings.currency)}</span>
+                                <button 
+                                  onClick={() => {
+                                    triggerHaptic();
+                                    setEditingExpenseId(expense.id);
+                                  }}
+                                  className={`flex items-center gap-2 hover:bg-white px-3 py-1.5 rounded-xl transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200 text-orange-600' : 'text-slate-700'} print:hover:bg-transparent print:p-0 print:ring-0`}
+                                >
+                                  {expense.amount === 0 ? (
+                                    <span className="text-sm font-bold flex items-center gap-1">
+                                      Set Amount <Edit2 className="w-3 h-3" />
+                                    </span>
+                                  ) : (
+                                    <span className="font-bold text-lg">{formatCurrency(expense.amount, effectiveSettings.currency)}</span>
+                                  )}
+                                </button>
                               )}
-                            </button>
-                          )}
-                          
-                          {isEditing ? (
-                             <button onClick={() => setEditingExpenseId(null)} className="bg-emerald-500 text-white p-2 rounded-full hover:bg-emerald-600 transition shadow-lg shadow-emerald-200">
-                               <Check className="w-4 h-4" />
-                             </button>
-                          ) : (
-                            // Added "hidden md:block" here so it doesn't show on mobile (swipe is used instead)
-                            <button onClick={() => removeExpense(expense.id)} className="text-slate-300 hover:text-red-500 transition p-2 rounded-xl hover:bg-red-50 opacity-0 group-hover:opacity-100 print:hidden hidden md:block">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </SwipeableExpenseRow>
+                              
+                              {isEditing ? (
+                                 <button onClick={() => setEditingExpenseId(null)} className="bg-emerald-500 text-white p-2 rounded-full hover:bg-emerald-600 transition shadow-lg shadow-emerald-200">
+                                   <Check className="w-4 h-4" />
+                                 </button>
+                              ) : (
+                                <button 
+                                  onClick={handleVacuum} // <--- UPDATED: Desktop delete triggers Vacuum
+                                  className="text-slate-300 hover:text-red-500 transition p-2 rounded-xl hover:bg-red-50 opacity-0 group-hover:opacity-100 print:hidden hidden md:block"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </SwipeableExpenseRow>
+                      )}
+                    </VacuumItem>
                   )})}
                 </React.Fragment>
               )
