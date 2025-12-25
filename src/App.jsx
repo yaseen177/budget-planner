@@ -1316,180 +1316,305 @@ const ReportSelector = ({ onClose, onSelect }) => (
   </div>
 );
 
-const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose, currency }) => {
+const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose, currency, bankDetails }) => {
   const totalExpenses = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
   const salaryNum = parseFloat(salary) || 0;
   const remainder = Math.max(0, salaryNum - totalExpenses);
 
+  // Calculate Current Account Stats
+  const allocatedAmount = allocations.reduce((sum, p) => sum + (remainder * (p.percentage / 100)), 0);
+  const currentAccountTarget = Math.max(0, remainder - allocatedAmount);
+  const totalPotActuals = Object.values(actuals || {}).reduce((s,v)=>s+(parseFloat(v)||0),0);
+  const currentAccountActual = Math.max(0, remainder - totalPotActuals);
+
   return (
-    <div className="fixed inset-0 bg-white z-[70] overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-100 z-[70] overflow-y-auto animate-in fade-in duration-300">
+      {/* Screen-only Header */}
       <div className="bg-slate-900 text-white p-4 sticky top-0 z-20 flex justify-between items-center shadow-lg print:hidden">
-        <h2 className="font-bold">Monthly Statement Preview</h2>
+        <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/10 rounded-lg"><FileText className="w-5 h-5 text-emerald-400" /></div>
+            <div>
+                <h2 className="font-bold text-sm">Statement Preview</h2>
+                <p className="text-xs text-slate-400">{MONTH_NAMES[date.getMonth()]} {date.getFullYear()}</p>
+            </div>
+        </div>
         <div className="flex gap-2">
           <button 
-            onClick={() => openReportInNewTab('printable-month-report', `Budget Statement - ${MONTH_NAMES[date.getMonth()]}`)} 
-            className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm hover:bg-emerald-400"
+            onClick={() => window.print()} 
+            className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-xs hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/20"
           >
-            <Printer className="w-4 h-4" /> Open Printable PDF
+            <Printer className="w-4 h-4" /> Print PDF
           </button>
-          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full">
+          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition">
             <X className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      <div id="printable-month-report" className="max-w-3xl mx-auto p-8 print:p-0">
-        <div className="border-b-2 border-slate-800 pb-4 mb-8 flex justify-between items-end">
-          <div>
-            <h1 className="text-4xl font-bold text-slate-900 mb-1">Budget Statement</h1>
-            <p className="text-slate-500">{MONTH_NAMES[date.getMonth()]} {date.getFullYear()}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs font-bold text-slate-400 uppercase">Net Salary</p>
-            <p className="text-2xl font-bold text-emerald-600">{formatCurrency(salaryNum, currency)}</p>
-          </div>
+      {/* PRINTABLE PAPER AREA */}
+      <div className="max-w-[210mm] mx-auto my-8 bg-white shadow-2xl min-h-[297mm] p-12 print:p-0 print:shadow-none print:m-0 print:w-full">
+        
+        {/* 1. STATEMENT HEADER */}
+        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-8 mb-8">
+            <div className="flex gap-4 items-center">
+               <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center text-emerald-400">
+                  <Wallet className="w-8 h-8" />
+               </div>
+               <div>
+                  <h1 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Budget Statement</h1>
+                  <p className="text-slate-500 font-medium tracking-wide text-sm mt-1">
+                    Generated for {FULL_MONTH_NAMES[date.getMonth()]} {date.getFullYear()}
+                  </p>
+               </div>
+            </div>
+            
+            {/* Bank Card Mini */}
+            {bankDetails && (
+                <div className="text-right">
+                    <div className="flex items-center justify-end gap-2 mb-1">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Primary Account</span>
+                        {bankDetails.logo && <img src={bankDetails.logo} className="w-6 h-6 object-contain rounded-full" />}
+                    </div>
+                    <div className="text-lg font-bold text-slate-800">{bankDetails.name}</div>
+                    <div className="text-xs font-mono text-slate-400">********</div>
+                </div>
+            )}
         </div>
 
-        <div className="grid grid-cols-2 gap-8 mb-8">
-          <div>
-            <h3 className="font-bold text-slate-800 border-b border-slate-200 pb-2 mb-3">Expenses</h3>
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-slate-100">
-                {expenses.map(e => (
-                  <tr key={e.id}>
-                    <td className="py-2 text-slate-600">{e.name}</td>
-                    <td className="py-2 text-right font-medium">{formatCurrency(e.amount, currency)}</td>
-                  </tr>
-                ))}
-                <tr className="font-bold text-slate-900">
-                  <td className="py-3 pt-4">Total Expenses</td>
-                  <td className="py-3 pt-4 text-right">{formatCurrency(totalExpenses, currency)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div>
-            <h3 className="font-bold text-slate-800 border-b border-slate-200 pb-2 mb-3">Savings & Goals</h3>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs text-slate-400 uppercase text-right">
-                   <th className="text-left font-medium pb-2">Goal</th>
-                   <th className="font-medium pb-2">Target</th>
-                   <th className="font-medium pb-2">Actual</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-              {allocations.map(plan => {
-                const target = remainder * (plan.percentage / 100);
-                // SAFER CHECK: Explicitly check for undefined to allow 0 or string values to process correctly
-                const rawActual = actuals && actuals[plan.id];
-                const actual = rawActual !== undefined && rawActual !== '' ? parseFloat(rawActual) : 0;
-
-                return (
-                  <tr key={plan.id}>
-                    <td className="py-2 text-slate-600">{plan.name} <span className="text-xs text-slate-400">({plan.percentage}%)</span></td>
-                    <td className="py-2 text-right font-medium text-slate-500">{formatCurrency(target, currency)}</td>
-                    <td className={`py-2 text-right font-bold ${actual >= target - 1 ? 'text-emerald-600' : 'text-orange-500'}`}>{formatCurrency(actual, currency)}</td>
-                  </tr>
-                );
-              })}
-
-              {/* --- NEW: Current Account Row --- */}
-              <tr className="bg-slate-50 border-t border-slate-100">
-                  <td className="py-2 pl-2 text-slate-800 font-bold">Current Account <span className="text-xs text-slate-400 font-normal">(Remainder)</span></td>
-                  {/* Calculate Target */}
-                  <td className="py-2 text-right font-medium text-slate-500">
-                    {formatCurrency(remainder * (Math.max(0, 100 - allocations.reduce((s,p)=>s+p.percentage,0)) / 100), currency)}
-                  </td>
-                  {/* Calculate Actual: Remainder minus SUM of all pots */}
-                  <td className="py-2 text-right font-bold text-slate-800">
-                    {formatCurrency(Math.max(0, remainder - Object.values(actuals || {}).reduce((s,v)=>s+(parseFloat(v)||0),0)), currency)}
-                  </td>
-              </tr>
-              
-              </tbody>
-            </table>
-             <div className="border-t border-slate-200 pt-3 flex justify-between font-bold text-slate-900 mt-2">
-                <span>Total Target</span>
-                <span>{formatCurrency(remainder, currency)}</span>
-              </div>
-          </div>
+        {/* 2. HIGH LEVEL SUMMARY */}
+        <div className="grid grid-cols-3 gap-6 mb-10">
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 print:border-slate-200">
+               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Net Income</p>
+               <p className="text-2xl font-black text-slate-800">{formatCurrency(salaryNum, currency)}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 print:border-slate-200 print:bg-white">
+               <p className="text-[10px] font-bold text-rose-400 uppercase tracking-wider mb-1">Total Expenses</p>
+               <p className="text-2xl font-black text-rose-600">{formatCurrency(totalExpenses, currency)}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100 print:border-slate-200 print:bg-white">
+               <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Net Savings</p>
+               <p className="text-2xl font-black text-emerald-700">{formatCurrency(remainder, currency)}</p>
+            </div>
         </div>
 
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-center print:border-slate-300">
-          <p className="text-sm text-slate-500">This report was generated automatically. Keep it for your records.</p>
+        <div className="grid grid-cols-2 gap-12">
+            
+            {/* 3. EXPENSES COLUMN */}
+            <div>
+                <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
+                    <TrendingDown className="w-5 h-5 text-rose-500" />
+                    <h3 className="font-bold text-slate-800">Monthly Expenses</h3>
+                </div>
+                
+                <table className="w-full text-sm">
+                    <tbody className="divide-y divide-slate-50">
+                        {expenses.map(e => {
+                            const Icon = getExpenseIcon(e.name);
+                            return (
+                                <tr key={e.id} className="group">
+                                    <td className="py-3 flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                                            {e.logo ? (
+                                                <img src={e.logo} className="w-5 h-5 object-contain mix-blend-multiply" />
+                                            ) : (
+                                                <Icon className="w-4 h-4 text-slate-400" />
+                                            )}
+                                        </div>
+                                        <span className="font-bold text-slate-700">{e.name}</span>
+                                    </td>
+                                    <td className="py-3 text-right font-medium text-slate-600 group-hover:text-slate-900">
+                                        {formatCurrency(e.amount, currency)}
+                                    </td>
+                                </tr>
+                            )
+                        })}
+                        {expenses.length === 0 && (
+                             <tr><td colSpan={2} className="py-4 text-center text-slate-400 italic">No expenses recorded</td></tr>
+                        )}
+                        <tr className="border-t-2 border-slate-900">
+                            <td className="py-4 font-black text-slate-900 uppercase text-xs tracking-wider">Total Outgoings</td>
+                            <td className="py-4 text-right font-black text-xl text-slate-900">{formatCurrency(totalExpenses, currency)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            {/* 4. ALLOCATIONS COLUMN */}
+            <div>
+                <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
+                    <Target className="w-5 h-5 text-indigo-500" />
+                    <h3 className="font-bold text-slate-800">Savings & Allocations</h3>
+                </div>
+
+                <div className="space-y-4">
+                    {/* Headers */}
+                    <div className="flex text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">
+                        <span className="flex-1">Pot Name</span>
+                        <span className="w-20 text-right">Target</span>
+                        <span className="w-20 text-right">Actual</span>
+                    </div>
+
+                    {allocations.map(plan => {
+                         const target = remainder * (plan.percentage / 100);
+                         const rawActual = actuals && actuals[plan.id];
+                         const actual = rawActual !== undefined && rawActual !== '' ? parseFloat(rawActual) : 0;
+                         const percentFilled = Math.min(100, (actual / target) * 100);
+                         
+                         return (
+                            <div key={plan.id} className="bg-slate-50 p-3 rounded-xl border border-slate-100 print:bg-white print:border-slate-200">
+                                <div className="flex justify-between items-end mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-2 h-2 rounded-full ${plan.color.split(' ')[0]}`}></div>
+                                        <div>
+                                            <div className="font-bold text-slate-800 text-sm leading-none">{plan.name}</div>
+                                            <div className="text-[10px] text-slate-400 font-bold mt-1">{plan.percentage}% Allocation</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                         <div className={`text-sm font-bold ${actual >= target -1 ? 'text-emerald-600' : 'text-slate-800'}`}>
+                                            {formatCurrency(actual, currency)}
+                                         </div>
+                                         <div className="text-[10px] text-slate-400">
+                                            of {formatCurrency(target, currency)}
+                                         </div>
+                                    </div>
+                                </div>
+                                {/* Progress Bar */}
+                                <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden print:hidden">
+                                    <div className={`h-full rounded-full ${plan.color.split(' ')[0]}`} style={{ width: `${percentFilled}%` }}></div>
+                                </div>
+                            </div>
+                         );
+                    })}
+
+                    {/* REMAINDER CARD */}
+                    <div className="bg-slate-900 text-white p-4 rounded-xl shadow-lg mt-4 print:bg-white print:text-black print:border-2 print:border-slate-900 print:shadow-none">
+                         <div className="flex justify-between items-center mb-2">
+                             <span className="font-bold text-sm flex items-center gap-2">
+                                {bankDetails?.logo && <img src={bankDetails.logo} className="w-4 h-4 rounded-full bg-white border border-white" />}
+                                Current Account
+                             </span>
+                             <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded text-white font-bold print:bg-slate-200 print:text-slate-800">REMAINDER</span>
+                         </div>
+                         <div className="flex justify-between items-end">
+                            <div className="opacity-80 text-xs">Target: {formatCurrency(currentAccountTarget, currency)}</div>
+                            <div className="text-xl font-black">{formatCurrency(currentAccountActual, currency)}</div>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {/* FOOTER */}
+        <div className="mt-16 pt-8 border-t border-slate-100 text-center">
+            <p className="text-xs text-slate-400">
+                This document is a generated financial summary. <br/>
+                Created with Budget Planner on {new Date().toLocaleDateString()}.
+            </p>
         </div>
       </div>
     </div>
   );
 };
 
-const HistoryReportView = ({ data, allocations, onClose, currency }) => {
+const HistoryReportView = ({ data, allocations, onClose, currency, bankDetails }) => {
   return (
-    <div className="fixed inset-0 bg-white z-[70] overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-100 z-[70] overflow-y-auto animate-in zoom-in-95 duration-200">
       <div className="bg-slate-900 text-white p-4 sticky top-0 z-20 flex justify-between items-center shadow-lg print:hidden">
-        <h2 className="font-bold">Annual History Preview</h2>
+        <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/10 rounded-lg"><Table className="w-5 h-5 text-amber-400" /></div>
+            <div>
+                <h2 className="font-bold text-sm">Annual History</h2>
+                <p className="text-xs text-slate-400">{data.length} months on record</p>
+            </div>
+        </div>
         <div className="flex gap-2">
           <button 
-            onClick={() => openReportInNewTab('printable-history-report', 'Annual Financial Report')} 
-            className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm hover:bg-emerald-400"
+            onClick={() => window.print()} 
+            className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-xs hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/20"
           >
-            <Printer className="w-4 h-4" /> Open Printable PDF
+            <Printer className="w-4 h-4" /> Print PDF
           </button>
-          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full">
+          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition">
             <X className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      <div id="printable-history-report" className="max-w-5xl mx-auto p-8 print:p-0 print:landscape">
-        <h1 className="text-2xl font-bold text-slate-900 mb-6 hidden print:block">Annual Financial Report</h1>
+      <div id="printable-history-report" className="max-w-[297mm] mx-auto my-8 bg-white shadow-2xl p-8 min-h-[210mm] print:p-0 print:shadow-none print:m-0 print:w-full">
+        
+        <div className="flex justify-between items-end border-b-2 border-slate-900 pb-6 mb-6">
+            <div>
+                <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Financial History</h1>
+                <p className="text-slate-500 text-sm mt-1">Annual breakdown of income, expenses, and savings pots.</p>
+            </div>
+            {bankDetails && bankDetails.logo && (
+                <img src={bankDetails.logo} className="h-8 object-contain" alt="Bank Logo" />
+            )}
+        </div>
         
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
+          <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b-2 border-slate-200">
-                <th className="py-3 px-2 font-bold text-slate-700">Month</th>
-                <th className="py-3 px-2 font-bold text-slate-700 text-right">Net Salary</th>
-                <th className="py-3 px-2 font-bold text-slate-700 text-right">Expenses</th>
-                <th className="py-3 px-2 font-bold text-slate-700 text-right border-r border-slate-200 pr-4">Target Savings</th>
+              <tr className="border-b border-slate-200">
+                <th className="py-3 px-2 font-black text-slate-900 uppercase tracking-wider w-24">Month</th>
+                <th className="py-3 px-2 font-bold text-slate-500 text-right bg-slate-50">Net Salary</th>
+                <th className="py-3 px-2 font-bold text-slate-500 text-right bg-rose-50/50 text-rose-600">Expenses</th>
+                <th className="py-3 px-2 font-black text-slate-900 text-right border-r-2 border-slate-100 pr-4 bg-emerald-50/50 text-emerald-700">Net Savings</th>
+                
+                {/* Remainder Column Header */}
+                 <th className="py-3 px-2 font-bold text-indigo-900 text-right bg-indigo-50/30 w-28">
+                    Current Acc.
+                 </th>
+
+                {/* Pot Headers */}
                 {allocations.map(plan => (
-                  <th key={plan.id} className="py-3 px-2 font-bold text-indigo-700 text-right text-xs uppercase w-24">
-                    {plan.name.split(' ')[0]} (Act)
+                  <th key={plan.id} className="py-3 px-2 font-bold text-slate-600 text-right w-24 whitespace-nowrap overflow-hidden text-ellipsis" title={plan.name}>
+                    <span className={`inline-block w-2 h-2 rounded-full mr-1 ${plan.color.split(' ')[0]}`}></span>
+                    {plan.name}
                   </th>
                 ))}
               </tr>
-              </thead>
+            </thead>
             <tbody className="divide-y divide-slate-100">
-              {data.map((row) => {
+              {data.map((row, index) => {
                 const totalExpenses = (row.expenses || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
                 const salary = parseFloat(row.salary) || 0;
                 const remainder = Math.max(0, salary - totalExpenses);
                 const actuals = row.actualSavings || {};
 
                 return (
-                  <tr key={row.id} className="hover:bg-slate-50 break-inside-avoid">
-                    <td className="py-3 px-2 font-medium text-slate-800">{row.id}</td>
-                    <td className="py-3 px-2 text-right font-mono font-bold text-emerald-600">{formatCurrency(salary, currency)}</td>
-                    <td className="py-3 px-2 text-right font-mono text-rose-500">{formatCurrency(totalExpenses, currency)}</td>
+                  <tr key={row.id} className={`break-inside-avoid ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                    <td className="py-3 px-2 font-bold text-slate-800">{row.id}</td>
                     
-                    {/* Current Account Actual Logic */}
-                    <td className="py-3 px-2 text-right font-mono font-bold text-indigo-600 border-r border-slate-200 pr-4">
+                    <td className="py-3 px-2 text-right font-mono text-slate-500 bg-slate-50">
+                        {formatCurrency(salary, currency)}
+                    </td>
+                    
+                    <td className="py-3 px-2 text-right font-mono text-rose-600 font-medium bg-rose-50/50">
+                        {formatCurrency(totalExpenses, currency)}
+                    </td>
+                    
+                    <td className="py-3 px-2 text-right font-mono font-bold text-emerald-600 border-r-2 border-slate-100 pr-4 bg-emerald-50/50">
+                        {formatCurrency(remainder, currency)}
+                    </td>
+
+                    {/* Current Account Actual */}
+                    <td className="py-3 px-2 text-right font-mono font-bold text-indigo-700 bg-indigo-50/30">
                       {formatCurrency(Math.max(0, remainder - Object.values(actuals).reduce((sum, val) => sum + (parseFloat(val) || 0), 0)), currency)}
                     </td>
 
                     {allocations.map(plan => {
-                      // SAFER CHECK: Extract raw value first, check validity, then parse
                       const rawActual = actuals[plan.id];
                       const actual = rawActual !== undefined && rawActual !== '' ? parseFloat(rawActual) : 0;
-                      
                       const target = remainder * (plan.percentage / 100);
-                      const isMet = actual >= target - 1; // Tolerance of 1
+                      const isMet = actual >= target - 1; 
                       
                       return (
-                        <td key={plan.id} className={`py-3 px-2 text-right font-mono text-sm ${isMet ? 'text-emerald-600' : 'text-orange-500'}`}>
-                          {formatCurrency(actual, currency)}
+                        <td key={plan.id} className="py-3 px-2 text-right font-mono text-slate-600">
+                          <span className={isMet ? 'text-emerald-600 font-bold' : 'text-slate-400'}>
+                             {formatCurrency(actual, currency)}
+                          </span>
                         </td>
                       );
                     })}
@@ -3897,26 +4022,28 @@ export default function App() {
         />
       )}
 
-{activeReport === 'month' && (
+      {activeReport === 'month' && (
         <MonthReportView 
           date={currentDate}
           salary={effectiveSalary} 
           expenses={effectiveExpenses} 
-          // FIX: Use effectiveAllocations instead of effectiveSettings.allocationRules
           allocations={effectiveAllocations} 
           actuals={effectiveActuals} 
           onClose={() => setActiveReport(null)}
           currency={effectiveSettings.currency} 
+          // ADD THIS LINE:
+          bankDetails={effectiveSettings.bankDetails} 
         />
       )}
 
       {activeReport === 'history' && (
         <HistoryReportView 
           data={reportData}
-          // FIX: Use effectiveAllocations here too so columns match your current setup
           allocations={effectiveAllocations} 
           onClose={() => setActiveReport(null)}
           currency={effectiveSettings.currency} 
+          // ADD THIS LINE:
+          bankDetails={effectiveSettings.bankDetails}
         />
       )}
 
