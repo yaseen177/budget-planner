@@ -4076,6 +4076,14 @@ const DailyPaceModal = ({ isOpen, onClose, currentTargets, onSave, currency }) =
   const [low, setLow] = useState(currentTargets?.low || 10);
   const [high, setHigh] = useState(currentTargets?.high || 30);
 
+  // --- FIX: Sync state with Settings whenever modal opens ---
+  useEffect(() => {
+    if (isOpen && currentTargets) {
+      setLow(currentTargets.low || 10);
+      setHigh(currentTargets.high || 30);
+    }
+  }, [isOpen, currentTargets]);
+
   if (!isOpen) return null;
 
   return (
