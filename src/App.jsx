@@ -5095,7 +5095,7 @@ export default function App() {
         }}
         className={`fixed bottom-6 right-6 text-white px-6 py-4 rounded-full shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 z-40 print:hidden flex items-center gap-2 font-bold ${isSandbox ? 'bg-indigo-600' : 'bg-slate-900'}`}
       >
-        <Plus className="w-5 h-5" /> <span className="hidden sm:inline">New Expense</span>
+        <Plus className="w-5 h-5" /> <span className="hidden sm:inline">Add One-Off Expense</span>
       </button>
 
       {/* Toast Notification */}
@@ -5760,7 +5760,7 @@ export default function App() {
                 const groups = [
                   { id: 'mort', title: 'Mortgages', items: mortgages, defaultOpen: true }, // <--- ADD THIS
                   { id: 'fix', title: 'Fixed Bills', items: fixed, defaultOpen: true },
-                  { id: 'var', title: 'Variable Spending', items: variable, defaultOpen: true },
+                  { id: 'var', title: 'One-Off Expenses', items: variable, defaultOpen: true },
                   { id: 'cc',  title: 'Credit Cards', items: cards, defaultOpen: true } 
                 ];
                 
