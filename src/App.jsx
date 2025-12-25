@@ -833,7 +833,7 @@ const MultiBarChart = ({ data, keys, colors }) => {
     );
 };
 
-// --- ANALYTICS DASHBOARD ---
+// --- ANALYTICS DASHBOARD (FIXED) ---
 const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
   const [history, setHistory] = useState([]);
   const [timeRange, setTimeRange] = useState('6M'); // 3M, 6M, 12M, ALL
@@ -842,13 +842,16 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
 
   useEffect(() => {
     const fetchHistory = async () => {
+      // Guard: If we don't have rules yet, wait.
+      if (!allocationRules || allocationRules.length === 0) return;
+
       try {
         const colRef = collection(db, 'artifacts', appId, 'users', user.uid, 'budgetData');
         const snapshot = await getDocs(colRef);
         let rawData = [];
+        
         snapshot.forEach(doc => {
           const val = doc.data();
-          // Extract basic stats
           const salary = parseFloat(val.salary) || 0;
           const expensesTotal = (val.expenses || []).reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
           const remainder = Math.max(0, salary - expensesTotal);
@@ -857,13 +860,17 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
           // Calculate target vs actual for each pot
           const potData = {};
           allocationRules.forEach(rule => {
+             // Robustly handle missing IDs or data
+             const actualVal = actuals[rule.id] !== undefined ? parseFloat(actuals[rule.id]) : 0;
+             
              potData[rule.id] = {
                  target: remainder * (rule.percentage / 100),
-                 actual: parseFloat(actuals[rule.id]) || 0
+                 actual: actualVal || 0
              };
           });
 
-          if (salary > 0) {
+          // Only push if there is some meaningful data
+          if (salary > 0 || Object.keys(potData).length > 0) {
             rawData.push({
               id: doc.id, // YYYY-MM
               label: MONTH_NAMES[parseInt(doc.id.split('-')[1]) - 1],
@@ -875,16 +882,18 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
             });
           }
         });
+        
         rawData.sort((a, b) => a.id.localeCompare(b.id));
         setHistory(rawData);
       } catch (e) {
-        console.error(e);
+        console.error("Analytics Error:", e);
       } finally {
         setLoading(false);
       }
     };
+
     fetchHistory();
-  }, [user]);
+  }, [user, allocationRules]); // <--- FIX: Added allocationRules here to force recalculation
 
   // Filter Data based on Time Range
   const filteredData = useMemo(() => {
@@ -894,19 +903,17 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
   }, [history, timeRange]);
 
   // 1. Pot-Specific Projections
-  // Calculate average actual savings PER POT over the filtered period
   const potProjections = useMemo(() => {
     const projections = {};
     if (filteredData.length === 0) return {};
 
     allocationRules.forEach(rule => {
-      // Sum up actuals for this specific pot across all filtered months
       const totalActualForPot = filteredData.reduce((sum, m) => {
-        const val = parseFloat(m.pots[rule.id]?.actual) || 0;
+        // Safe access in case history has old data structure
+        const val = m.pots[rule.id]?.actual || 0;
         return sum + val;
       }, 0);
       
-      // Calculate monthly average based on the filtered timeframe
       const avg = totalActualForPot / filteredData.length;
       
       projections[rule.id] = {
@@ -919,22 +926,20 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
     return projections;
   }, [filteredData, allocationRules]);
   
-  // 2. Variance Calculations (Month-over-Month)
+  // 2. Variance Calculations
   const getVariance = (key) => {
       if (filteredData.length < 2) return null;
       const current = filteredData[filteredData.length - 1][key];
       const previous = filteredData[filteredData.length - 2][key];
       if (previous === 0) return null;
-      const percent = ((current - previous) / previous) * 100;
-      return percent;
+      return ((current - previous) / previous) * 100;
   };
   
   const incomeVar = getVariance('salary');
   const expenseVar = getVariance('expenses');
 
-  if (loading) return <div className="fixed inset-0 z-[100] bg-white flex items-center justify-center">Loading Analytics...</div>;
+  if (loading) return <div className="fixed inset-0 z-[100] bg-white flex items-center justify-center font-bold text-slate-500">Loading Analytics...</div>;
 
-  // -- RENDER --
   return (
     <div className="fixed inset-0 bg-slate-50 z-[60] overflow-y-auto animate-in fade-in slide-in-from-bottom-8">
       
@@ -944,7 +949,6 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
           <BarChart3 className="w-5 h-5 text-emerald-500" /> Analytics
         </h2>
         
-        {/* Range Selector */}
         <div className="flex bg-slate-100 p-1 rounded-lg">
            {['3M', '6M', '12M', 'ALL'].map(r => (
              <button 
@@ -964,36 +968,28 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
 
       <div className="max-w-2xl mx-auto p-4 space-y-6 pb-20">
         
-        {filteredData.length < 2 ? (
+        {filteredData.length === 0 ? (
            <div className="text-center py-20 text-slate-400">
              <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-20" />
-             <p>Need more data to show trends.</p>
-             <p className="text-xs">Keep tracking your months!</p>
+             <p className="font-bold">No data found</p>
+             <p className="text-xs mt-2">Make sure you have saved at least one month of data.</p>
            </div>
         ) : (
           <>
-            {/* --- NEW: POT PROJECTION CARDS --- */}
+            {/* PROJECTION CARDS */}
             <div className="mb-6">
                <h3 className="text-sm font-bold text-slate-800 mb-3 px-2 flex items-center gap-2">
                  <TrendingUp className="w-4 h-4 text-emerald-500" /> Future Projections
                </h3>
-               {/* Horizontal Scroll Container */}
                <div className="flex gap-4 overflow-x-auto pb-4 px-2 -mx-2 no-scrollbar snap-x">
                  {allocationRules.map(rule => {
                     const proj = potProjections[rule.id] || { avg: 0, sixMonths: 0, oneYear: 0, fiveYears: 0 };
                     
-                    // Simple logic to try and match the pot color (fallback to slate)
                     let colorHex = '#64748b'; 
-                    if (rule.color.includes('emerald')) colorHex = '#10b981';
-                    else if (rule.color.includes('indigo')) colorHex = '#6366f1';
-                    else if (rule.color.includes('sky')) colorHex = '#0ea5e9';
-                    else if (rule.color.includes('amber')) colorHex = '#f59e0b';
-                    else if (rule.color.includes('rose')) colorHex = '#f43f5e';
-                    else if (rule.color.includes('purple')) colorHex = '#a855f7';
-                    
+                    if (rule.hex) colorHex = rule.hex; // Use exact hex if available
+
                     return (
                        <div key={rule.id} className="min-w-[280px] bg-slate-900 text-white p-5 rounded-2xl shadow-lg relative overflow-hidden snap-center flex-shrink-0 border border-slate-800">
-                          {/* Background Glow based on pot color */}
                           <div 
                             className="absolute top-0 right-0 w-32 h-32 rounded-full -mr-10 -mt-10 blur-xl opacity-20"
                             style={{ backgroundColor: colorHex }}
@@ -1037,7 +1033,6 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                <div className="flex justify-between items-center mb-4">
                  <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Income Trend</h3>
-                    {/* --- NEW: INCOME VARIANCE PILL --- */}
                     {incomeVar !== null && (
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${incomeVar >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
                             {incomeVar >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
@@ -1064,10 +1059,8 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                <div className="flex justify-between items-center mb-4">
                  <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Monthly Expenses</h3>
-                    {/* --- NEW: EXPENSE VARIANCE PILL --- */}
                     {expenseVar !== null && (
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${expenseVar <= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                            {/* Logic flipped for expenses: Up is Bad (Rose), Down is Good (Emerald) */}
                             {expenseVar > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                             {Math.abs(expenseVar).toFixed(1)}%
                         </span>
@@ -1099,12 +1092,7 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                     }));
                     const totalSaved = potHistory.reduce((sum, x) => sum + x.value, 0);
                     
-                    // Color mapping
-                    let color = '#64748b';
-                    if (rule.color.includes('indigo')) color = '#6366f1';
-                    if (rule.color.includes('emerald')) color = '#10b981';
-                    if (rule.color.includes('sky')) color = '#0ea5e9';
-                    if (rule.color.includes('amber')) color = '#f59e0b';
+                    let color = rule.hex || '#64748b';
 
                     return (
                       <button 
@@ -1151,7 +1139,7 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                           actual: d.pots[selectedPot.id]?.actual || 0
                        }))}
                        keys={['target', 'actual']}
-                       colors={['bg-slate-300', selectedPot.color.split(' ')[0].replace('bg-', 'bg-')]} // Hacky color extraction or pass explicit
+                       colors={['bg-slate-300', selectedPot.color ? selectedPot.color.split(' ')[0] : 'bg-emerald-500']}
                     />
                  </div>
                  <div className="flex justify-center gap-6 mt-6">
@@ -1159,7 +1147,7 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                        <div className="w-3 h-3 bg-slate-300 rounded-sm"></div> Target
                     </div>
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                       <div className={`w-3 h-3 rounded-sm ${selectedPot.color.split(' ')[0]}`}></div> Actual
+                       <div className={`w-3 h-3 rounded-sm ${selectedPot.color ? selectedPot.color.split(' ')[0] : 'bg-emerald-500'}`}></div> Actual
                     </div>
                  </div>
               </div>
