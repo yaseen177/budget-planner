@@ -261,7 +261,6 @@ const RollingNumber = ({ value, currency = 'GBP', decimals = 0 }) => {
       if (!startTime) startTime = currentTime;
       const progress = Math.min((currentTime - startTime) / duration, 1);
       
-      // EaseOutQuart function for smooth landing
       const ease = 1 - Math.pow(1 - progress, 4);
       
       const current = start + (end - start) * ease;
@@ -291,7 +290,6 @@ const TiltCard = ({ children, className }) => {
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
     
-    // Calculate rotation (max 5 degrees)
     const rotateX = ((y - centerY) / centerY) * -3; 
     const rotateY = ((x - centerX) / centerX) * 3;
 
