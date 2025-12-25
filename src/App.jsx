@@ -3897,24 +3897,26 @@ export default function App() {
         />
       )}
 
-      {activeReport === 'month' && (
+{activeReport === 'month' && (
         <MonthReportView 
           date={currentDate}
-          salary={effectiveSalary} // <--- CHANGED
-          expenses={effectiveExpenses} // <--- CHANGED
-          allocations={effectiveSettings.allocationRules} // <--- CHANGED
-          actuals={effectiveActuals} // <--- CHANGED
+          salary={effectiveSalary} 
+          expenses={effectiveExpenses} 
+          // FIX: Use effectiveAllocations instead of effectiveSettings.allocationRules
+          allocations={effectiveAllocations} 
+          actuals={effectiveActuals} 
           onClose={() => setActiveReport(null)}
-          currency={effectiveSettings.currency} // <--- CHANGED
+          currency={effectiveSettings.currency} 
         />
       )}
 
       {activeReport === 'history' && (
         <HistoryReportView 
           data={reportData}
-          allocations={effectiveSettings.allocationRules} // <--- CHANGED
+          // FIX: Use effectiveAllocations here too so columns match your current setup
+          allocations={effectiveAllocations} 
           onClose={() => setActiveReport(null)}
-          currency={effectiveSettings.currency} // <--- CHANGED
+          currency={effectiveSettings.currency} 
         />
       )}
 
