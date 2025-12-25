@@ -2333,8 +2333,13 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   // --- NEW: Credit Cards State ---
   const [creditCards, setCreditCards] = useState(currentSettings.creditCards || []);
 
-  // --- NEW: Mortgages State ---
+  // --- UPDATED: Mortgages State ---
   const [mortgages, setMortgages] = useState(currentSettings.mortgages || []);
+
+  // --- NEW: Update Mortgage Amount ---
+  const updateMortgageAmount = (name, amount) => {
+     setMortgages(mortgages.map(m => m.name === name ? { ...m, amount: parseFloat(amount) || 0 } : m));
+  };
 
   const toggleCreditCard = (card) => {
      if (creditCards.some(c => c.name === card.name)) {
@@ -2349,7 +2354,8 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
     if (mortgages.some(m => m.name === lender.name)) {
        setMortgages(mortgages.filter(m => m.name !== lender.name));
     } else {
-       setMortgages([...mortgages, lender]);
+       // Default amount to 0 if adding new
+       setMortgages([...mortgages, { ...lender, amount: '' }]);
     }
  };
 
@@ -2485,20 +2491,36 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
            </div>
         </section>
 
-        {/* --- NEW: MORTGAGES SECTION (Insert after Credit Cards) --- */}
+        {/* --- UPDATED: MORTGAGES SECTION --- */}
         <section className="space-y-3">
            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">My Mortgages</h3>
            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
               <p className="text-xs text-slate-500 leading-relaxed">
-                 Select your mortgage provider.
+                 Select your mortgage provider and enter your <strong>fixed monthly repayment</strong>.
               </p>
               
-              <div className="flex flex-wrap gap-2 mb-2">
+              {/* Selected Mortgages with Amount Input */}
+              <div className="space-y-2 mb-2">
                  {mortgages.map(m => (
-                    <div key={m.name} className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-blue-100 shadow-sm animate-in zoom-in">
-                       {m.logo && <img src={m.logo} className="w-4 h-4 object-contain" />}
-                       <span className="text-xs font-bold text-slate-700">{m.name}</span>
-                       <button onClick={() => toggleMortgage(m)} className="text-slate-300 hover:text-red-500"><X className="w-3 h-3" /></button>
+                    <div key={m.name} className="flex items-center gap-2 bg-white p-2 rounded-xl border border-blue-200 shadow-sm animate-in zoom-in">
+                       <div className="flex items-center gap-2 flex-1">
+                           {m.logo && <img src={m.logo} className="w-6 h-6 object-contain" />}
+                           <span className="text-sm font-bold text-slate-700">{m.name}</span>
+                       </div>
+                       
+                       {/* Amount Input */}
+                       <div className="relative w-24">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">£</span>
+                          <input 
+                            type="number" 
+                            placeholder="0"
+                            value={m.amount}
+                            onChange={(e) => updateMortgageAmount(m.name, e.target.value)}
+                            className="w-full pl-5 pr-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100"
+                          />
+                       </div>
+
+                       <button onClick={() => toggleMortgage(m)} className="p-2 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition"><X className="w-4 h-4" /></button>
                     </div>
                  ))}
               </div>
@@ -3249,8 +3271,13 @@ const OnboardingWizard = ({ user, onComplete }) => {
   if (mortgages.some(m => m.name === lender.name)) {
      setMortgages(mortgages.filter(m => m.name !== lender.name));
   } else {
-     setMortgages([...mortgages, lender]);
+     setMortgages([...mortgages, { ...lender, amount: '' }]);
   }};
+
+
+  const updateMortgageAmount = (name, amount) => {
+    setMortgages(mortgages.map(m => m.name === name ? { ...m, amount: parseFloat(amount) || 0 } : m));
+ };
 
 
   return (
@@ -3328,17 +3355,30 @@ const OnboardingWizard = ({ user, onComplete }) => {
            </div>
         )}
 
-        {/* --- NEW STEP 3: MORTGAGES --- */}
+        {/* --- UPDATED STEP 3: MORTGAGES --- */}
         {step === 3 && (
           <div className="space-y-6 animate-in slide-in-from-right-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-slate-800">Mortgages</h2>
-              <p className="text-slate-500">Do you have a mortgage?</p>
+              <p className="text-slate-500">Select lender & enter <strong>monthly repayment</strong>.</p>
             </div>
 
-            <div className="flex flex-wrap gap-2 justify-center">
+            {/* List of Selected Mortgages with Inputs */}
+            <div className="space-y-2">
                  {mortgages.map(m => (
-                    <span key={m.name} className="text-xs font-bold bg-slate-900 text-white px-2 py-1 rounded animate-in zoom-in">{m.name}</span>
+                    <div key={m.name} className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-200 animate-in zoom-in">
+                       <span className="text-xs font-bold bg-slate-900 text-white px-2 py-1 rounded">{m.name}</span>
+                       <div className="relative w-28">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">£</span>
+                          <input 
+                             type="number"
+                             placeholder="Amount"
+                             value={m.amount}
+                             onChange={(e) => updateMortgageAmount(m.name, e.target.value)}
+                             className="w-full pl-6 pr-2 py-2 rounded-lg border border-slate-200 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-200"
+                          />
+                       </div>
+                    </div>
                  ))}
             </div>
 
@@ -4480,18 +4520,17 @@ export default function App() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         let currentExpenses = data.expenses || [];
-        let needsUpdate = false; // Track if we need to save changes to DB
+        let needsUpdate = false; 
 
-        // --- 1. Inject Credit Cards if missing ---
+        // 1. Inject Credit Cards (Variable = 0)
         if (userSettings.creditCards && userSettings.creditCards.length > 0) {
            userSettings.creditCards.forEach(card => {
-              // Check if this card exists in expenses (by name and type)
               const exists = currentExpenses.some(e => e.name === card.name && e.type === 'credit_card');
               if (!exists) {
                  currentExpenses.push({
                     id: `cc_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
                     name: card.name,
-                    amount: 0, 
+                    amount: 0, // Credit cards are variable
                     type: 'credit_card',
                     logo: card.logo
                  });
@@ -4500,15 +4539,16 @@ export default function App() {
            });
         }
 
-        // --- 2. Inject Mortgages if missing (NEW) ---
+        // 2. Inject Mortgages (FIXED AMOUNT)
         if (userSettings.mortgages && userSettings.mortgages.length > 0) {
            userSettings.mortgages.forEach(mort => {
               const exists = currentExpenses.some(e => e.name === mort.name && e.type === 'mortgage');
+              // Only inject if it doesn't exist. If it exists, we respect the existing month's data.
               if (!exists) {
                  currentExpenses.push({
                     id: `mort_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
                     name: mort.name,
-                    amount: 0, 
+                    amount: parseFloat(mort.amount) || 0, // <--- USE USER SETTING AMOUNT
                     type: 'mortgage',
                     logo: mort.logo
                  });
@@ -4517,17 +4557,14 @@ export default function App() {
            });
         }
            
-        // If we added cards OR mortgages, save to DB immediately (unless in Sandbox/Demo)
         if (needsUpdate && !isSandbox && !activeDemoId) {
             setDoc(docRef, { ...data, expenses: currentExpenses }, { merge: true });
         }
         
         setExpenses(currentExpenses);
-
         setSalary(data.salary || '');
         setActualSavings(data.actualSavings || {});
 
-        // --- AUTO-LOCK LOGIC ---
         if (data.salary && !data.allocationRules) {
            setDoc(docRef, { ...data, allocationRules: userSettings.allocationRules }, { merge: true });
            setMonthAllocations(userSettings.allocationRules);
@@ -4536,13 +4573,12 @@ export default function App() {
         }
 
       } else {
-        // --- NEW/EMPTY MONTH INITIALIZATION ---
+        // --- NEW/EMPTY MONTH ---
         setSalary('');
         
-        // Start with Fixed Expenses
         const initialExpenses = [...(userSettings.defaultFixedExpenses || [])];
         
-        // Append Credit Cards
+        // Add Credit Cards
         if (userSettings.creditCards) {
            userSettings.creditCards.forEach(card => {
               initialExpenses.push({
@@ -4555,13 +4591,13 @@ export default function App() {
            });
         }
 
-        // Append Mortgages (NEW)
+        // Add Mortgages with FIXED AMOUNT
         if (userSettings.mortgages) {
            userSettings.mortgages.forEach(mort => {
               initialExpenses.push({
                  id: `mort_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
                  name: mort.name,
-                 amount: 0,
+                 amount: parseFloat(mort.amount) || 0, // <--- USE USER SETTING AMOUNT
                  type: 'mortgage',
                  logo: mort.logo
               });
