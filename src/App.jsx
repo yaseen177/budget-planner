@@ -1235,7 +1235,7 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Monthly Cost</label>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">One-Off Expense Amount</label>
             <div className="relative" id="input-expense-amount">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-slate-400">£</span>
               <input 
