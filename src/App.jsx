@@ -274,6 +274,94 @@ const MorphButton = ({ children, onClick, className = '', ...props }) => {
      }, 700);
   };
 
+// HELPER 6: SPRING DRAWER (Mobile Bottom Sheet)
+const SpringDrawer = ({ isOpen, onClose, children, title }) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const [offsetY, setOffsetY] = useState(0);
+  const [startY, setStartY] = useState(0);
+  const [isVisible, setIsVisible] = useState(false);
+
+  // Handle entry animation
+  useEffect(() => {
+    if (isOpen) {
+        setIsVisible(true);
+        setOffsetY(0); // Reset position
+    } else {
+        setTimeout(() => setIsVisible(false), 300); // Wait for exit anim
+    }
+  }, [isOpen]);
+
+  if (!isVisible && !isOpen) return null;
+
+  // PHYSICS HANDLERS
+  const handleTouchStart = (e) => {
+    setIsDragging(true);
+    setStartY(e.touches[0].clientY);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDragging) return;
+    const currentY = e.touches[0].clientY;
+    const delta = currentY - startY;
+    
+    // Only allow dragging DOWN (positive delta)
+    if (delta > 0) {
+        e.preventDefault(); // Stop scrolling body
+        setOffsetY(delta);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    // If dragged down more than 120px, close it. Otherwise spring back.
+    if (offsetY > 120) {
+        onClose();
+    } else {
+        setOffsetY(0);
+    }
+  };
+
+  return (
+    <div className={`fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:justify-center`}>
+       {/* BACKDROP (Fades in/out) */}
+       <div 
+         className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`} 
+         onClick={onClose}
+       />
+
+       {/* DRAWER PANEL */}
+       <div 
+         className={`
+            relative w-full max-w-sm bg-white shadow-2xl overflow-hidden
+            sm:rounded-3xl sm:m-4 sm:translate-y-0 
+            rounded-t-[2.5rem] 
+            transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
+         `}
+         style={{ 
+            // If dragging, follow finger exactly. If released, animate.
+            transform: isDragging ? `translateY(${offsetY}px)` : `translateY(${isOpen ? '0%' : '100%'})`,
+            transition: isDragging ? 'none' : 'transform 400ms cubic-bezier(0.32, 0.72, 0, 1)'
+         }}
+       >
+          {/* DRAG HANDLE (Mobile Only) */}
+          <div 
+            className="w-full h-8 flex items-center justify-center cursor-grab active:cursor-grabbing touch-none sm:hidden"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+             <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+          </div>
+
+          {/* CONTENT */}
+          <div className="max-h-[85vh] overflow-y-auto no-scrollbar">
+             {children}
+          </div>
+       </div>
+    </div>
+  );
+};
+
   return (
     <button 
        onClick={handleClick}
@@ -1027,40 +1115,44 @@ const Toast = ({ message, onClose }) => (
   </div>
 );
 
-// --- ADD EXPENSE MODAL (WITH JUICE MORPH BUTTON) ---
+// --- ADD EXPENSE MODAL (SMART: Drawer on Mobile, Modal on Desktop) ---
 const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [logo, setLogo] = useState(null); 
 
-  if (!isOpen) return null;
+  // Reset state when opening
+  useEffect(() => {
+    if (isOpen) {
+        setName('');
+        setAmount('');
+        setLogo(null);
+    }
+  }, [isOpen]);
 
-  // We keep this just in case, but we prevent default so the button handles the logic
-  const handleFormSubmit = (e) => {
-    e.preventDefault();
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4 animate-in fade-in">
-      <div id="modal-add-expense" className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-spring duration-200">
-        
-        {/* Header */}
-        <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+  // Handle Form Logic
+  const handleFormSubmit = (e) => { e.preventDefault(); };
+  
+  const content = (
+    <div className="bg-white">
+        {/* Header (Hidden on mobile usually, but good for context) */}
+        <div className="px-6 pb-2 pt-2 sm:pt-6 sm:border-b sm:border-slate-100 flex justify-between items-center">
           <h3 className="font-bold text-lg text-slate-800">New Expense</h3>
-          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition">
+          {/* Close button only for desktop/modal view */}
+          <button onClick={onClose} className="hidden sm:block p-2 hover:bg-slate-200 rounded-full transition">
             <X className="w-5 h-5 text-slate-500" />
           </button>
         </div>
         
-        {/* Form Inputs (No Submit Button Here anymore) */}
-        <form onSubmit={handleFormSubmit} className="p-6 space-y-4 pb-2">
+        {/* Form Inputs */}
+        <form onSubmit={handleFormSubmit} className="p-6 space-y-5 pb-2">
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Bill Name</label>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Bill Name</label>
             <div id="input-expense-name">
               <BrandSearchInput 
-                autoFocus={true}
+                autoFocus={false} // False on mobile to prevent keyboard jumping immediately
                 placeholder="e.g. Netflix, Tesco..." 
-                className="w-full p-4 rounded-xl bg-slate-50 border-none text-lg font-medium text-slate-800 placeholder-slate-300 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                className="w-full p-4 rounded-2xl bg-slate-50 border-none text-xl font-medium text-slate-800 placeholder-slate-300 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all focus:bg-white"
                 value={name}
                 onChange={setName}
                 onSelectBrand={(brandName, brandLogo) => {
@@ -1071,13 +1163,14 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Amount</label>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Monthly Cost</label>
             <div className="relative" id="input-expense-amount">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-400">£</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-slate-400">£</span>
               <input 
                 type="text" 
+                inputMode="decimal" // Better keyboard on mobile
                 placeholder="0.00" 
-                className="w-full pl-10 p-4 rounded-xl bg-slate-50 border-none text-lg font-bold text-slate-800 placeholder-slate-300 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                className="w-full pl-10 p-4 rounded-2xl bg-slate-50 border-none text-2xl font-bold text-slate-800 placeholder-slate-300 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all focus:bg-white"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
               />
@@ -1085,35 +1178,32 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
           </div>
         </form>
 
-        {/* JUICE FOOTER: Cancel + Morph Button */}
-        <div className="p-6 border-t border-slate-100 bg-slate-50 flex gap-3">
+        {/* JUICE FOOTER */}
+        <div className="p-6 pt-4 border-t border-slate-50 bg-white sm:bg-slate-50 flex gap-3 pb-8 sm:pb-6">
              <button 
                onClick={onClose}
-               className="flex-1 py-4 rounded-xl font-bold text-slate-500 hover:bg-slate-200 transition"
+               className="flex-1 py-4 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition"
              >
                Cancel
              </button>
              
              <MorphButton 
-               disabled={!name || !amount} // Disable if empty
+               disabled={!name || !amount} 
                onClick={() => {
-                  // This runs AFTER the checkmark animation finishes
                   onSave(name, safeCalculate(amount), logo);
-                  // Optional: Clear state slightly after to ensure smooth exit
-                  setTimeout(() => {
-                    setName('');
-                    setAmount('');
-                    setLogo(null);
-                  }, 500);
                }}
-               className={`flex-[2] py-4 rounded-xl font-bold text-white shadow-lg transition-all ${(!name || !amount) ? 'bg-slate-300 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800 hover:shadow-2xl'}`}
+               className={`flex-[2] py-4 rounded-xl font-bold text-white shadow-lg transition-all ${(!name || !amount) ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800 hover:shadow-2xl'}`}
              >
                Save Bill
              </MorphButton>
         </div>
-
-      </div>
     </div>
+  );
+
+  return (
+      <SpringDrawer isOpen={isOpen} onClose={onClose}>
+          {content}
+      </SpringDrawer>
   );
 };
 
