@@ -3036,16 +3036,17 @@ const calculateDaysUntilPayday = (payDayStr, salaryInputted) => {
 };
 
 // --- NEW COMPONENT: ONBOARDING WIZARD ---
-// --- ONBOARDING WIZARD COMPONENT ---
+
 const OnboardingWizard = ({ user, onComplete }) => {
   const [step, setStep] = useState(0); 
-  // Steps: 0:Intro, 1:Bank, 2:Payday, 3:Currency, 4:Pots, 5:Bills
+  // Steps: 0:Intro, 1:Bank, 2:Payday, 3:CreditCards, 4:Currency, 5:Pots, 6:Bills, 7:Pace
 
   const [paceTargets, setPaceTargets] = useState({ low: 10, high: 30 });
   
   const [currency, setCurrency] = useState('GBP');
   const [bank, setBank] = useState(null);
   const [payDay, setPayDay] = useState(''); // Stores string '1' to '31'
+  
   // --- NEW: Credit Cards State ---
   const [creditCards, setCreditCards] = useState([]);
   
@@ -3111,7 +3112,7 @@ const OnboardingWizard = ({ user, onComplete }) => {
       creditCards: creditCards,
       allocationRules: pots,
       defaultFixedExpenses: bills,
-      dailyPaceTargets: paceTargets // <--- ADD THIS
+      dailyPaceTargets: paceTargets 
     };
     onComplete(settings);
   };
@@ -3149,7 +3150,7 @@ const OnboardingWizard = ({ user, onComplete }) => {
           </div>
         )}
 
-        {/* STEP 1: BANK SELECTION (NEW) */}
+        {/* STEP 1: BANK SELECTION */}
         {step === 1 && (
            <div className="space-y-6 animate-in slide-in-from-right-8">
              <div className="text-center">
@@ -3168,17 +3169,38 @@ const OnboardingWizard = ({ user, onComplete }) => {
            </div>
         )}
 
-        {/* STEP 2: PAYDAY (Update Next Button) */}
+        {/* STEP 2: PAYDAY */}
         {step === 2 && (
-           <div className="...">
-            {/* ... Payday UI ... */}
-            <button disabled={!payDay} onClick={() => setStep(3)} className="...">
+           <div className="space-y-6 animate-in slide-in-from-right-8">
+             <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-800">When is Payday?</h2>
+              <p className="text-slate-500">We use this to track your monthly cycle.</p>
+            </div>
+
+            <div className="grid grid-cols-7 gap-2 max-h-64 overflow-y-auto p-1">
+               {Array.from({length: 31}, (_, i) => i + 1).map(day => (
+                  <button 
+                    key={day}
+                    onClick={() => setPayDay(String(day))}
+                    className={`aspect-square rounded-lg font-bold border flex items-center justify-center transition ${payDay === String(day) ? 'bg-slate-900 text-white border-slate-900 scale-110 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}
+                  >
+                    {day}
+                  </button>
+               ))}
+            </div>
+            {payDay && (
+              <p className="text-center font-bold text-emerald-600 animate-in fade-in">
+                Payday is on the {payDay}{['1','21','31'].includes(payDay)?'st':['2','22'].includes(payDay)?'nd':['3','23'].includes(payDay)?'rd':'th'}
+              </p>
+            )}
+
+            <button disabled={!payDay} onClick={() => setStep(3)} className="w-full bg-slate-900 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
               Next
             </button>
            </div>
         )}
 
-        {/* --- NEW STEP 3: CREDIT CARDS --- */}
+        {/* STEP 3: CREDIT CARDS */}
         {step === 3 && (
           <div className="space-y-6 animate-in slide-in-from-right-8">
             <div className="text-center">
@@ -3221,7 +3243,8 @@ const OnboardingWizard = ({ user, onComplete }) => {
                 </button>
               ))}
             </div>
-            <button onClick={() => setStep(4)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
+            {/* FIXED: Was setStep(4), changed to setStep(5) */}
+            <button onClick={() => setStep(5)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
               Next Step
             </button>
           </div>
@@ -3280,9 +3303,10 @@ const OnboardingWizard = ({ user, onComplete }) => {
                 {totalPercent > 100 && <AlertCircle className="w-6 h-6 text-red-500" />}
             </div>
 
+            {/* FIXED: Was setStep(5), changed to setStep(6) */}
             <button 
               disabled={totalPercent > 100}
-              onClick={() => setStep(5)} 
+              onClick={() => setStep(6)} 
               className="w-full bg-slate-900 disabled:bg-slate-300 disabled:text-slate-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition"
             >
               {totalPercent > 100 ? 'Total cannot exceed 100%' : 'Continue'}
@@ -3337,8 +3361,8 @@ const OnboardingWizard = ({ user, onComplete }) => {
                <button onClick={addBill} className="bg-slate-900 text-white p-3 rounded-xl"><Plus className="w-5 h-5" /></button>
             </div>
 
-            {/* ADDED: Button to go to Step 6 */}
-            <button onClick={() => setStep(6)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
+            {/* FIXED: Was setStep(6), changed to setStep(7) */}
+            <button onClick={() => setStep(7)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
               Next
             </button>
           </div>
@@ -3398,8 +3422,6 @@ const OnboardingWizard = ({ user, onComplete }) => {
             </button>
           </div>
         )}
-
-
 
       </div>
     </div>
