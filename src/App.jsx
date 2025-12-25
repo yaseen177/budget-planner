@@ -3528,6 +3528,9 @@ export default function App() {
   const [showPaceModal, setShowPaceModal] = useState(false);
   const [paceView, setPaceView] = useState('daily'); // 'daily' or 'weekly'
 
+  const [touchStart, setTouchStart] = useState(null); // <--- ADD THIS
+  const [touchEnd, setTouchEnd] = useState(null);     // <--- ADD THIS
+
   
 
   const isMobile = window.innerWidth < 768;
@@ -4773,8 +4776,31 @@ export default function App() {
              </div>
              
              {/* --- PASTE THIS NEW WIDGET BELOW --- */}
-             {/* Stat 3: Daily/Weekly Pace Widget (HEARTBEAT + PAGINATION) */}
-             <div className={`flex-1 p-6 rounded-[2.5rem] shadow-sm border flex flex-col justify-center text-center relative overflow-hidden group transition-all duration-500
+             {/* Stat 3: Daily/Weekly Pace Widget (SWIPEABLE + 2 DECIMALS) */}
+             <div 
+                // SWIPE HANDLERS START
+                onTouchStart={(e) => {
+                  setTouchEnd(null); 
+                  setTouchStart(e.targetTouches[0].clientX);
+                }}
+                onTouchMove={(e) => setTouchEnd(e.targetTouches[0].clientX)}
+                onTouchEnd={() => {
+                  if (!touchStart || !touchEnd) return;
+                  const distance = touchStart - touchEnd;
+                  const isLeftSwipe = distance > 50;
+                  const isRightSwipe = distance < -50;
+                  
+                  if (isLeftSwipe) {
+                     setPaceView('weekly');
+                     if (window.navigator.vibrate) window.navigator.vibrate(10);
+                  }
+                  if (isRightSwipe) {
+                     setPaceView('daily');
+                     if (window.navigator.vibrate) window.navigator.vibrate(10);
+                  }
+                }}
+                // SWIPE HANDLERS END
+                className={`flex-1 p-6 rounded-[2.5rem] shadow-sm border flex flex-col justify-center text-center relative overflow-hidden group transition-all duration-500 cursor-grab active:cursor-grabbing
                 ${isLow ? 'bg-rose-50 border-rose-200 animate-throb' : 
                   isHealthy ? 'bg-emerald-50 border-emerald-200 animate-breathe' : 
                   'bg-indigo-50 border-indigo-100'}`}
@@ -4784,21 +4810,36 @@ export default function App() {
                 
                 {/* Settings Icon (Top Right) */}
                 <button 
-                  onClick={() => setShowPaceModal(true)}
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent swipe when clicking settings
+                    setShowPaceModal(true);
+                  }}
                   className={`absolute top-3 right-3 p-1.5 rounded-full transition hover:bg-black/5 ${isLow ? 'text-rose-400' : isHealthy ? 'text-emerald-500' : 'text-indigo-300'}`}
                 >
                    <Settings className="w-3.5 h-3.5" />
                 </button>
 
                 {/* Main Label */}
-                <span className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${isLow ? 'text-rose-600' : isHealthy ? 'text-emerald-600' : 'text-indigo-400'}`}>
-                   {isWeekly ? 'Weekly Pace' : 'Daily Pace'}
-                </span>
+                <div className="flex items-center justify-center gap-2 mb-1">
+                   {/* Left Arrow Hint (Only visible on Weekly) */}
+                   <ChevronLeft className={`w-3 h-3 transition-opacity ${isWeekly ? 'opacity-30' : 'opacity-0'}`} />
+                   
+                   <span className={`text-[10px] font-bold uppercase tracking-widest ${isLow ? 'text-rose-600' : isHealthy ? 'text-emerald-600' : 'text-indigo-400'}`}>
+                      {isWeekly ? 'Weekly Pace' : 'Daily Pace'}
+                   </span>
+
+                   {/* Right Arrow Hint (Only visible on Daily) */}
+                   <ChevronRight className={`w-3 h-3 transition-opacity ${!isWeekly ? 'opacity-30' : 'opacity-0'}`} />
+                </div>
                 
-                {/* Rolling Number Display */}
+                {/* Rolling Number Display (UPDATED DECIMALS) */}
                 <div className="flex items-baseline justify-center gap-1 min-h-[40px]">
                    <span className={`text-3xl font-black tracking-tight ${isLow ? 'text-rose-700' : isHealthy ? 'text-emerald-700' : 'text-indigo-700'}`}>
-                     <RollingNumber value={displayPace} currency={userSettings.currency} decimals={0} />
+                     <RollingNumber 
+                        value={displayPace} 
+                        currency={effectiveSettings.currency} 
+                        decimals={2}  // <--- CHANGED TO 2 DECIMAL PLACES
+                     />
                    </span>
                 </div>
                 
@@ -4809,11 +4850,11 @@ export default function App() {
                 {/* Pagination Dots (Bottom) */}
                 <div className="flex justify-center gap-1.5 mt-3">
                    <button 
-                     onClick={() => { triggerHaptic(); setPaceView('daily'); }}
+                     onClick={() => setPaceView('daily')}
                      className={`w-2 h-2 rounded-full transition-all ${!isWeekly ? (isLow ? 'bg-rose-400' : isHealthy ? 'bg-emerald-500' : 'bg-indigo-400') : 'bg-black/10 hover:bg-black/20'}`}
                    />
                    <button 
-                     onClick={() => { triggerHaptic(); setPaceView('weekly'); }}
+                     onClick={() => setPaceView('weekly')}
                      className={`w-2 h-2 rounded-full transition-all ${isWeekly ? (isLow ? 'bg-rose-400' : isHealthy ? 'bg-emerald-500' : 'bg-indigo-400') : 'bg-black/10 hover:bg-black/20'}`}
                    />
                 </div>
