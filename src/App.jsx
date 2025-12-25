@@ -4601,6 +4601,14 @@ export default function App() {
       const config = getFirebaseConfig();
       if (!config.apiKey) return;
 
+      // --- FIX 1: Set Persistence Here (Once on Load) ---
+      try {
+        await setPersistence(auth, browserSessionPersistence);
+      } catch (e) {
+        console.error("Persistence setting failed", e);
+      }
+
+      // Check for custom tokens (existing logic)
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
         try {
           if (YOUR_FIREBASE_KEYS.apiKey === "") {
@@ -4786,11 +4794,13 @@ export default function App() {
     setIsLoggingIn(true);
 
     try {
-      await setPersistence(auth, browserSessionPersistence);
+      // --- FIX 2: REMOVED setPersistence FROM HERE ---
+      // It caused the "Popup Blocked" error by delaying the window open event.
       
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       
+      // This now runs immediately on click, satisfying the browser's popup blocker
       const result = await signInWithPopup(auth, provider);
       
       console.log("Login successful:", result.user.email);
@@ -4800,10 +4810,13 @@ export default function App() {
     } catch (error) {
       console.error("Login Failed:", error);
       
-      // --- FIX: IGNORE POPUP CANCELLATION ERRORS ---
-      // This suppresses the specific error you are seeing
-      if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-closed-by-user') {
-         console.log("Login popup cancelled. Ignoring.");
+      // Ignore popup cancellations/blocks to avoid confusing the user
+      if (
+        error.code === 'auth/cancelled-popup-request' || 
+        error.code === 'auth/popup-closed-by-user' ||
+        error.code === 'auth/popup-blocked'
+      ) {
+         console.log("Login popup cancelled or blocked. Ignoring.");
          setIsLoggingIn(false);
          return;
       }
@@ -4814,7 +4827,6 @@ export default function App() {
         alert(`Login failed: ${error.message}`);
       }
     } finally {
-       // Always reset loading state (unless successful login unmounts this screen)
        setIsLoggingIn(false);
     }
   };
