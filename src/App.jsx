@@ -75,6 +75,136 @@ import {
   Shield
 } from 'lucide-react';
 
+
+// --- JUICE ENHANCEMENTS START ---
+
+const juiceStyles = `
+  /* 1. HEARTBEAT ANIMATIONS */
+  @keyframes throb-red {
+    0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.4); transform: scale(1); }
+    70% { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); transform: scale(1.02); }
+    100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); transform: scale(1); }
+  }
+  @keyframes breathe-green {
+    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.3); }
+    50% { box-shadow: 0 0 20px 0 rgba(16, 185, 129, 0.4); border-color: rgba(16, 185, 129, 0.6); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.3); }
+  }
+  .animate-throb { animation: throb-red 1s infinite; }
+  .animate-breathe { animation: breathe-green 3s infinite ease-in-out; }
+
+  /* 2. CONFETTI PARTICLES */
+  @keyframes confetti-fall {
+    0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(60px) rotate(720deg); opacity: 0; }
+  }
+  .confetti-piece {
+    position: absolute;
+    top: -20px;
+    width: 8px;
+    height: 8px;
+    animation: confetti-fall 2.5s ease-out forwards;
+    z-index: 0;
+  }
+`;
+
+// HELPER 1: ROLLING NUMBER
+const RollingNumber = ({ value, currency = 'GBP', decimals = 0 }) => {
+  const [displayValue, setDisplayValue] = useState(0);
+  
+  useEffect(() => {
+    let start = displayValue;
+    let end = parseFloat(value) || 0;
+    if (start === end) return;
+
+    let duration = 800;
+    let startTime = null;
+
+    const animate = (currentTime) => {
+      if (!startTime) startTime = currentTime;
+      const progress = Math.min((currentTime - startTime) / duration, 1);
+      
+      const ease = 1 - Math.pow(1 - progress, 4);
+      
+      const current = start + (end - start) * ease;
+      setDisplayValue(current);
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    requestAnimationFrame(animate);
+  }, [value]);
+
+  return formatCurrency(displayValue, currency, decimals);
+};
+
+// HELPER 2: TILT CARD
+const TiltCard = ({ children, className }) => {
+  const [transform, setTransform] = useState('');
+  const [glare, setGlare] = useState('');
+
+  const handleMouseMove = (e) => {
+    const card = e.currentTarget;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    const rotateX = ((y - centerY) / centerY) * -3; 
+    const rotateY = ((x - centerX) / centerX) * 3;
+
+    setTransform(`perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`);
+    setGlare(`radial-gradient(circle at ${x}px ${y}px, rgba(255,255,255,0.2), transparent 40%)`);
+  };
+
+  const handleMouseLeave = () => {
+    setTransform('perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)');
+    setGlare('none');
+  };
+
+  return (
+    <div 
+      className={`relative transition-transform duration-200 ease-out ${className}`}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{ transform, transformStyle: 'preserve-3d' }}
+    >
+      <div 
+        className="absolute inset-0 rounded-[inherit] pointer-events-none z-20 mix-blend-overlay"
+        style={{ background: glare }}
+      />
+      {children}
+    </div>
+  );
+};
+
+// HELPER 3: CONFETTI EXPLOSION
+const ConfettiExplosion = () => {
+  const particles = Array.from({ length: 30 });
+  const colors = ['#10b981', '#fbbf24', '#6366f1', '#f43f5e'];
+  
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[inherit]">
+      {particles.map((_, i) => (
+        <div 
+          key={i} 
+          className="confetti-piece"
+          style={{
+            left: `${Math.random() * 100}%`,
+            backgroundColor: colors[Math.floor(Math.random() * colors.length)],
+            animationDelay: `${Math.random() * 0.5}s`,
+            animationDuration: `${1.5 + Math.random()}s`
+          }} 
+        />
+      ))}
+    </div>
+  );
+};
+// --- JUICE ENHANCEMENTS END ---
+
 // --- FIREBASE CONFIGURATION AREA ---
 const YOUR_FIREBASE_KEYS = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -213,134 +343,7 @@ const springStyles = `
 `;
 
 
-// --- JUICE ENHANCEMENTS START ---
 
-const juiceStyles = `
-  /* 1. HEARTBEAT ANIMATIONS */
-  @keyframes throb-red {
-    0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.4); transform: scale(1); }
-    70% { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); transform: scale(1.02); }
-    100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); transform: scale(1); }
-  }
-  @keyframes breathe-green {
-    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.3); }
-    50% { box-shadow: 0 0 20px 0 rgba(16, 185, 129, 0.4); border-color: rgba(16, 185, 129, 0.6); }
-    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.3); }
-  }
-  .animate-throb { animation: throb-red 1s infinite; }
-  .animate-breathe { animation: breathe-green 3s infinite ease-in-out; }
-
-  /* 2. CONFETTI PARTICLES */
-  @keyframes confetti-fall {
-    0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
-    100% { transform: translateY(60px) rotate(720deg); opacity: 0; }
-  }
-  .confetti-piece {
-    position: absolute;
-    top: -20px;
-    width: 8px;
-    height: 8px;
-    animation: confetti-fall 2.5s ease-out forwards;
-    z-index: 0;
-  }
-`;
-
-// HELPER 1: ROLLING NUMBER
-const RollingNumber = ({ value, currency = 'GBP', decimals = 0 }) => {
-  const [displayValue, setDisplayValue] = useState(0);
-  
-  useEffect(() => {
-    let start = displayValue;
-    let end = parseFloat(value) || 0;
-    if (start === end) return;
-
-    let duration = 800;
-    let startTime = null;
-
-    const animate = (currentTime) => {
-      if (!startTime) startTime = currentTime;
-      const progress = Math.min((currentTime - startTime) / duration, 1);
-      
-      const ease = 1 - Math.pow(1 - progress, 4);
-      
-      const current = start + (end - start) * ease;
-      setDisplayValue(current);
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      }
-    };
-    requestAnimationFrame(animate);
-  }, [value]);
-
-  return formatCurrency(displayValue, currency, decimals);
-};
-
-// HELPER 2: TILT CARD
-const TiltCard = ({ children, className }) => {
-  const [transform, setTransform] = useState('');
-  const [glare, setGlare] = useState('');
-
-  const handleMouseMove = (e) => {
-    const card = e.currentTarget;
-    const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    
-    const rotateX = ((y - centerY) / centerY) * -3; 
-    const rotateY = ((x - centerX) / centerX) * 3;
-
-    setTransform(`perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`);
-    setGlare(`radial-gradient(circle at ${x}px ${y}px, rgba(255,255,255,0.2), transparent 40%)`);
-  };
-
-  const handleMouseLeave = () => {
-    setTransform('perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)');
-    setGlare('none');
-  };
-
-  return (
-    <div 
-      className={`relative transition-transform duration-200 ease-out ${className}`}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      style={{ transform, transformStyle: 'preserve-3d' }}
-    >
-      <div 
-        className="absolute inset-0 rounded-[inherit] pointer-events-none z-20 mix-blend-overlay"
-        style={{ background: glare }}
-      />
-      {children}
-    </div>
-  );
-};
-
-// HELPER 3: CONFETTI EXPLOSION
-const ConfettiExplosion = () => {
-  const particles = Array.from({ length: 30 });
-  const colors = ['#10b981', '#fbbf24', '#6366f1', '#f43f5e'];
-  
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[inherit]">
-      {particles.map((_, i) => (
-        <div 
-          key={i} 
-          className="confetti-piece"
-          style={{
-            left: `${Math.random() * 100}%`,
-            backgroundColor: colors[Math.floor(Math.random() * colors.length)],
-            animationDelay: `${Math.random() * 0.5}s`,
-            animationDuration: `${1.5 + Math.random()}s`
-          }} 
-        />
-      ))}
-    </div>
-  );
-};
-// --- JUICE ENHANCEMENTS END ---
 
 // --- UPDATED PRINT HELPER (Auto-Landscape & Virtual Paper) ---
 const handlePrint = (elementId, title, isLandscape = false) => {
