@@ -184,10 +184,13 @@ const safeCalculate = (expression) => {
   }
 };
 
-// --- UPDATED PRINT HELPER (SUPPORTS LANDSCAPE) ---
+// --- UPDATED PRINT HELPER (VIRTUAL PAPER MODE) ---
 const handlePrint = (elementId, title, isLandscape = false) => {
   const content = document.getElementById(elementId);
   if (!content) return;
+
+  // We clone the node to ensure we don't mess up the original React DOM
+  const contentClone = content.cloneNode(true);
 
   const html = `
     <!DOCTYPE html>
@@ -199,27 +202,58 @@ const handlePrint = (elementId, title, isLandscape = false) => {
       <script src="https://cdn.tailwindcss.com"></script>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         
-        /* DYNAMIC PAGE ORIENTATION */
+        /* SCREEN PREVIEW STYLES (Make it look like a paper document) */
+        body { 
+          font-family: 'Inter', sans-serif; 
+          background-color: #f1f5f9; /* Slate-100 */
+          display: flex;
+          justify-content: center;
+          padding: 40px;
+        }
+        
+        .paper-container {
+          background: white;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+          margin: 0 auto;
+          /* Force A4 Dimensions on Screen */
+          width: ${isLandscape ? '297mm' : '210mm'};
+          min-height: ${isLandscape ? '210mm' : '297mm'};
+          padding: 0; /* Padding is handled by inner elements */
+          box-sizing: border-box;
+        }
+
+        /* PRINT STYLES */
         @page { 
           size: ${isLandscape ? 'A4 landscape' : 'A4'}; 
-          margin: ${isLandscape ? '10mm' : '15mm'}; 
+          margin: 0; /* We handle margins in CSS to match screen preview */
         }
         
         @media print { 
+          body { 
+            background: none; 
+            padding: 0; 
+            display: block; 
+          }
+          .paper-container {
+            box-shadow: none;
+            margin: 0;
+            width: 100%;
+            height: auto;
+            border: none;
+          }
           .no-print { display: none; }
-          /* Ensure backgrounds print */
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       </style>
     </head>
     <body>
-      <div class="w-full h-full">
-        ${content.innerHTML}
+      <div class="paper-container">
+        ${contentClone.innerHTML}
       </div>
       <script>
-        window.onload = () => { setTimeout(() => { window.print(); }, 500); };
+        // Wait slightly for Tailwind to parse, then print
+        window.onload = () => { setTimeout(() => { window.print(); }, 800); };
       </script>
     </body>
     </html>
@@ -1375,7 +1409,7 @@ const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose
   return (
     <div className="fixed inset-0 bg-slate-100 z-[70] overflow-y-auto animate-in fade-in duration-300">
       {/* HEADER BAR */}
-      <div className="bg-slate-900 text-white p-4 sticky top-0 z-50 flex justify-between items-center shadow-lg">
+      <div className="bg-slate-900 text-white p-4 sticky top-0 z-50 flex justify-between items-center shadow-lg print:hidden">
         <div className="flex items-center gap-3">
             <div className="p-2 bg-white/10 rounded-lg"><FileText className="w-5 h-5 text-emerald-400" /></div>
             <div>
@@ -1398,25 +1432,26 @@ const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose
       </div>
 
       <div className="flex justify-center p-4">
-        {/* PRINTABLE AREA - COMPACTED FOR SINGLE PAGE */}
-        <div id="month-report-content" className="w-full max-w-[210mm] bg-white shadow-2xl p-8 rounded-xl">
+        {/* REPORT CONTENT WRAPPER */}
+        {/* We use padding here (p-10) which simulates the paper margin in the Blob view */}
+        <div id="month-report-content" className="w-full max-w-[210mm] bg-white shadow-2xl rounded-xl p-10 md:p-12 text-slate-900">
           
           {/* 1. COMPACT HEADER */}
-          <div className="flex justify-between items-center border-b-2 border-slate-800 pb-4 mb-6">
-              <div className="flex gap-3 items-center">
-                 <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-emerald-400 shrink-0">
-                    <Wallet className="w-5 h-5" />
+          <div className="flex justify-between items-center border-b-2 border-slate-900 pb-6 mb-8">
+              <div className="flex gap-4 items-center">
+                 <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-emerald-400 shrink-0">
+                    <Wallet className="w-6 h-6" />
                  </div>
                  <div>
-                    <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight leading-none">Budget Statement</h1>
-                    <p className="text-slate-500 font-medium text-xs mt-0.5">
+                    <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight leading-none">Budget Statement</h1>
+                    <p className="text-slate-500 font-medium text-sm mt-1">
                       {FULL_MONTH_NAMES[date.getMonth()]} {date.getFullYear()}
                     </p>
                  </div>
               </div>
               
               {bankDetails && (
-                  <div className="text-right flex items-center gap-3 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                  <div className="text-right flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-lg border border-slate-100">
                       <div>
                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Primary Account</div>
                         <div className="text-sm font-bold text-slate-800 leading-none">{bankDetails.name}</div>
@@ -1426,28 +1461,28 @@ const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose
               )}
           </div>
 
-          {/* 2. SUMMARY STRIP (Compact) */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
-                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Net Income</p>
-                 <p className="text-lg font-black text-slate-800">{formatCurrency(salaryNum, currency)}</p>
+          {/* 2. SUMMARY STRIP */}
+          <div className="grid grid-cols-3 gap-6 mb-8">
+              <div className="p-4 rounded-lg bg-slate-50 border border-slate-100">
+                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Net Income</p>
+                 <p className="text-xl font-black text-slate-800">{formatCurrency(salaryNum, currency)}</p>
               </div>
-              <div className="p-3 rounded-lg bg-rose-50 border border-rose-100">
-                 <p className="text-[10px] font-bold text-rose-400 uppercase tracking-wider mb-0.5">Outgoings</p>
-                 <p className="text-lg font-black text-rose-600">{formatCurrency(totalExpenses, currency)}</p>
+              <div className="p-4 rounded-lg bg-rose-50 border border-rose-100">
+                 <p className="text-[10px] font-bold text-rose-400 uppercase tracking-wider mb-1">Outgoings</p>
+                 <p className="text-xl font-black text-rose-600">{formatCurrency(totalExpenses, currency)}</p>
               </div>
-              <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100">
-                 <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-0.5">Net Savings</p>
-                 <p className="text-lg font-black text-emerald-700">{formatCurrency(remainder, currency)}</p>
+              <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-100">
+                 <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Net Savings</p>
+                 <p className="text-xl font-black text-emerald-700">{formatCurrency(remainder, currency)}</p>
               </div>
           </div>
 
-          {/* 3. MAIN CONTENT GRID (Side by Side) */}
-          <div className="grid grid-cols-2 gap-8">
+          {/* 3. MAIN CONTENT GRID */}
+          <div className="grid grid-cols-2 gap-10">
               
               {/* LEFT: EXPENSES */}
               <div>
-                  <div className="flex items-center gap-2 mb-2 border-b border-slate-200 pb-1">
+                  <div className="flex items-center gap-2 mb-3 border-b border-slate-200 pb-2">
                       <TrendingDown className="w-4 h-4 text-rose-500" />
                       <h3 className="font-bold text-slate-800 text-sm">Expenses</h3>
                   </div>
@@ -1458,28 +1493,28 @@ const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose
                               const Icon = getExpenseIcon(e.name);
                               return (
                                   <tr key={e.id}>
-                                      <td className="py-1.5 flex items-center gap-2 pr-2">
-                                          <div className="w-5 h-5 rounded bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                                      <td className="py-2 flex items-center gap-3 pr-2">
+                                          <div className="w-6 h-6 rounded bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
                                               {e.logo ? (
-                                                  <img src={e.logo} className="w-3 h-3 object-contain mix-blend-multiply" />
+                                                  <img src={e.logo} className="w-4 h-4 object-contain mix-blend-multiply" />
                                               ) : (
                                                   <Icon className="w-3 h-3 text-slate-400" />
                                               )}
                                           </div>
-                                          <span className="font-semibold text-slate-700 truncate max-w-[100px]">{e.name}</span>
+                                          <span className="font-semibold text-slate-700 truncate max-w-[120px]">{e.name}</span>
                                       </td>
-                                      <td className="py-1.5 text-right font-medium text-slate-600">
+                                      <td className="py-2 text-right font-medium text-slate-600">
                                           {formatCurrency(e.amount, currency)}
                                       </td>
                                   </tr>
                               )
                           })}
                           {expenses.length === 0 && (
-                               <tr><td colSpan={2} className="py-4 text-center text-slate-400 italic">No expenses</td></tr>
+                               <tr><td colSpan={2} className="py-6 text-center text-slate-400 italic">No expenses recorded</td></tr>
                           )}
                           <tr className="border-t border-slate-800">
-                              <td className="py-2 font-black text-slate-900 text-xs">Total</td>
-                              <td className="py-2 text-right font-black text-sm text-slate-900">{formatCurrency(totalExpenses, currency)}</td>
+                              <td className="py-3 font-black text-slate-900 text-xs">Total</td>
+                              <td className="py-3 text-right font-black text-sm text-slate-900">{formatCurrency(totalExpenses, currency)}</td>
                           </tr>
                       </tbody>
                   </table>
@@ -1487,15 +1522,14 @@ const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose
 
               {/* RIGHT: ALLOCATIONS */}
               <div>
-                  <div className="flex items-center gap-2 mb-2 border-b border-slate-200 pb-1">
+                  <div className="flex items-center gap-2 mb-3 border-b border-slate-200 pb-2">
                       <Target className="w-4 h-4 text-indigo-500" />
                       <h3 className="font-bold text-slate-800 text-sm">Allocations</h3>
                   </div>
 
-                  <div className="space-y-2">
-                      {/* Table Header */}
+                  <div className="space-y-3">
                       <div className="flex text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 px-1">
-                          <span className="flex-1">Pot</span>
+                          <span className="flex-1">Pot Name</span>
                           <span className="w-16 text-right">Target</span>
                           <span className="w-16 text-right">Actual</span>
                       </div>
@@ -1507,10 +1541,10 @@ const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose
                            const percentFilled = Math.min(100, (actual / target) * 100);
                            
                            return (
-                              <div key={plan.id} className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                              <div key={plan.id} className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                                   <div className="flex justify-between items-center mb-1.5">
-                                      <div className="flex items-center gap-1.5 overflow-hidden">
-                                          <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${plan.color.split(' ')[0]}`}></div>
+                                      <div className="flex items-center gap-2 overflow-hidden">
+                                          <div className={`w-2 h-2 rounded-full shrink-0 ${plan.color.split(' ')[0]}`}></div>
                                           <div className="min-w-0">
                                               <div className="font-bold text-slate-800 text-xs truncate leading-none">{plan.name}</div>
                                           </div>
@@ -1522,18 +1556,17 @@ const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose
                                            </div>
                                       </div>
                                   </div>
-                                  <div className="h-1 w-full bg-slate-200 rounded-full overflow-hidden">
+                                  <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
                                       <div className={`h-full rounded-full ${plan.color.split(' ')[0]}`} style={{ width: `${percentFilled}%` }}></div>
                                   </div>
                               </div>
                            );
                       })}
 
-                      {/* Remainder Card - Compact */}
-                      <div className="bg-slate-900 text-white p-3 rounded-lg shadow-sm mt-3">
-                           <div className="flex justify-between items-center mb-1">
-                               <span className="font-bold text-xs flex items-center gap-1.5">
-                                  {bankDetails?.logo && <img src={bankDetails.logo} className="w-3 h-3 rounded-full bg-white border border-white" />}
+                      <div className="bg-slate-900 text-white p-3 rounded-lg shadow-sm mt-4">
+                           <div className="flex justify-between items-center mb-2">
+                               <span className="font-bold text-xs flex items-center gap-2">
+                                  {bankDetails?.logo && <img src={bankDetails.logo} className="w-4 h-4 rounded-full bg-white border border-white" />}
                                   Remainder
                                </span>
                                <span className="text-[8px] bg-white/20 px-1.5 py-0.5 rounded text-white font-bold">CURRENT ACC</span>
@@ -1547,8 +1580,8 @@ const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose
               </div>
           </div>
 
-          <div className="mt-8 pt-4 border-t border-slate-100 text-center">
-              <p className="text-[10px] text-slate-400">
+          <div className="mt-12 pt-6 border-t border-slate-100 text-center">
+              <p className="text-[10px] text-slate-400 uppercase tracking-widest">
                   Budget Planner • {new Date().toLocaleDateString()}
               </p>
           </div>
@@ -1561,7 +1594,8 @@ const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose
 const HistoryReportView = ({ data, allocations, onClose, currency, bankDetails }) => {
   return (
     <div className="fixed inset-0 bg-slate-100 z-[70] overflow-y-auto animate-in zoom-in-95 duration-200">
-      <div className="bg-slate-900 text-white p-4 sticky top-0 z-20 flex justify-between items-center shadow-lg">
+      {/* HEADER BAR */}
+      <div className="bg-slate-900 text-white p-4 sticky top-0 z-50 flex justify-between items-center shadow-lg print:hidden">
         <div className="flex items-center gap-3">
             <div className="p-2 bg-white/10 rounded-lg"><Table className="w-5 h-5 text-amber-400" /></div>
             <div>
@@ -1570,7 +1604,7 @@ const HistoryReportView = ({ data, allocations, onClose, currency, bankDetails }
             </div>
         </div>
         <div className="flex gap-2">
-          {/* UPDATED PRINT BUTTON: Pass TRUE for Landscape */}
+          {/* Print Button - FORCE LANDSCAPE (true) */}
           <button 
             onClick={() => handlePrint('history-report-content', 'Annual Financial History', true)} 
             className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-xs hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/20"
@@ -1585,34 +1619,35 @@ const HistoryReportView = ({ data, allocations, onClose, currency, bankDetails }
 
       <div className="flex justify-center p-4 md:p-8">
         
-        {/* PRINTABLE AREA */}
-        <div id="history-report-content" className="w-full max-w-[297mm] bg-white shadow-2xl p-6 md:p-8 rounded-xl overflow-hidden">
+        {/* REPORT CONTENT WRAPPER (Landscape Width) */}
+        {/* We use p-10 padding here to simulate margins in the Blob view */}
+        <div id="history-report-content" className="w-full max-w-[297mm] bg-white shadow-2xl p-10 rounded-xl overflow-hidden text-slate-900">
           
-          <div className="flex justify-between items-end border-b-2 border-slate-900 pb-4 mb-4">
+          <div className="flex justify-between items-end border-b-2 border-slate-900 pb-6 mb-6">
               <div>
-                  <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight">Financial History</h1>
-                  <p className="text-slate-500 text-xs mt-0.5">Annual breakdown of income, expenses, and pots.</p>
+                  <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Financial History</h1>
+                  <p className="text-slate-500 text-sm mt-1">Annual breakdown of income, expenses, and pots.</p>
               </div>
               {bankDetails && bankDetails.logo && (
-                  <img src={bankDetails.logo} className="h-6 object-contain" alt="Bank Logo" />
+                  <img src={bankDetails.logo} className="h-8 object-contain" alt="Bank Logo" />
               )}
           </div>
           
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-[10px] min-w-[800px]">
+            <table className="w-full text-left border-collapse text-xs min-w-[800px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="py-2 px-2 font-black text-slate-900 uppercase tracking-wider w-20">Month</th>
-                  <th className="py-2 px-2 font-bold text-slate-600 text-right">Net Salary</th>
-                  <th className="py-2 px-2 font-bold text-rose-600 text-right">Expenses</th>
-                  <th className="py-2 px-2 font-black text-emerald-700 text-right border-r border-slate-200 pr-4">Net Savings</th>
+                  <th className="py-3 px-2 font-black text-slate-900 uppercase tracking-wider w-20">Month</th>
+                  <th className="py-3 px-2 font-bold text-slate-600 text-right">Net Salary</th>
+                  <th className="py-3 px-2 font-bold text-rose-600 text-right">Expenses</th>
+                  <th className="py-3 px-2 font-black text-emerald-700 text-right border-r border-slate-200 pr-4">Net Savings</th>
                   
-                   <th className="py-2 px-2 font-bold text-indigo-900 text-right w-24">
+                   <th className="py-3 px-2 font-bold text-indigo-900 text-right w-24">
                       Current Acc.
                    </th>
 
                   {allocations.map(plan => (
-                    <th key={plan.id} className="py-2 px-2 font-bold text-slate-600 text-right whitespace-nowrap overflow-hidden text-ellipsis max-w-[80px]" title={plan.name}>
+                    <th key={plan.id} className="py-3 px-2 font-bold text-slate-600 text-right whitespace-nowrap overflow-hidden text-ellipsis max-w-[80px]" title={plan.name}>
                       <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${plan.color.split(' ')[0]}`}></span>
                       {plan.name}
                     </th>
@@ -1628,21 +1663,21 @@ const HistoryReportView = ({ data, allocations, onClose, currency, bankDetails }
 
                   return (
                     <tr key={row.id} className={`break-inside-avoid ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                      <td className="py-2 px-2 font-bold text-slate-800">{row.id}</td>
+                      <td className="py-2.5 px-2 font-bold text-slate-800">{row.id}</td>
                       
-                      <td className="py-2 px-2 text-right font-mono text-slate-500">
+                      <td className="py-2.5 px-2 text-right font-mono text-slate-500">
                           {formatCurrency(salary, currency)}
                       </td>
                       
-                      <td className="py-2 px-2 text-right font-mono text-rose-600 font-medium">
+                      <td className="py-2.5 px-2 text-right font-mono text-rose-600 font-medium">
                           {formatCurrency(totalExpenses, currency)}
                       </td>
                       
-                      <td className="py-2 px-2 text-right font-mono font-bold text-emerald-600 border-r border-slate-200 pr-4">
+                      <td className="py-2.5 px-2 text-right font-mono font-bold text-emerald-600 border-r border-slate-200 pr-4">
                           {formatCurrency(remainder, currency)}
                       </td>
 
-                      <td className="py-2 px-2 text-right font-mono font-bold text-indigo-700">
+                      <td className="py-2.5 px-2 text-right font-mono font-bold text-indigo-700">
                         {formatCurrency(Math.max(0, remainder - Object.values(actuals).reduce((sum, val) => sum + (parseFloat(val) || 0), 0)), currency)}
                       </td>
 
@@ -1653,7 +1688,7 @@ const HistoryReportView = ({ data, allocations, onClose, currency, bankDetails }
                         const isMet = actual >= target - 1; 
                         
                         return (
-                          <td key={plan.id} className="py-2 px-2 text-right font-mono text-slate-600">
+                          <td key={plan.id} className="py-2.5 px-2 text-right font-mono text-slate-600">
                             <span className={isMet ? 'text-emerald-600 font-bold' : 'text-slate-400'}>
                                {formatCurrency(actual, currency)}
                             </span>
