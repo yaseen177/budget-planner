@@ -2330,6 +2330,9 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
 
   const [payDay, setPayDay] = useState(currentSettings.payDay || '1');
   
+
+  // --- NEW: Local State for Pace Targets ---
+  const [paceTargets, setPaceTargets] = useState(currentSettings.dailyPaceTargets || { low: 10, high: 30 });
   // --- NEW: Credit Cards State ---
   const [creditCards, setCreditCards] = useState(currentSettings.creditCards || []);
 
@@ -2376,7 +2379,8 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
       allocationRules: allocations,
       defaultFixedExpenses: defaultExpenses,
       creditCards: creditCards,
-      mortgages: mortgages
+      mortgages: mortgages,
+      dailyPaceTargets: paceTargets
     });
     onClose();
   };
@@ -2544,14 +2548,11 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                  <div>
                     <label className="block text-xs font-bold text-rose-500 mb-1">Low Warning (&lt;)</label>
                     <div className="relative">
-                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currentSettings.currency === 'GBP' ? '£' : currentSettings.currency === 'USD' ? '$' : '€'}</span>
+                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
                        <input 
                          type="number" 
-                         value={currentSettings.dailyPaceTargets?.low || 10}
-                         onChange={(e) => onSaveSettings({ 
-                            ...currentSettings, 
-                            dailyPaceTargets: { ...currentSettings.dailyPaceTargets || {}, low: parseFloat(e.target.value) || 0 }
-                         })}
+                         value={paceTargets.low}
+                         onChange={(e) => setPaceTargets({ ...paceTargets, low: parseFloat(e.target.value) || 0 })}
                          className="w-full pl-7 p-3 bg-white border border-rose-200 rounded-xl text-rose-600 font-bold outline-none focus:ring-2 focus:ring-rose-100"
                        />
                     </div>
@@ -2560,14 +2561,11 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                  <div>
                     <label className="block text-xs font-bold text-emerald-600 mb-1">Healthy Goal (&gt;)</label>
                     <div className="relative">
-                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currentSettings.currency === 'GBP' ? '£' : currentSettings.currency === 'USD' ? '$' : '€'}</span>
+                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
                        <input 
                          type="number" 
-                         value={currentSettings.dailyPaceTargets?.high || 30}
-                         onChange={(e) => onSaveSettings({ 
-                            ...currentSettings, 
-                            dailyPaceTargets: { ...currentSettings.dailyPaceTargets || {}, high: parseFloat(e.target.value) || 0 }
-                         })}
+                         value={paceTargets.high}
+                         onChange={(e) => setPaceTargets({ ...paceTargets, high: parseFloat(e.target.value) || 0 })}
                          className="w-full pl-7 p-3 bg-white border border-emerald-200 rounded-xl text-emerald-600 font-bold outline-none focus:ring-2 focus:ring-emerald-100"
                        />
                     </div>
