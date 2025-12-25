@@ -4166,8 +4166,8 @@ const DailyPaceModal = ({ isOpen, onClose, currentTargets, onSave, currency }) =
   );
 };
 
-// --- NEW: MARKETING LANDING PAGE ---
-const LandingPage = ({ onGetStarted, onLogin }) => {
+// --- MARKETING LANDING PAGE (UPDATED) ---
+const LandingPage = ({ onGetStarted, onDemo }) => {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 overflow-x-hidden">
       
@@ -4178,10 +4178,8 @@ const LandingPage = ({ onGetStarted, onLogin }) => {
              <div className="bg-slate-900 text-white p-2 rounded-xl"><Wallet className="w-6 h-6" /></div>
              <span className="font-bold text-xl tracking-tight">Budget Planner</span>
           </div>
+          {/* REMOVED LOGIN BUTTON, KEPT LAUNCH APP */}
           <div className="flex items-center gap-4">
-             <button onClick={onLogin} className="text-sm font-bold text-slate-500 hover:text-slate-900 transition hidden sm:block">
-               Log In
-             </button>
              <button onClick={onGetStarted} className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-full font-bold text-sm transition shadow-lg shadow-emerald-500/20 active:scale-95">
                Launch App
              </button>
@@ -4196,10 +4194,15 @@ const LandingPage = ({ onGetStarted, onLogin }) => {
          <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-indigo-300/20 rounded-full blur-[100px] -z-10"></div>
 
          <div className="max-w-4xl mx-auto text-center space-y-8 relative z-10">
-            <div className="inline-flex items-center gap-2 bg-slate-900 text-white px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider animate-in slide-in-from-bottom-4 fade-in duration-700">
+            {/* UPDATED: LIVE DEMO BUTTON */}
+            <button 
+               onClick={onDemo}
+               className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider animate-in slide-in-from-bottom-4 fade-in duration-700 transition cursor-pointer hover:scale-105"
+            >
                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-               Live Demo Available
-            </div>
+               Click to try Live Demo
+            </button>
+
             <h1 className="text-5xl md:text-7xl font-black tracking-tight text-slate-900 leading-[1.1] animate-in slide-in-from-bottom-8 fade-in duration-700 delay-100">
                Stop Tracking. <br/>
                <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-500 to-indigo-600">Start Forecasting.</span>
@@ -4221,30 +4224,77 @@ const LandingPage = ({ onGetStarted, onLogin }) => {
          </div>
       </header>
 
-      {/* 3. APP PREVIEW (Tilt Card) */}
+      {/* 3. APP PREVIEW (High Fidelity CSS Mockup) */}
       <section className="px-4 mb-24 relative z-20 -mt-10">
          <div className="max-w-5xl mx-auto bg-white rounded-[2.5rem] p-4 shadow-2xl border border-slate-200/50 transform md:rotate-1 hover:rotate-0 transition duration-500">
-            <div className="bg-slate-50 rounded-[2rem] overflow-hidden border border-slate-100 relative aspect-[16/9] group">
-               {/* This represents a screenshot of the app */}
-               <div className="absolute inset-0 flex items-center justify-center bg-slate-100 text-slate-300">
-                  {/* You can replace this with an actual screenshot <img> tag later */}
-                  <div className="text-center">
-                     <PieChart className="w-20 h-20 mx-auto mb-4 opacity-20" />
-                     <p className="font-bold text-lg">App Dashboard Preview</p>
+            <div className="bg-slate-100 rounded-[2rem] overflow-hidden border border-slate-200 relative aspect-[16/9] flex">
+               
+               {/* SIDEBAR MOCKUP */}
+               <div className="hidden md:flex w-64 bg-slate-900 p-6 flex-col gap-6">
+                  <div className="flex items-center gap-2 text-white opacity-50 mb-4">
+                     <div className="w-8 h-8 rounded-lg bg-white/10"></div>
+                     <div className="w-20 h-4 rounded bg-white/10"></div>
+                  </div>
+                  {[1,2,3,4,5].map(i => (
+                     <div key={i} className="h-4 w-full rounded bg-white/5"></div>
+                  ))}
+               </div>
+
+               {/* MAIN CONTENT MOCKUP */}
+               <div className="flex-1 p-8 bg-slate-50 overflow-hidden relative">
+                  <div className="flex justify-between items-center mb-8">
+                     <div>
+                        <div className="h-8 w-48 bg-slate-200 rounded-lg mb-2"></div>
+                        <div className="h-4 w-32 bg-slate-200/50 rounded-lg"></div>
+                     </div>
+                     <div className="h-10 w-10 bg-slate-200 rounded-full"></div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     {/* BUDGET WHEEL MOCKUP */}
+                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center aspect-square md:aspect-auto">
+                        <div className="relative w-48 h-48 rounded-full" 
+                             style={{ background: 'conic-gradient(#10b981 0% 55%, #6366f1 55% 75%, #f43f5e 75% 100%)' }}>
+                             <div className="absolute inset-4 bg-white rounded-full flex flex-col items-center justify-center shadow-inner">
+                                <span className="text-sm text-slate-400 font-bold uppercase tracking-wider">Safe to Spend</span>
+                                <span className="text-3xl font-black text-slate-800">£1,240</span>
+                             </div>
+                        </div>
+                        <div className="flex gap-4 mt-6">
+                           <div className="flex items-center gap-2"><span className="w-3 h-3 bg-emerald-500 rounded-full"></span> <span className="text-xs font-bold text-slate-500">Free</span></div>
+                           <div className="flex items-center gap-2"><span className="w-3 h-3 bg-indigo-500 rounded-full"></span> <span className="text-xs font-bold text-slate-500">Saved</span></div>
+                           <div className="flex items-center gap-2"><span className="w-3 h-3 bg-rose-500 rounded-full"></span> <span className="text-xs font-bold text-slate-500">Bills</span></div>
+                        </div>
+                     </div>
+
+                     {/* EXPENSE LIST MOCKUP */}
+                     <div className="space-y-3">
+                        <div className="h-4 w-24 bg-slate-200 rounded mb-2"></div>
+                        {[
+                           { name: 'Rent', amt: '£1,200', icon: 'bg-indigo-100 text-indigo-500' },
+                           { name: 'Grocery Run', amt: '£85.50', icon: 'bg-emerald-100 text-emerald-500' },
+                           { name: 'Netflix', amt: '£15.99', icon: 'bg-indigo-100 text-indigo-500' },
+                           { name: 'Gym', amt: '£45.00', icon: 'bg-indigo-100 text-indigo-500' },
+                        ].map((item, i) => (
+                           <div key={i} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                 <div className={`w-10 h-10 rounded-xl ${item.icon} flex items-center justify-center font-bold`}>£</div>
+                                 <div className="text-sm font-bold text-slate-700">{item.name}</div>
+                              </div>
+                              <div className="font-bold text-slate-800">{item.amt}</div>
+                           </div>
+                        ))}
+                     </div>
                   </div>
                </div>
-               {/* Overlay Content */}
-               <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-slate-900/50 to-transparent p-8 flex items-end justify-between text-white">
-                  <div>
-                    <p className="font-bold text-lg">The Dashboard</p>
-                    <p className="text-sm opacity-80">See your financial health in one glance.</p>
-                  </div>
-               </div>
+               
+               {/* OVERLAY GRADIENT */}
+               <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-slate-900/10 to-transparent pointer-events-none"></div>
             </div>
          </div>
       </section>
 
-      {/* 4. FEATURES GRID */}
+      {/* 4. FEATURES GRID (Unchanged) */}
       <section id="features" className="py-24 bg-white">
          <div className="max-w-6xl mx-auto px-6">
             <div className="text-center max-w-2xl mx-auto mb-16">
@@ -4270,7 +4320,7 @@ const LandingPage = ({ onGetStarted, onLogin }) => {
          </div>
       </section>
 
-      {/* 5. FOOTER */}
+      {/* 5. FOOTER (Unchanged) */}
       <footer className="bg-slate-900 text-slate-400 py-12 border-t border-slate-800">
          <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="flex items-center gap-2 text-white">
@@ -4728,38 +4778,69 @@ export default function App() {
         }
 
       } else {
-        // --- NEW/EMPTY MONTH ---
-        setSalary('');
+        // --- NEW/EMPTY MONTH INITIALIZATION ---
         
-        const initialExpenses = [...(userSettings.defaultFixedExpenses || [])];
-        
-        // Add Credit Cards
-        if (userSettings.creditCards) {
-           userSettings.creditCards.forEach(card => {
-              initialExpenses.push({
-                 id: `cc_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
-                 name: card.name,
-                 amount: 0,
-                 type: 'credit_card',
-                 logo: card.logo
+        // CHECK: Is this a Demo User? If so, SEED DATA!
+        const isDemo = auth.currentUser?.isAnonymous;
+
+        if (isDemo) {
+           // --- SEED DEMO DATA ---
+           setSalary(3200); // Fake Salary
+           
+           // Fake Expenses
+           const demoExpenses = [
+             { id: 'd1', name: 'Rent', amount: 1200, type: 'fixed' },
+             { id: 'd2', name: 'Council Tax', amount: 150, type: 'fixed' },
+             { id: 'd3', name: 'Netflix', amount: 15.99, type: 'fixed' },
+             { id: 'd4', name: 'Grocery Run', amount: 85.50, type: 'variable' },
+             { id: 'd5', name: 'Uber Eats', amount: 24.00, type: 'variable' },
+           ];
+           setExpenses(demoExpenses);
+           
+           // Fake Pots
+           const demoPots = [
+             { id: 'p1', name: 'Holiday', percentage: 10, hex: '#10b981' }, // Emerald
+             { id: 'p2', name: 'Emergency', percentage: 20, hex: '#6366f1' }, // Indigo
+           ];
+           setMonthAllocations(demoPots);
+           
+        } else {
+           // --- NORMAL NEW USER (Empty) ---
+           setSalary('');
+           
+           // Start with Fixed Expenses
+           const initialExpenses = [...(userSettings.defaultFixedExpenses || [])];
+           
+           // Add Credit Cards
+           if (userSettings.creditCards) {
+              userSettings.creditCards.forEach(card => {
+                 initialExpenses.push({
+                    id: `cc_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
+                    name: card.name,
+                    amount: 0,
+                    type: 'credit_card',
+                    logo: card.logo
+                 });
               });
-           });
+           }
+
+           // Add Mortgages with FIXED AMOUNT
+           if (userSettings.mortgages) {
+              userSettings.mortgages.forEach(mort => {
+                 initialExpenses.push({
+                    id: `mort_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
+                    name: mort.name,
+                    amount: parseFloat(mort.amount) || 0,
+                    type: 'mortgage',
+                    logo: mort.logo
+                 });
+              });
+           }
+           
+           setExpenses(initialExpenses);
+           setMonthAllocations(null);
         }
 
-        // Add Mortgages with FIXED AMOUNT
-        if (userSettings.mortgages) {
-           userSettings.mortgages.forEach(mort => {
-              initialExpenses.push({
-                 id: `mort_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
-                 name: mort.name,
-                 amount: parseFloat(mort.amount) || 0, // <--- USE USER SETTING AMOUNT
-                 type: 'mortgage',
-                 logo: mort.logo
-              });
-           });
-        }
-        
-        setExpenses(initialExpenses);
         setActualSavings({});
         setMonthAllocations(null);
       }
@@ -4834,6 +4915,22 @@ export default function App() {
       }
     } finally {
        setIsLoggingIn(false);
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
+    try {
+      // 1. Sign in Anonymously (No password needed)
+      const result = await signInAnonymously(auth);
+      setUser(result.user);
+      logSystemEvent('Demo User Started', 'demo', result.user);
+    } catch (error) {
+      console.error("Demo Login Failed", error);
+      alert("Could not start demo. Please try again.");
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
