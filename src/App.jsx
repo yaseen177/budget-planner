@@ -3528,22 +3528,7 @@ export default function App() {
   const [showPaceModal, setShowPaceModal] = useState(false);
   const [paceView, setPaceView] = useState('daily'); // 'daily' or 'weekly'
 
-  // ... inside render ...
-  // Calculate Target Logic
-  const paceLow = effectiveSettings.dailyPaceTargets?.low || 10;
-  const paceHigh = effectiveSettings.dailyPaceTargets?.high || 30;
   
-  // Calculate Display Values
-  const weeklyAllowance = dailyAllowance * 7;
-  const isWeekly = paceView === 'weekly';
-  const displayPace = isWeekly ? weeklyAllowance : dailyAllowance;
-  
-  // Animation Logic (Scale targets if weekly)
-  const targetLow = isWeekly ? paceLow * 7 : paceLow;
-  const targetHigh = isWeekly ? paceHigh * 7 : paceHigh;
-  
-  const isLow = displayPace < targetLow && displayPace > 0;
-  const isHealthy = displayPace > targetHigh;
 
   const isMobile = window.innerWidth < 768;
 
@@ -4312,6 +4297,24 @@ export default function App() {
       />
     );
   }
+
+
+  // ... inside render ...
+  // Calculate Target Logic
+  const paceLow = effectiveSettings.dailyPaceTargets?.low || 10;
+  const paceHigh = effectiveSettings.dailyPaceTargets?.high || 30;
+  
+  // Calculate Display Values
+  const weeklyAllowance = dailyAllowance * 7;
+  const isWeekly = paceView === 'weekly';
+  const displayPace = isWeekly ? weeklyAllowance : dailyAllowance;
+  
+  // Animation Logic (Scale targets if weekly)
+  const targetLow = isWeekly ? paceLow * 7 : paceLow;
+  const targetHigh = isWeekly ? paceHigh * 7 : paceHigh;
+  
+  const isLow = displayPace < targetLow && displayPace > 0;
+  const isHealthy = displayPace > targetHigh;
 
   return (
     <div className={`relative min-h-screen pb-24 font-sans transition-colors duration-500 ${isSandbox ? 'bg-slate-50' : ''} print:bg-white print:pb-0`}>
