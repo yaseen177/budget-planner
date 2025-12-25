@@ -72,7 +72,9 @@ import {
   Maximize2,
   HelpCircle,
   Menu,
-  Shield
+  Shield,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 
