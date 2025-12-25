@@ -72,9 +72,7 @@ import {
   Maximize2,
   HelpCircle,
   Menu,
-  Shield,
-  Sun,
-  Moon
+  Shield
 } from 'lucide-react';
 
 
@@ -409,32 +407,6 @@ const playJuiceSound = (type) => {
   
   // Play and catch errors (e.g. if user hasn't interacted with page yet)
   audio.play().catch(e => console.log('Audio play blocked:', e));
-};
-
-// HELPER 8: ECLIPSE THEME LAYER
-const EclipseLayer = ({ isActive, origin, mode }) => {
-  if (!isActive) return null;
-
-  const isGoingDark = mode === 'dark';
-
-  return (
-    <div 
-      className="fixed inset-0 z-[9999] pointer-events-none transition-all duration-700 ease-[cubic-bezier(0.645,0.045,0.355,1)]"
-      style={{
-        backgroundColor: isGoingDark ? '#0f172a' : '#f8fafc', // Slate-900 or Slate-50
-        clipPath: isActive ? `circle(150% at ${origin.x}px ${origin.y}px)` : `circle(0% at ${origin.x}px ${origin.y}px)`,
-        // We force a repaint to ensure the animation plays
-        animation: 'none'
-      }}
-    >
-      {/* Optional: Add a text hint in the middle of the eclipse */}
-      <div className={`absolute inset-0 flex items-center justify-center opacity-0 animate-in fade-in duration-700 delay-200`}>
-         <span className={`text-4xl font-black tracking-tighter ${isGoingDark ? 'text-slate-800' : 'text-slate-200'}`}>
-            {isGoingDark ? 'LIGHTS OUT' : 'LIGHTS ON'}
-         </span>
-      </div>
-    </div>
-  );
 };
 // --- JUICE ENHANCEMENTS END ---
 
@@ -4018,36 +3990,6 @@ export default function App() {
 
   const [highlightedSlice, setHighlightedSlice] = useState(null); // 'expenses' or pot ID
 
-
-  // --- THEME & ECLIPSE STATE ---
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [eclipse, setEclipse] = useState({ active: false, x: 0, y: 0, mode: 'light' });
-
-  const toggleTheme = async (e) => {
-    // 1. Get coordinates of the click
-    const x = e.clientX;
-    const y = e.clientY;
-    const nextMode = isDarkMode ? 'light' : 'dark';
-
-    // 2. Play Sound
-    playJuiceSound('toggle');
-    if (window.navigator.vibrate) window.navigator.vibrate(20);
-
-    // 3. Start the Eclipse (Start expanding the circle)
-    setEclipse({ active: true, x, y, mode: nextMode });
-
-    // 4. Wait for the circle to cover the screen (400ms)
-    await new Promise(r => setTimeout(r, 400));
-
-    // 5. SWAP THE THEME (Underneath the cover)
-    setIsDarkMode(!isDarkMode);
-
-    // 6. Reset Eclipse (after animation finishes)
-    setTimeout(() => {
-       setEclipse(prev => ({ ...prev, active: false }));
-    }, 400);
-  };
-
   // --- DATA SOURCE LOGIC (Real vs Sandbox vs Admin Demo) ---
 
   // 1. Define Tutorial Mode First (Fixes ReferenceError)
@@ -4608,13 +4550,7 @@ export default function App() {
   const isHealthy = displayPace > targetHigh;
 
   return (
-    <div className={`relative min-h-screen pb-24 font-sans transition-colors duration-500 
-      ${isDarkMode ? 'bg-slate-950 text-slate-100' : (isSandbox ? 'bg-slate-50' : 'bg-slate-50')} 
-      print:bg-white print:pb-0`}
-    >
-      {/* THE ECLIPSE LAYER (Must be at the top) */}
-      <EclipseLayer isActive={eclipse.active} origin={{ x: eclipse.x, y: eclipse.y }} mode={eclipse.mode} />
-
+    <div className={`relative min-h-screen pb-24 font-sans transition-colors duration-500 ${isSandbox ? 'bg-slate-50' : ''} print:bg-white print:pb-0`}>
       <style>{`
         @media print {
           @page { margin: 10mm; size: A4 landscape; }
@@ -4860,19 +4796,6 @@ export default function App() {
             <button onClick={() => setShowReportSelector(true)} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white" title="Reports">
               <FileText className={`w-5 h-5`} />
             </button>
-
-            <button
-              onClick={toggleTheme}
-              className={`p-2.5 rounded-xl transition border border-transparent 
-                ${isDarkMode 
-                  ? 'bg-slate-800 text-yellow-400 hover:bg-slate-700 hover:text-yellow-300' 
-                  : 'hover:bg-white/10 text-white/70 hover:text-white'
-                }`}
-              title="Toggle Theme"
-            >
-              {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-            
             <button id="btn-settings" onClick={() => setShowSettings(true)} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white">
               <Settings className="w-5 h-5" />
             </button>
