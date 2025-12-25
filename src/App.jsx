@@ -2016,6 +2016,51 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
            </div>
         </section>
 
+        {/* DAILY PACE SETTINGS */}
+        <section className="space-y-3">
+           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Daily Pace Targets</h3>
+           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+              <p className="text-xs text-slate-500 leading-relaxed">
+                 Customize when the heartbeat widget warns you (red throb) or celebrates (green breathing).
+              </p>
+              
+              <div className="grid grid-cols-2 gap-4">
+                 <div>
+                    <label className="block text-xs font-bold text-rose-500 mb-1">Low Warning (&lt;)</label>
+                    <div className="relative">
+                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currentSettings.currency === 'GBP' ? '£' : currentSettings.currency === 'USD' ? '$' : '€'}</span>
+                       <input 
+                         type="number" 
+                         value={currentSettings.dailyPaceTargets?.low || 10}
+                         onChange={(e) => onSaveSettings({ 
+                            ...currentSettings, 
+                            dailyPaceTargets: { ...currentSettings.dailyPaceTargets || {}, low: parseFloat(e.target.value) || 0 }
+                         })}
+                         className="w-full pl-7 p-3 bg-white border border-rose-200 rounded-xl text-rose-600 font-bold outline-none focus:ring-2 focus:ring-rose-100"
+                       />
+                    </div>
+                 </div>
+
+                 <div>
+                    <label className="block text-xs font-bold text-emerald-600 mb-1">Healthy Goal (&gt;)</label>
+                    <div className="relative">
+                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currentSettings.currency === 'GBP' ? '£' : currentSettings.currency === 'USD' ? '$' : '€'}</span>
+                       <input 
+                         type="number" 
+                         value={currentSettings.dailyPaceTargets?.high || 30}
+                         onChange={(e) => onSaveSettings({ 
+                            ...currentSettings, 
+                            dailyPaceTargets: { ...currentSettings.dailyPaceTargets || {}, high: parseFloat(e.target.value) || 0 }
+                         })}
+                         className="w-full pl-7 p-3 bg-white border border-emerald-200 rounded-xl text-emerald-600 font-bold outline-none focus:ring-2 focus:ring-emerald-100"
+                       />
+                    </div>
+                 </div>
+              </div>
+           </div>
+        </section>
+
+
         {/* Profile Name */}
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Profile & Currency</h3>
@@ -2588,6 +2633,8 @@ const calculateDaysUntilPayday = (payDayStr, salaryInputted) => {
 const OnboardingWizard = ({ user, onComplete }) => {
   const [step, setStep] = useState(0); 
   // Steps: 0:Intro, 1:Bank, 2:Payday, 3:Currency, 4:Pots, 5:Bills
+
+  const [paceTargets, setPaceTargets] = useState({ low: 10, high: 30 });
   
   const [currency, setCurrency] = useState('GBP');
   const [bank, setBank] = useState(null);
@@ -2650,10 +2697,11 @@ const OnboardingWizard = ({ user, onComplete }) => {
     const settings = {
       displayName: user.displayName || 'Friend',
       currency,
-      bankDetails: bank, // Save selected bank (includes name, logo, color)
-      payDay: payDay,    // Save selected payday
+      bankDetails: bank, 
+      payDay: payDay,
       allocationRules: pots,
-      defaultFixedExpenses: bills
+      defaultFixedExpenses: bills,
+      dailyPaceTargets: paceTargets // <--- ADD THIS
     };
     onComplete(settings);
   };
@@ -2865,6 +2913,62 @@ const OnboardingWizard = ({ user, onComplete }) => {
                  onChange={e => setNewBillAmount(e.target.value)} 
                />
                <button onClick={addBill} className="bg-slate-900 text-white p-3 rounded-xl"><Plus className="w-5 h-5" /></button>
+            </div>
+
+            {/* ADDED: Button to go to Step 6 */}
+            <button onClick={() => setStep(6)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
+              Next
+            </button>
+          </div>
+        )}
+
+        {/* STEP 6: DAILY PACE GOALS */}
+        {step === 6 && (
+          <div className="space-y-6 animate-in slide-in-from-right-8">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-800">Your Speed Limit</h2>
+              <p className="text-slate-500 text-sm">
+                We calculate your "Daily Pace" by dividing your <strong>Safe-to-Spend</strong> by the days left until payday.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-6">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider px-2">
+                   <span>Panic Zone</span>
+                   <span>Healthy Zone</span>
+                </div>
+                <div className="h-4 bg-slate-200 rounded-full overflow-hidden flex shadow-inner">
+                   <div className="h-full bg-rose-400" style={{ width: '30%' }}></div>
+                   <div className="h-full bg-slate-300" style={{ width: '30%' }}></div>
+                   <div className="h-full bg-emerald-400" style={{ width: '40%' }}></div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                   <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-2">Warn me below:</label>
+                      <div className="relative">
+                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
+                         <input 
+                           type="number" 
+                           value={paceTargets.low}
+                           onChange={(e) => setPaceTargets({...paceTargets, low: parseFloat(e.target.value)})}
+                           className="w-full pl-8 p-3 bg-white border border-rose-200 rounded-xl font-bold text-rose-600 outline-none focus:ring-2 focus:ring-rose-100"
+                         />
+                      </div>
+                   </div>
+                   <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-2">Target above:</label>
+                      <div className="relative">
+                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
+                         <input 
+                           type="number" 
+                           value={paceTargets.high}
+                           onChange={(e) => setPaceTargets({...paceTargets, high: parseFloat(e.target.value)})}
+                           className="w-full pl-8 p-3 bg-white border border-emerald-200 rounded-xl font-bold text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-100"
+                         />
+                      </div>
+                   </div>
+                </div>
             </div>
 
             <button onClick={handleFinish} className="w-full bg-emerald-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-600 transition mt-4">
@@ -3331,6 +3435,74 @@ const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
   );
 };
 
+const DailyPaceModal = ({ isOpen, onClose, currentTargets, onSave, currency }) => {
+  const [low, setLow] = useState(currentTargets?.low || 10);
+  const [high, setHigh] = useState(currentTargets?.high || 30);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex items-center justify-center p-4 animate-in fade-in">
+       <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-spring">
+          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+             <h3 className="font-bold text-lg text-slate-800">Daily Pace Settings</h3>
+             <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full"><X className="w-5 h-5 text-slate-500" /></button>
+          </div>
+          <div className="p-6 space-y-6">
+             <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100 text-xs text-indigo-800 leading-relaxed">
+                <strong>How is this calculated?</strong><br/>
+                We take your <em>Safe-to-Spend</em> balance and divide it by the number of days left until payday. This is your speed limit.
+             </div>
+             
+             <div className="space-y-4">
+                 <div>
+                    <label className="flex items-center gap-2 text-xs font-bold text-rose-500 uppercase tracking-wider mb-2">
+                       <TrendingDown className="w-4 h-4" /> Panic Zone (Low)
+                    </label>
+                    <div className="relative">
+                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
+                       <input 
+                         type="number" 
+                         value={low}
+                         onChange={(e) => setLow(e.target.value)}
+                         className="w-full pl-10 p-4 bg-rose-50 border border-rose-100 rounded-xl text-lg font-bold text-rose-600 outline-none focus:ring-2 focus:ring-rose-200"
+                       />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">Widget throbs red if your daily pace drops below this.</p>
+                 </div>
+
+                 <div>
+                    <label className="flex items-center gap-2 text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">
+                       <TrendingUp className="w-4 h-4" /> Healthy Zone (High)
+                    </label>
+                    <div className="relative">
+                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
+                       <input 
+                         type="number" 
+                         value={high}
+                         onChange={(e) => setHigh(e.target.value)}
+                         className="w-full pl-10 p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-lg font-bold text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-200"
+                       />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">Widget breathes green if your daily pace is above this.</p>
+                 </div>
+             </div>
+
+             <button 
+               onClick={() => {
+                  onSave(parseFloat(low), parseFloat(high));
+                  onClose();
+               }}
+               className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 active:scale-95 transition"
+             >
+               Save Goals
+             </button>
+          </div>
+       </div>
+    </div>
+  );
+};
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -3350,6 +3522,27 @@ export default function App() {
 
   // --- ADMIN DEMO STATE ---
   const [activeDemoId, setActiveDemoId] = useState(null);
+
+  // Add these new states
+  const [showPaceModal, setShowPaceModal] = useState(false);
+  const [paceView, setPaceView] = useState('daily'); // 'daily' or 'weekly'
+
+  // ... inside render ...
+  // Calculate Target Logic
+  const paceLow = effectiveSettings.dailyPaceTargets?.low || 10;
+  const paceHigh = effectiveSettings.dailyPaceTargets?.high || 30;
+  
+  // Calculate Display Values
+  const weeklyAllowance = dailyAllowance * 7;
+  const isWeekly = paceView === 'weekly';
+  const displayPace = isWeekly ? weeklyAllowance : dailyAllowance;
+  
+  // Animation Logic (Scale targets if weekly)
+  const targetLow = isWeekly ? paceLow * 7 : paceLow;
+  const targetHigh = isWeekly ? paceHigh * 7 : paceHigh;
+  
+  const isLow = displayPace < targetLow && displayPace > 0;
+  const isHealthy = displayPace > targetHigh;
 
   const isMobile = window.innerWidth < 768;
 
@@ -4313,6 +4506,18 @@ export default function App() {
         />
       )}
 
+
+      <DailyPaceModal 
+        isOpen={showPaceModal}
+        onClose={() => setShowPaceModal(false)}
+        currentTargets={{ low: paceLow, high: paceHigh }}
+        currency={effectiveSettings.currency}
+        onSave={(low, high) => saveSettings({ 
+           ...effectiveSettings, 
+           dailyPaceTargets: { low, high } 
+        })}
+      />
+
       {/* --- 2. PREMIUM HEADER --- */}
       <header className={`pt-8 pb-32 px-6 rounded-b-[3rem] shadow-xl relative z-10 print:hidden transition-all duration-500 ease-in-out ${isSandbox ? 'bg-gradient-to-br from-indigo-900 to-indigo-800' : 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'}`}>
         <div className="max-w-3xl mx-auto flex justify-between items-center mb-6 relative">
@@ -4564,30 +4769,52 @@ export default function App() {
              </div>
              
              {/* --- PASTE THIS NEW WIDGET BELOW --- */}
-             {/* Stat 3: Daily Allowance Widget (HEARTBEAT ENHANCED) */}
+             {/* Stat 3: Daily/Weekly Pace Widget (HEARTBEAT + PAGINATION) */}
              <div className={`flex-1 p-6 rounded-[2.5rem] shadow-sm border flex flex-col justify-center text-center relative overflow-hidden group transition-all duration-500
-                ${dailyAllowance < 10 && dailyAllowance > 0 ? 'bg-rose-50 border-rose-200 animate-throb' : 
-                  dailyAllowance > 30 ? 'bg-emerald-50 border-emerald-200 animate-breathe' : 
+                ${isLow ? 'bg-rose-50 border-rose-200 animate-throb' : 
+                  isHealthy ? 'bg-emerald-50 border-emerald-200 animate-breathe' : 
                   'bg-indigo-50 border-indigo-100'}`}
              >
                 {/* Decorative Top Bar */}
-                <div className={`absolute top-0 left-0 w-full h-1.5 ${dailyAllowance < 10 && dailyAllowance > 0 ? 'bg-rose-400' : dailyAllowance > 30 ? 'bg-emerald-400' : 'bg-indigo-200/50'}`}></div>
+                <div className={`absolute top-0 left-0 w-full h-1.5 ${isLow ? 'bg-rose-400' : isHealthy ? 'bg-emerald-400' : 'bg-indigo-200/50'}`}></div>
                 
-                <span className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${dailyAllowance < 10 && dailyAllowance > 0 ? 'text-rose-600' : dailyAllowance > 30 ? 'text-emerald-600' : 'text-indigo-400'}`}>Daily Pace</span>
+                {/* Settings Icon (Top Right) */}
+                <button 
+                  onClick={() => setShowPaceModal(true)}
+                  className={`absolute top-3 right-3 p-1.5 rounded-full transition hover:bg-black/5 ${isLow ? 'text-rose-400' : isHealthy ? 'text-emerald-500' : 'text-indigo-300'}`}
+                >
+                   <Settings className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Main Label */}
+                <span className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${isLow ? 'text-rose-600' : isHealthy ? 'text-emerald-600' : 'text-indigo-400'}`}>
+                   {isWeekly ? 'Weekly Pace' : 'Daily Pace'}
+                </span>
                 
-                <div className="flex items-baseline justify-center gap-1">
-                   <span className={`text-3xl font-black tracking-tight ${dailyAllowance < 10 && dailyAllowance > 0 ? 'text-rose-700' : dailyAllowance > 30 ? 'text-emerald-700' : 'text-indigo-700'}`}>
-                     <RollingNumber value={dailyAllowance} currency={userSettings.currency} decimals={2} />
+                {/* Rolling Number Display */}
+                <div className="flex items-baseline justify-center gap-1 min-h-[40px]">
+                   <span className={`text-3xl font-black tracking-tight ${isLow ? 'text-rose-700' : isHealthy ? 'text-emerald-700' : 'text-indigo-700'}`}>
+                     <RollingNumber value={displayPace} currency={userSettings.currency} decimals={0} />
                    </span>
-                   <span className={`text-sm font-bold ${dailyAllowance < 10 && dailyAllowance > 0 ? 'text-rose-400' : dailyAllowance > 30 ? 'text-emerald-500' : 'text-indigo-400'}`}>/ day</span>
                 </div>
                 
-                <p className={`text-[10px] mt-2 font-medium opacity-80 px-2 ${dailyAllowance < 10 && dailyAllowance > 0 ? 'text-rose-600' : dailyAllowance > 30 ? 'text-emerald-600' : 'text-indigo-400'}`}>
-                   {dailyAllowance < 10 && dailyAllowance > 0 ? 'Running Low! Be careful.' : dailyAllowance > 30 ? 'Healthy budget. You are doing great!' : 'Daily spend limit.'}
+                <p className={`text-[10px] mt-2 font-medium opacity-80 px-2 min-h-[30px] ${isLow ? 'text-rose-600' : isHealthy ? 'text-emerald-600' : 'text-indigo-400'}`}>
+                   {isLow ? 'Running Low! Slow down.' : isHealthy ? 'Healthy budget. Doing great!' : 'Safe spend limit.'}
                 </p>
+
+                {/* Pagination Dots (Bottom) */}
+                <div className="flex justify-center gap-1.5 mt-3">
+                   <button 
+                     onClick={() => { triggerHaptic(); setPaceView('daily'); }}
+                     className={`w-2 h-2 rounded-full transition-all ${!isWeekly ? (isLow ? 'bg-rose-400' : isHealthy ? 'bg-emerald-500' : 'bg-indigo-400') : 'bg-black/10 hover:bg-black/20'}`}
+                   />
+                   <button 
+                     onClick={() => { triggerHaptic(); setPaceView('weekly'); }}
+                     className={`w-2 h-2 rounded-full transition-all ${isWeekly ? (isLow ? 'bg-rose-400' : isHealthy ? 'bg-emerald-500' : 'bg-indigo-400') : 'bg-black/10 hover:bg-black/20'}`}
+                   />
+                </div>
              </div>
              {/* ----------------------------------- */}
-
           </div>
         </div>
 
