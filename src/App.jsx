@@ -2711,9 +2711,9 @@ const OnboardingWizard = ({ user, onComplete }) => {
     <div className="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 overflow-y-auto">
       <div className="max-w-md w-full space-y-8 py-10">
         
-        {/* Progress Dots - 6 Steps total */}
+        {/* Progress Dots - 7 Steps total */}
         <div className="flex justify-center gap-2 mb-8">
-          {[0, 1, 2, 3, 4, 5].map(i => (
+          {[0, 1, 2, 3, 4, 5, 6].map(i => (
             <div key={i} className={`w-3 h-3 rounded-full transition-all ${step === i ? 'bg-slate-900 scale-125' : 'bg-slate-200'}`} />
           ))}
         </div>
