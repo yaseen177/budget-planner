@@ -231,6 +231,7 @@ const VacuumItem = ({ children, onRemove, className = '' }) => {
   const triggerExit = (e) => {
     // Stop click from bubbling up
     if (e) e.stopPropagation();
+    playJuiceSound('delete')
     
     // Start animation
     setIsExiting(true);
@@ -352,6 +353,7 @@ const MorphButton = ({ children, onClick, className = '', ...props }) => {
      
      // 3. Show Success
      setStatus('success');
+     playJuiceSound('success)');
      if (window.navigator.vibrate) window.navigator.vibrate([50, 50, 50]);
 
      // 4. Wait, then fire action
@@ -385,6 +387,26 @@ const MorphButton = ({ children, onClick, className = '', ...props }) => {
        </div>
     </button>
   );
+};
+
+// HELPER 7: AUDIO JUICE ENGINE
+const playJuiceSound = (type) => {
+  const sounds = {
+    // A satisfying mechanical keyboard "thock" for clicks
+    click: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
+    // A pleasant "ding" for success
+    success: 'https://assets.mixkit.co/active_storage/sfx/1114/1114-preview.mp3',
+    // A quick "paper crumple" for delete
+    delete: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3',
+    // A crisp switch sound for toggles
+    toggle: 'https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3'
+  };
+
+  const audio = new Audio(sounds[type]);
+  audio.volume = 0.5; // Keep it subtle, not loud
+  
+  // Play and catch errors (e.g. if user hasn't interacted with page yet)
+  audio.play().catch(e => console.log('Audio play blocked:', e));
 };
 // --- JUICE ENHANCEMENTS END ---
 
@@ -623,8 +645,15 @@ const formatCurrency = (amount, currency = 'GBP', decimals = 0) => {
 
 const getMonthId = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
+// --- UPGRADED HAPTIC + AUDIO FUNCTION ---
 const triggerHaptic = () => {
-  if (navigator.vibrate) navigator.vibrate(15);
+  // 1. Play the "Thock" sound
+  playJuiceSound('click');
+
+  // 2. Vibrate the phone
+  if (window.navigator && window.navigator.vibrate) {
+    window.navigator.vibrate(10);
+  }
 };
 
 const openReportInNewTab = (elementId, title) => {
@@ -4402,6 +4431,7 @@ export default function App() {
 
   const toggleSandbox = () => {
       triggerHaptic();
+      playJuiceSound('toggle');
       if (isSandbox) {
           // Exit immediately
           setIsSandbox(false);
