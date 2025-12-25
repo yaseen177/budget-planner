@@ -1382,7 +1382,10 @@ const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose
               <tbody className="divide-y divide-slate-100">
               {allocations.map(plan => {
                 const target = remainder * (plan.percentage / 100);
-                const actual = actuals && actuals[plan.id] ? parseFloat(actuals[plan.id]) : 0;
+                // SAFER CHECK: Explicitly check for undefined to allow 0 or string values to process correctly
+                const rawActual = actuals && actuals[plan.id];
+                const actual = rawActual !== undefined && rawActual !== '' ? parseFloat(rawActual) : 0;
+
                 return (
                   <tr key={plan.id}>
                     <td className="py-2 text-slate-600">{plan.name} <span className="text-xs text-slate-400">({plan.percentage}%)</span></td>
@@ -1392,7 +1395,6 @@ const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose
                 );
               })}
 
-              {/* <--- PASTE THE FIRST SNIPPET HERE ---> */}
               {/* --- NEW: Current Account Row --- */}
               <tr className="bg-slate-50 border-t border-slate-100">
                   <td className="py-2 pl-2 text-slate-800 font-bold">Current Account <span className="text-xs text-slate-400 font-normal">(Remainder)</span></td>
@@ -1400,12 +1402,11 @@ const MonthReportView = ({ date, salary, expenses, allocations, actuals, onClose
                   <td className="py-2 text-right font-medium text-slate-500">
                     {formatCurrency(remainder * (Math.max(0, 100 - allocations.reduce((s,p)=>s+p.percentage,0)) / 100), currency)}
                   </td>
-                  {/* Calculate Actual */}
+                  {/* Calculate Actual: Remainder minus SUM of all pots */}
                   <td className="py-2 text-right font-bold text-slate-800">
                     {formatCurrency(Math.max(0, remainder - Object.values(actuals || {}).reduce((s,v)=>s+(parseFloat(v)||0),0)), currency)}
                   </td>
               </tr>
-
               
               </tbody>
             </table>
@@ -1459,7 +1460,7 @@ const HistoryReportView = ({ data, allocations, onClose, currency }) => {
                   </th>
                 ))}
               </tr>
-            </thead>
+              </thead>
             <tbody className="divide-y divide-slate-100">
               {data.map((row) => {
                 const totalExpenses = (row.expenses || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
@@ -1472,16 +1473,17 @@ const HistoryReportView = ({ data, allocations, onClose, currency }) => {
                     <td className="py-3 px-2 font-medium text-slate-800">{row.id}</td>
                     <td className="py-3 px-2 text-right font-mono font-bold text-emerald-600">{formatCurrency(salary, currency)}</td>
                     <td className="py-3 px-2 text-right font-mono text-rose-500">{formatCurrency(totalExpenses, currency)}</td>
-                    {/* --- NEW: Current Account Actual Logic --- */}
+                    
+                    {/* Current Account Actual Logic */}
                     <td className="py-3 px-2 text-right font-mono font-bold text-indigo-600 border-r border-slate-200 pr-4">
-                      {/* Remainder - Sum of all pot actuals */}
                       {formatCurrency(Math.max(0, remainder - Object.values(actuals).reduce((sum, val) => sum + (parseFloat(val) || 0), 0)), currency)}
                     </td>
-  
-                    {/* <--- END PASTE ---> */}
 
                     {allocations.map(plan => {
-                      const actual = actuals[plan.id] ? parseFloat(actuals[plan.id]) : 0;
+                      // SAFER CHECK: Extract raw value first, check validity, then parse
+                      const rawActual = actuals[plan.id];
+                      const actual = rawActual !== undefined && rawActual !== '' ? parseFloat(rawActual) : 0;
+                      
                       const target = remainder * (plan.percentage / 100);
                       const isMet = actual >= target - 1; // Tolerance of 1
                       
