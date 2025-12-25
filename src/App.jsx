@@ -4224,13 +4224,13 @@ const LandingPage = ({ onGetStarted, onDemo }) => {
          </div>
       </header>
 
-      {/* 3. APP PREVIEW (High Fidelity CSS Mockup) */}
+      {/* 3. APP PREVIEW (Responsive Mockup) */}
       <section className="px-4 mb-24 relative z-20 -mt-10">
-         <div className="max-w-5xl mx-auto bg-white rounded-[2.5rem] p-4 shadow-2xl border border-slate-200/50 transform md:rotate-1 hover:rotate-0 transition duration-500">
-            <div className="bg-slate-100 rounded-[2rem] overflow-hidden border border-slate-200 relative aspect-[16/9] flex">
+         <div className="max-w-5xl mx-auto bg-white rounded-[2rem] md:rounded-[2.5rem] p-2 md:p-4 shadow-2xl border border-slate-200/50 transform rotate-0 md:rotate-1 md:hover:rotate-0 transition duration-500">
+            <div className="bg-slate-100 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden border border-slate-200 relative flex flex-col md:flex-row">
                
-               {/* SIDEBAR MOCKUP */}
-               <div className="hidden md:flex w-64 bg-slate-900 p-6 flex-col gap-6">
+               {/* SIDEBAR MOCKUP (Hidden on Mobile) */}
+               <div className="hidden md:flex w-64 bg-slate-900 p-6 flex-col gap-6 shrink-0">
                   <div className="flex items-center gap-2 text-white opacity-50 mb-4">
                      <div className="w-8 h-8 rounded-lg bg-white/10"></div>
                      <div className="w-20 h-4 rounded bg-white/10"></div>
@@ -4241,47 +4241,49 @@ const LandingPage = ({ onGetStarted, onDemo }) => {
                </div>
 
                {/* MAIN CONTENT MOCKUP */}
-               <div className="flex-1 p-8 bg-slate-50 overflow-hidden relative">
-                  <div className="flex justify-between items-center mb-8">
+               <div className="flex-1 p-4 md:p-8 bg-slate-50 relative min-h-[400px]">
+                  {/* Fake Header */}
+                  <div className="flex justify-between items-center mb-6 md:mb-8">
                      <div>
-                        <div className="h-8 w-48 bg-slate-200 rounded-lg mb-2"></div>
-                        <div className="h-4 w-32 bg-slate-200/50 rounded-lg"></div>
+                        <div className="h-6 md:h-8 w-32 md:w-48 bg-slate-200 rounded-lg mb-2"></div>
+                        <div className="h-3 md:h-4 w-24 md:w-32 bg-slate-200/50 rounded-lg"></div>
                      </div>
-                     <div className="h-10 w-10 bg-slate-200 rounded-full"></div>
+                     <div className="h-8 w-8 md:h-10 md:w-10 bg-slate-200 rounded-full"></div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Dashboard Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 relative z-10">
+                     
                      {/* BUDGET WHEEL MOCKUP */}
-                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center aspect-square md:aspect-auto">
-                        <div className="relative w-48 h-48 rounded-full" 
+                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center">
+                        <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-full" 
                              style={{ background: 'conic-gradient(#10b981 0% 55%, #6366f1 55% 75%, #f43f5e 75% 100%)' }}>
                              <div className="absolute inset-4 bg-white rounded-full flex flex-col items-center justify-center shadow-inner">
-                                <span className="text-sm text-slate-400 font-bold uppercase tracking-wider">Safe to Spend</span>
-                                <span className="text-3xl font-black text-slate-800">£1,240</span>
+                                <span className="text-[10px] md:text-sm text-slate-400 font-bold uppercase tracking-wider">Safe to Spend</span>
+                                <span className="text-2xl md:text-3xl font-black text-slate-800">£1,240</span>
                              </div>
                         </div>
-                        <div className="flex gap-4 mt-6">
-                           <div className="flex items-center gap-2"><span className="w-3 h-3 bg-emerald-500 rounded-full"></span> <span className="text-xs font-bold text-slate-500">Free</span></div>
-                           <div className="flex items-center gap-2"><span className="w-3 h-3 bg-indigo-500 rounded-full"></span> <span className="text-xs font-bold text-slate-500">Saved</span></div>
-                           <div className="flex items-center gap-2"><span className="w-3 h-3 bg-rose-500 rounded-full"></span> <span className="text-xs font-bold text-slate-500">Bills</span></div>
+                        {/* Legend (Hidden on very small screens to save space) */}
+                        <div className="hidden xs:flex gap-4 mt-6">
+                           <div className="flex items-center gap-2"><span className="w-2 h-2 md:w-3 md:h-3 bg-emerald-500 rounded-full"></span> <span className="text-[10px] md:text-xs font-bold text-slate-500">Free</span></div>
+                           <div className="flex items-center gap-2"><span className="w-2 h-2 md:w-3 md:h-3 bg-indigo-500 rounded-full"></span> <span className="text-[10px] md:text-xs font-bold text-slate-500">Saved</span></div>
                         </div>
                      </div>
 
                      {/* EXPENSE LIST MOCKUP */}
                      <div className="space-y-3">
-                        <div className="h-4 w-24 bg-slate-200 rounded mb-2"></div>
+                        <div className="h-4 w-24 bg-slate-200 rounded mb-2 hidden md:block"></div>
                         {[
                            { name: 'Rent', amt: '£1,200', icon: 'bg-indigo-100 text-indigo-500' },
-                           { name: 'Grocery Run', amt: '£85.50', icon: 'bg-emerald-100 text-emerald-500' },
+                           { name: 'Groceries', amt: '£85.50', icon: 'bg-emerald-100 text-emerald-500' },
                            { name: 'Netflix', amt: '£15.99', icon: 'bg-indigo-100 text-indigo-500' },
-                           { name: 'Gym', amt: '£45.00', icon: 'bg-indigo-100 text-indigo-500' },
                         ].map((item, i) => (
-                           <div key={i} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+                           <div key={i} className="bg-white p-3 md:p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
                               <div className="flex items-center gap-3">
-                                 <div className={`w-10 h-10 rounded-xl ${item.icon} flex items-center justify-center font-bold`}>£</div>
-                                 <div className="text-sm font-bold text-slate-700">{item.name}</div>
+                                 <div className={`w-8 h-8 md:w-10 md:h-10 rounded-xl ${item.icon} flex items-center justify-center font-bold text-xs md:text-base`}>£</div>
+                                 <div className="text-xs md:text-sm font-bold text-slate-700">{item.name}</div>
                               </div>
-                              <div className="font-bold text-slate-800">{item.amt}</div>
+                              <div className="text-xs md:text-sm font-bold text-slate-800">{item.amt}</div>
                            </div>
                         ))}
                      </div>
@@ -4289,7 +4291,7 @@ const LandingPage = ({ onGetStarted, onDemo }) => {
                </div>
                
                {/* OVERLAY GRADIENT */}
-               <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-slate-900/10 to-transparent pointer-events-none"></div>
+               <div className="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-slate-900/5 to-transparent pointer-events-none z-0"></div>
             </div>
          </div>
       </section>
@@ -5260,6 +5262,7 @@ export default function App() {
         return (
            <LandingPage 
               onGetStarted={() => setShowLandingPage(false)} 
+              onDemo={handleDemoLogin}
               onLogin={() => setShowLandingPage(false)} 
            />
         );
