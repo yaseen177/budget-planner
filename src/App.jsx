@@ -2159,11 +2159,96 @@ const HistoryReportView = ({ data, allocations, onClose, currency, bankDetails }
   );
 };
 
+// --- NEW: CREDIT CARD SELECTOR ---
+const CreditCardSelector = ({ selectedCards, onToggle }) => {
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const LOGO_PUBLIC_KEY = import.meta.env.VITE_LOGO_DEV_PUBLIC_KEY;
+
+  const isSelected = (name) => selectedCards.some(c => c.name === name);
+
+  return (
+    <div className="space-y-4">
+      {!isSearching ? (
+        <>
+          <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto p-1">
+            {UK_CREDIT_CARDS.map(card => {
+               const active = isSelected(card.name);
+               return (
+                <button
+                  key={card.id}
+                  onClick={() => onToggle({ name: card.name, logo: `https://img.logo.dev/${card.domain}?token=${LOGO_PUBLIC_KEY}`, type: 'credit_card' })}
+                  className={`p-3 rounded-xl border flex items-center gap-3 transition-all text-left ${active ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-200 hover:border-slate-300 bg-white'}`}
+                >
+                  <img 
+                    src={`https://img.logo.dev/${card.domain}?token=${LOGO_PUBLIC_KEY}`} 
+                    alt={card.name} 
+                    className="w-8 h-8 object-contain rounded-full bg-white p-0.5 shadow-sm"
+                  />
+                  <span className={`text-xs font-bold ${active ? 'text-emerald-700' : 'text-slate-700'}`}>{card.name}</span>
+                  {active && <Check className="w-4 h-4 text-emerald-600 ml-auto" />}
+                </button>
+            )})}
+          </div>
+          <button 
+            onClick={() => setIsSearching(true)}
+            className="w-full py-3 text-sm font-bold text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl border border-dashed border-slate-300 transition"
+          >
+            Search for other cards...
+          </button>
+        </>
+      ) : (
+        <div className="animate-in fade-in">
+           <div className="flex justify-between items-center mb-2">
+              <label className="text-xs font-bold text-slate-400 uppercase">Search Card Provider</label>
+              <button onClick={() => setIsSearching(false)} className="text-xs text-indigo-500 font-bold">Back to list</button>
+           </div>
+           <BrandSearchInput 
+              placeholder="e.g. Vanquis, Aqua..."
+              value={searchTerm}
+              onChange={setSearchTerm}
+              onSelectBrand={(name, logo) => {
+                 onToggle({ name, logo, type: 'credit_card' });
+                 setSearchTerm('');
+                 setIsSearching(false);
+              }}
+              className="w-full p-3 rounded-xl border border-slate-200"
+              autoFocus
+           />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- NEW: COLLAPSIBLE EXPENSE SECTION ---
+const CollapsibleSection = ({ title, count, children, defaultOpen = true }) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div className="mb-2">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between bg-slate-50/80 px-6 py-3 border-y border-slate-100 hover:bg-slate-100 transition group"
+      >
+         <div className="flex items-center gap-2">
+            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-slate-600 transition">{title}</h4>
+            <span className="bg-slate-200 text-slate-600 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{count}</span>
+         </div>
+         <ChevronRight className={`w-4 h-4 text-slate-300 transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`} />
+      </button>
+      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+         {children}
+      </div>
+    </div>
+  );
+};
+
+
 const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onResetMonth, isTutorial, onExitTutorial, isLegacyMode }) => {
   const [displayName, setDisplayName] = useState(currentSettings.displayName || user.displayName || '');
   const [currency, setCurrency] = useState(currentSettings.currency || 'GBP');
   const [bank, setBank] = useState(currentSettings.bankDetails || null);
-  const [payDay, setPayDay] = useState(currentSettings.payDay || '1');
   
   const [allocations, setAllocations] = useState(currentSettings.allocationRules || []);
   const [defaultExpenses, setDefaultExpenses] = useState(currentSettings.defaultFixedExpenses || []);
@@ -2181,6 +2266,19 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   const totalPercentage = allocations.reduce((sum, item) => sum + parseFloat(item.percentage), 0);
   const remainderPercent = Math.max(0, 100 - totalPercentage);
 
+  const [payDay, setPayDay] = useState(currentSettings.payDay || '1');
+  
+  // --- NEW: Credit Cards State ---
+  const [creditCards, setCreditCards] = useState(currentSettings.creditCards || []);
+
+  const toggleCreditCard = (card) => {
+     if (creditCards.some(c => c.name === card.name)) {
+        setCreditCards(creditCards.filter(c => c.name !== card.name));
+     } else {
+        setCreditCards([...creditCards, card]);
+     }
+  };
+
   const handleSave = () => {
     if (totalPercentage > 100) {
       alert("Total percentage cannot exceed 100%");
@@ -2196,7 +2294,8 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
       bankDetails: bank,
       payDay,
       allocationRules: allocations,
-      defaultFixedExpenses: defaultExpenses
+      defaultFixedExpenses: defaultExpenses,
+      creditCards: creditCards
     });
     onClose();
   };
@@ -2248,7 +2347,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
         
         {isLegacyMode && (
           <div className="bg-amber-50 text-amber-800 p-4 rounded-xl border border-amber-200 text-sm font-bold mb-4">
-             Please update your Bank and Payday to use the new features.
+             Please complete your setup: Add Bank, Payday, and any Credit Cards.
           </div>
         )}
 
@@ -2281,6 +2380,33 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                  </select>
               </div>
 
+           </div>
+        </section>
+
+        {/* --- NEW: CREDIT CARDS SECTION (Insert after Bank/Payday section) --- */}
+        <section className="space-y-3">
+           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">My Credit Cards</h3>
+           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+              <p className="text-xs text-slate-500 leading-relaxed">
+                 Select cards you use. These will appear in your budget with a variable amount (starting at 0) each month.
+              </p>
+              
+              {/* Selected Cards Pills */}
+              <div className="flex flex-wrap gap-2 mb-2">
+                 {creditCards.map(c => (
+                    <div key={c.name} className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-emerald-100 shadow-sm animate-in zoom-in">
+                       {c.logo && <img src={c.logo} className="w-4 h-4 object-contain" />}
+                       <span className="text-xs font-bold text-slate-700">{c.name}</span>
+                       <button onClick={() => toggleCreditCard(c)} className="text-slate-300 hover:text-red-500"><X className="w-3 h-3" /></button>
+                    </div>
+                 ))}
+                 {creditCards.length === 0 && <span className="text-xs text-slate-400 italic">No cards selected</span>}
+              </div>
+
+              <CreditCardSelector 
+                 selectedCards={creditCards}
+                 onToggle={toggleCreditCard}
+              />
            </div>
         </section>
 
@@ -2798,6 +2924,19 @@ const UK_BANKS = [
   { id: 'nationwide', name: 'Nationwide', domain: 'nationwide.co.uk', color: '#D2112C' },
 ];
 
+// --- NEW: UK CREDIT CARDS ---
+const UK_CREDIT_CARDS = [
+  { id: 'amex', name: 'American Express', domain: 'americanexpress.com' },
+  { id: 'barclaycard', name: 'Barclaycard', domain: 'barclays.co.uk' }, // Often shares domain
+  { id: 'capitalone', name: 'Capital One', domain: 'capitalone.co.uk' },
+  { id: 'mbna', name: 'MBNA', domain: 'mbna.co.uk' },
+  { id: 'tesco', name: 'Tesco Bank', domain: 'tescobank.com' },
+  { id: 'sainsburys', name: 'Sainsburys Bank', domain: 'sainsburysbank.co.uk' },
+  { id: 'santander_cc', name: 'Santander Cards', domain: 'santander.co.uk' },
+  { id: 'natwest_cc', name: 'NatWest Cards', domain: 'natwest.com' },
+  { id: 'halifax_cc', name: 'Halifax Cards', domain: 'halifax.co.uk' },
+  { id: 'virgin', name: 'Virgin Money', domain: 'virginmoney.com' },
+];
 
 // --- ADMIN TEST LAB SCENARIOS ---
 // --- ADMIN TEST LAB SCENARIOS ---
@@ -2907,6 +3046,8 @@ const OnboardingWizard = ({ user, onComplete }) => {
   const [currency, setCurrency] = useState('GBP');
   const [bank, setBank] = useState(null);
   const [payDay, setPayDay] = useState(''); // Stores string '1' to '31'
+  // --- NEW: Credit Cards State ---
+  const [creditCards, setCreditCards] = useState([]);
   
   // Pots State (User defined pots only - Current Account is calculated automatically)
   const [pots, setPots] = useState([
@@ -2967,6 +3108,7 @@ const OnboardingWizard = ({ user, onComplete }) => {
       currency,
       bankDetails: bank, 
       payDay: payDay,
+      creditCards: creditCards,
       allocationRules: pots,
       defaultFixedExpenses: bills,
       dailyPaceTargets: paceTargets // <--- ADD THIS
@@ -2974,13 +3116,21 @@ const OnboardingWizard = ({ user, onComplete }) => {
     onComplete(settings);
   };
 
+  const toggleCard = (card) => {
+    if (creditCards.some(c => c.name === card.name)) {
+       setCreditCards(creditCards.filter(c => c.name !== card.name));
+    } else {
+       setCreditCards([...creditCards, card]);
+    }
+ };
+
   return (
     <div className="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 overflow-y-auto">
       <div className="max-w-md w-full space-y-8 py-10">
         
-        {/* Progress Dots - 7 Steps total */}
+        {/* Progress Dots - 8 Steps total */}
         <div className="flex justify-center gap-2 mb-8">
-          {[0, 1, 2, 3, 4, 5, 6].map(i => (
+          {[0, 1, 2, 3, 4, 5, 6, 7].map(i => (
             <div key={i} className={`w-3 h-3 rounded-full transition-all ${step === i ? 'bg-slate-900 scale-125' : 'bg-slate-200'}`} />
           ))}
         </div>
@@ -3018,39 +3168,43 @@ const OnboardingWizard = ({ user, onComplete }) => {
            </div>
         )}
 
-        {/* STEP 2: PAYDAY SELECTION (NEW) */}
+        {/* STEP 2: PAYDAY (Update Next Button) */}
         {step === 2 && (
-           <div className="space-y-6 animate-in slide-in-from-right-8">
-             <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">When is Payday?</h2>
-              <p className="text-slate-500">We use this to track your monthly cycle.</p>
-            </div>
-
-            <div className="grid grid-cols-7 gap-2 max-h-64 overflow-y-auto p-1">
-               {Array.from({length: 31}, (_, i) => i + 1).map(day => (
-                  <button 
-                    key={day}
-                    onClick={() => setPayDay(String(day))}
-                    className={`aspect-square rounded-lg font-bold border flex items-center justify-center transition ${payDay === String(day) ? 'bg-slate-900 text-white border-slate-900 scale-110 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}
-                  >
-                    {day}
-                  </button>
-               ))}
-            </div>
-            {payDay && (
-              <p className="text-center font-bold text-emerald-600 animate-in fade-in">
-                Payday is on the {payDay}{['1','21','31'].includes(payDay)?'st':['2','22'].includes(payDay)?'nd':['3','23'].includes(payDay)?'rd':'th'}
-              </p>
-            )}
-
-            <button disabled={!payDay} onClick={() => setStep(3)} className="w-full bg-slate-900 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
+           <div className="...">
+            {/* ... Payday UI ... */}
+            <button disabled={!payDay} onClick={() => setStep(3)} className="...">
               Next
             </button>
            </div>
         )}
 
-        {/* STEP 3: CURRENCY */}
+        {/* --- NEW STEP 3: CREDIT CARDS --- */}
         {step === 3 && (
+          <div className="space-y-6 animate-in slide-in-from-right-8">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-800">Credit Cards</h2>
+              <p className="text-slate-500">Do you have any credit cards you pay off monthly?</p>
+            </div>
+
+            <div className="flex flex-wrap gap-2 justify-center">
+                 {creditCards.map(c => (
+                    <span key={c.name} className="text-xs font-bold bg-slate-900 text-white px-2 py-1 rounded animate-in zoom-in">{c.name}</span>
+                 ))}
+            </div>
+
+            <CreditCardSelector 
+                selectedCards={creditCards}
+                onToggle={toggleCard}
+            />
+
+            <button onClick={() => setStep(4)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
+              {creditCards.length === 0 ? 'I don\'t have any cards' : 'Next'}
+            </button>
+          </div>
+        )}
+
+        {/* STEP 4: CURRENCY */}
+        {step === 4 && (
           <div className="space-y-6 animate-in slide-in-from-right-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-slate-800">Your Currency</h2>
@@ -3073,8 +3227,8 @@ const OnboardingWizard = ({ user, onComplete }) => {
           </div>
         )}
 
-        {/* STEP 4: POTS & CURRENT ACCOUNT */}
-        {step === 4 && (
+        {/* STEP 5: POTS & CURRENT ACCOUNT */}
+        {step === 5 && (
           <div className="space-y-6 animate-in slide-in-from-right-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-slate-800">Savings & Pots</h2>
@@ -3136,8 +3290,8 @@ const OnboardingWizard = ({ user, onComplete }) => {
           </div>
         )}
 
-        {/* STEP 5: FIXED EXPENSES */}
-        {step === 5 && (
+        {/* STEP 6: FIXED EXPENSES */}
+        {step === 6 && (
           <div className="space-y-6 animate-in slide-in-from-right-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-slate-800">Monthly Commitments</h2>
@@ -3190,8 +3344,8 @@ const OnboardingWizard = ({ user, onComplete }) => {
           </div>
         )}
 
-        {/* STEP 6: DAILY PACE GOALS */}
-        {step === 6 && (
+        {/* STEP 7: DAILY PACE GOALS */}
+        {step === 7 && (
           <div className="space-y-6 animate-in slide-in-from-right-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-slate-800">Your Speed Limit</h2>
@@ -3244,6 +3398,8 @@ const OnboardingWizard = ({ user, onComplete }) => {
             </button>
           </div>
         )}
+
+
 
       </div>
     </div>
@@ -4016,7 +4172,8 @@ export default function App() {
     displayName: '',
     currency: 'GBP',
     allocationRules: DEFAULT_ALLOCATIONS,
-    defaultFixedExpenses: DEFAULT_FIXED_EXPENSES
+    defaultFixedExpenses: DEFAULT_FIXED_EXPENSES,
+    creditCards: []
   });
 
   const [editingExpenseId, setEditingExpenseId] = useState(null);
@@ -4115,12 +4272,12 @@ export default function App() {
         const data = docSnap.data();
         setUserSettings(data);
         
-        // CHECK IF LEGACY: Missing Bank or Payday
-        if (!data.bankDetails || !data.payDay) {
-           setIsLegacyUser(true);
-           setShowSettings(true); // Force open settings
+        // CHECK IF LEGACY: Missing Bank or Payday OR Credit Cards Config
+        if (!data.bankDetails || !data.payDay || data.creditCards === undefined) {
+          setIsLegacyUser(true);
+          setShowSettings(true); // Force open settings
         } else {
-           setIsLegacyUser(false);
+          setIsLegacyUser(false);
         }
         setOnboardingComplete(true);
       } else {
@@ -4146,11 +4303,41 @@ export default function App() {
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
+
+        // --- START CHANGE: Inject Credit Cards into Existing Month ---
+        let currentExpenses = data.expenses || [];
+        
+        // Check if the user has Credit Cards in settings that are missing from this month's data
+        if (userSettings.creditCards && userSettings.creditCards.length > 0) {
+           let cardsAdded = false;
+           userSettings.creditCards.forEach(card => {
+              // Check if this card exists in expenses (by name and type)
+              const exists = currentExpenses.some(e => e.name === card.name && e.type === 'credit_card');
+              if (!exists) {
+                 currentExpenses.push({
+                    id: `cc_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
+                    name: card.name,
+                    amount: 0, // Starts at 0 (Variable)
+                    type: 'credit_card',
+                    logo: card.logo
+                 });
+                 cardsAdded = true;
+              }
+           });
+           
+           // If we added cards, save them to DB immediately (unless in Sandbox/Demo)
+           if (cardsAdded && !isSandbox && !activeDemoId) {
+              setDoc(docRef, { ...data, expenses: currentExpenses }, { merge: true });
+           }
+        }
+        
+        setExpenses(currentExpenses);
+        // --- END CHANGE ---
+
         setSalary(data.salary || '');
-        setExpenses(data.expenses || []);
         setActualSavings(data.actualSavings || {});
 
-        // --- NEW: AUTO-LOCK LOGIC ---
+        // --- NEW: AUTO-LOCK LOGIC (Keep your existing code here) ---
         if (data.salary && !data.allocationRules) {
            // This is a "Legacy Month" (Has data, but no rules saved).
            // We automatically save the current global rules to it to lock it.
@@ -4165,7 +4352,25 @@ export default function App() {
       } else {
         // New/Empty Month
         setSalary('');
-        setExpenses(userSettings.defaultFixedExpenses || DEFAULT_FIXED_EXPENSES);
+        
+        // --- START CHANGE: Initialize New Month with Bills AND Credit Cards ---
+        const initialExpenses = [...(userSettings.defaultFixedExpenses || [])];
+        
+        if (userSettings.creditCards) {
+           userSettings.creditCards.forEach(card => {
+              initialExpenses.push({
+                 id: `cc_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
+                 name: card.name,
+                 amount: 0,
+                 type: 'credit_card',
+                 logo: card.logo
+              });
+           });
+        }
+        
+        setExpenses(initialExpenses);
+        // --- END CHANGE ---
+
         setActualSavings({});
         setMonthAllocations(null);
       }
@@ -5309,118 +5514,119 @@ export default function App() {
           </div>
 
           <div className="divide-y divide-slate-50">
-             {/* ... (Keep existing Expense List mapping logic exactly as before) ... */}
-             {[
-              { title: 'Fixed Bills', items: fixedExpenses },
-              { title: 'Variable Spending', items: variableExpenses }
-            ].map(group => (
-              group.items.length > 0 && (
-                <React.Fragment key={group.title}>
-                  {(searchTerm || (fixedExpenses.length > 0 && variableExpenses.length > 0)) && (
-                    <div className="bg-slate-50/80 px-6 py-3 border-y border-slate-100">
-                      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{group.title}</h4>
-                    </div>
-                  )}
-                  
-                  {group.items.map((expense) => {
-                    const Icon = getExpenseIcon(expense.name);
-                    const isEditing = editingExpenseId === expense.id;
-                    
-                    return (
-                    <VacuumItem 
-                       key={expense.id} 
-                       onRemove={() => removeExpense(expense.id)} // The REAL delete happens here after animation
-                    >
-                      {(handleVacuum) => (
-                        <SwipeableExpenseRow 
-                           isMobile={isMobile}
-                           onEdit={() => { triggerHaptic(); setEditingExpenseId(expense.id); }}
-                           onDelete={handleVacuum} // Connects Swipe-to-Delete to Vacuum animation
-                        >
-                          <div className="p-4 sm:px-6 flex justify-between items-center group hover:bg-slate-50/80 transition-all duration-200">
-                            <div className="flex items-center gap-4 flex-1">
-                              <div className={`p-2.5 rounded-2xl bg-slate-50 text-slate-400 w-12 h-12 flex items-center justify-center border border-slate-100 shadow-sm group-hover:scale-110 transition duration-300`}>
-                                 {expense.logo ? (
-                                   <img src={expense.logo} alt={expense.name} className="w-full h-full object-contain mix-blend-multiply" />
-                                 ) : (
-                                   <Icon className="w-5 h-5" />
-                                 )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                {isEditing ? (
-                                  <input 
-                                    autoFocus
-                                    type="text"
-                                    defaultValue={expense.name}
-                                    className="font-medium text-slate-800 w-full bg-white border border-emerald-200 rounded px-2 py-1 outline-none ring-2 ring-emerald-100"
-                                    onBlur={(e) => updateExpenseName(expense.id, e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
-                                  />
-                                ) : (
-                                  <p className="font-bold text-slate-700 truncate">{expense.name}</p>
-                                )}
-                                <p className="text-xs text-slate-400 capitalize flex items-center gap-1">
-                                   <span className={`w-1.5 h-1.5 rounded-full ${expense.type === 'fixed' ? 'bg-indigo-400' : 'bg-emerald-400'}`}></span>
-                                   {expense.type}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                            {isEditing ? (
-                                <div className="flex items-center gap-1">
-                                  <input 
-                                    autoFocus
-                                    type="text"
-                                    defaultValue={expense.amount}
-                                    onBlur={(e) => updateExpenseAmount(expense.id, safeCalculate(e.target.value))}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                         updateExpenseAmount(expense.id, safeCalculate(e.currentTarget.value));
-                                         setEditingExpenseId(null);
-                                      }
-                                    }}
-                                    className="w-24 p-2 border border-emerald-200 rounded-lg bg-white text-right font-bold text-slate-800 ring-2 ring-emerald-100 outline-none"
-                                  />
-                                </div>
-                              ) : (
-                                <button 
-                                  onClick={() => {
-                                    triggerHaptic();
-                                    setEditingExpenseId(expense.id);
-                                  }}
-                                  className={`flex items-center gap-2 hover:bg-white px-3 py-1.5 rounded-xl transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200 text-orange-600' : 'text-slate-700'} print:hover:bg-transparent print:p-0 print:ring-0`}
+             {/* --- NEW: CATEGORIZATION & COLLAPSIBLE LOGIC --- */}
+             {(() => {
+                // 1. Separate the expenses
+                const fixed = finalExpenses.filter(e => e.type === 'fixed');
+                const variable = finalExpenses.filter(e => e.type === 'variable');
+                const cards = finalExpenses.filter(e => e.type === 'credit_card');
+
+                // 2. Define Groups
+                const groups = [
+                  { id: 'fix', title: 'Fixed Bills', items: fixed, defaultOpen: true },
+                  { id: 'var', title: 'Variable Spending', items: variable, defaultOpen: true },
+                  { id: 'cc',  title: 'Credit Cards', items: cards, defaultOpen: true } 
+                ];
+                
+                // 3. Render Groups
+                return groups.map(group => (
+                  group.items.length > 0 && (
+                    <CollapsibleSection key={group.id} title={group.title} count={group.items.length} defaultOpen={group.defaultOpen}>
+                       {group.items.map((expense) => {
+                          const Icon = getExpenseIcon(expense.name);
+                          const isEditing = editingExpenseId === expense.id;
+                          
+                          return (
+                            <VacuumItem key={expense.id} onRemove={() => removeExpense(expense.id)}>
+                              {(handleVacuum) => (
+                                <SwipeableExpenseRow 
+                                   isMobile={isMobile}
+                                   onEdit={() => { triggerHaptic(); setEditingExpenseId(expense.id); }}
+                                   onDelete={handleVacuum}
                                 >
-                                  {expense.amount === 0 ? (
-                                    <span className="text-sm font-bold flex items-center gap-1">
-                                      Set Amount <Edit2 className="w-3 h-3" />
-                                    </span>
-                                  ) : (
-                                    <span className="font-bold text-lg">{formatCurrency(expense.amount, effectiveSettings.currency)}</span>
-                                  )}
-                                </button>
+                                  <div className="p-4 sm:px-6 flex justify-between items-center group hover:bg-slate-50/80 transition-all duration-200">
+                                    <div className="flex items-center gap-4 flex-1">
+                                      <div className={`p-2.5 rounded-2xl bg-slate-50 text-slate-400 w-12 h-12 flex items-center justify-center border border-slate-100 shadow-sm group-hover:scale-110 transition duration-300`}>
+                                         {expense.logo ? (
+                                           <img src={expense.logo} alt={expense.name} className="w-full h-full object-contain mix-blend-multiply" />
+                                         ) : (
+                                           <Icon className="w-5 h-5" />
+                                         )}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        {isEditing ? (
+                                          <input 
+                                            autoFocus
+                                            type="text"
+                                            defaultValue={expense.name}
+                                            className="font-medium text-slate-800 w-full bg-white border border-emerald-200 rounded px-2 py-1 outline-none ring-2 ring-emerald-100"
+                                            onBlur={(e) => updateExpenseName(expense.id, e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
+                                          />
+                                        ) : (
+                                          <p className="font-bold text-slate-700 truncate">{expense.name}</p>
+                                        )}
+                                        {/* Updated Type Badge Logic for Credit Cards */}
+                                        <p className="text-xs text-slate-400 capitalize flex items-center gap-1">
+                                           <span className={`w-1.5 h-1.5 rounded-full ${expense.type === 'fixed' ? 'bg-indigo-400' : expense.type === 'credit_card' ? 'bg-purple-400' : 'bg-emerald-400'}`}></span>
+                                           {expense.type.replace('_', ' ')}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-3">
+                                      {isEditing ? (
+                                        <div className="flex items-center gap-1">
+                                          <input 
+                                            autoFocus
+                                            type="text"
+                                            defaultValue={expense.amount}
+                                            onBlur={(e) => updateExpenseAmount(expense.id, safeCalculate(e.target.value))}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                 updateExpenseAmount(expense.id, safeCalculate(e.currentTarget.value));
+                                                 setEditingExpenseId(null);
+                                              }
+                                            }}
+                                            className="w-24 p-2 border border-emerald-200 rounded-lg bg-white text-right font-bold text-slate-800 ring-2 ring-emerald-100 outline-none"
+                                          />
+                                        </div>
+                                      ) : (
+                                        <button 
+                                          onClick={() => { triggerHaptic(); setEditingExpenseId(expense.id); }}
+                                          className={`flex items-center gap-2 hover:bg-white px-3 py-1.5 rounded-xl transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200 text-orange-600' : 'text-slate-700'} print:hover:bg-transparent print:p-0 print:ring-0`}
+                                        >
+                                          {expense.amount === 0 ? (
+                                            <span className="text-sm font-bold flex items-center gap-1">
+                                              Set Amount <Edit2 className="w-3 h-3" />
+                                            </span>
+                                          ) : (
+                                            <span className="font-bold text-lg">{formatCurrency(expense.amount, effectiveSettings.currency)}</span>
+                                          )}
+                                        </button>
+                                      )}
+                                      
+                                      {isEditing ? (
+                                         <button onClick={() => setEditingExpenseId(null)} className="bg-emerald-500 text-white p-2 rounded-full hover:bg-emerald-600 transition shadow-lg shadow-emerald-200">
+                                           <Check className="w-4 h-4" />
+                                         </button>
+                                      ) : (
+                                        <button onClick={handleVacuum} className="text-slate-300 hover:text-red-500 transition p-2 rounded-xl hover:bg-red-50 opacity-0 group-hover:opacity-100 print:hidden hidden md:block">
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </SwipeableExpenseRow>
                               )}
-                              
-                              {isEditing ? (
-                                 <button onClick={() => setEditingExpenseId(null)} className="bg-emerald-500 text-white p-2 rounded-full hover:bg-emerald-600 transition shadow-lg shadow-emerald-200">
-                                   <Check className="w-4 h-4" />
-                                 </button>
-                              ) : (
-                                <button 
-                                  onClick={handleVacuum} // <--- UPDATED: Desktop delete triggers Vacuum
-                                  className="text-slate-300 hover:text-red-500 transition p-2 rounded-xl hover:bg-red-50 opacity-0 group-hover:opacity-100 print:hidden hidden md:block"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </SwipeableExpenseRow>
-                      )}
-                    </VacuumItem>
-                  )})}
-                </React.Fragment>
-              )
-            ))}
+                            </VacuumItem>
+                          );
+                       })}
+                    </CollapsibleSection>
+                  )
+                ));
+             })()}
+             
              {expenses.length === 0 && (
               <div className="py-20 text-center flex flex-col items-center justify-center">
                 <div className="relative mb-6">
@@ -5428,7 +5634,6 @@ export default function App() {
                    <div className="relative bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
                       <ShoppingCart className="w-10 h-10 text-emerald-200" />
                    </div>
-                   {/* Floating "Plus" badge */}
                    <div className="absolute -bottom-2 -right-2 bg-slate-900 text-white p-1.5 rounded-full border-4 border-white shadow-sm">
                       <Plus className="w-4 h-4" />
                    </div>
