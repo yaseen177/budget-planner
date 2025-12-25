@@ -2221,6 +2221,68 @@ const CreditCardSelector = ({ selectedCards, onToggle }) => {
   );
 };
 
+// --- NEW: MORTGAGE SELECTOR ---
+const MortgageSelector = ({ selectedLenders, onToggle }) => {
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const LOGO_PUBLIC_KEY = import.meta.env.VITE_LOGO_DEV_PUBLIC_KEY;
+
+  const isSelected = (name) => selectedLenders.some(m => m.name === name);
+
+  return (
+    <div className="space-y-4">
+      {!isSearching ? (
+        <>
+          <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto p-1">
+            {UK_MORTGAGE_LENDERS.map(lender => {
+               const active = isSelected(lender.name);
+               return (
+                <button
+                  key={lender.id}
+                  onClick={() => onToggle({ name: lender.name, logo: `https://img.logo.dev/${lender.domain}?token=${LOGO_PUBLIC_KEY}`, type: 'mortgage' })}
+                  className={`p-3 rounded-xl border flex items-center gap-3 transition-all text-left ${active ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-slate-200 hover:border-slate-300 bg-white'}`}
+                >
+                  <img 
+                    src={`https://img.logo.dev/${lender.domain}?token=${LOGO_PUBLIC_KEY}`} 
+                    alt={lender.name} 
+                    className="w-8 h-8 object-contain rounded-full bg-white p-0.5 shadow-sm"
+                  />
+                  <span className={`text-xs font-bold ${active ? 'text-blue-700' : 'text-slate-700'}`}>{lender.name}</span>
+                  {active && <Check className="w-4 h-4 text-blue-600 ml-auto" />}
+                </button>
+            )})}
+          </div>
+          <button 
+            onClick={() => setIsSearching(true)}
+            className="w-full py-3 text-sm font-bold text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl border border-dashed border-slate-300 transition"
+          >
+            Search other lenders...
+          </button>
+        </>
+      ) : (
+        <div className="animate-in fade-in">
+           <div className="flex justify-between items-center mb-2">
+              <label className="text-xs font-bold text-slate-400 uppercase">Search Mortgage Lender</label>
+              <button onClick={() => setIsSearching(false)} className="text-xs text-indigo-500 font-bold">Back to list</button>
+           </div>
+           <BrandSearchInput 
+              placeholder="e.g. Leeds Building Society..."
+              value={searchTerm}
+              onChange={setSearchTerm}
+              onSelectBrand={(name, logo) => {
+                 onToggle({ name, logo, type: 'mortgage' });
+                 setSearchTerm('');
+                 setIsSearching(false);
+              }}
+              className="w-full p-3 rounded-xl border border-slate-200"
+              autoFocus
+           />
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- NEW: COLLAPSIBLE EXPENSE SECTION ---
 const CollapsibleSection = ({ title, count, children, defaultOpen = true }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -2271,6 +2333,9 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   // --- NEW: Credit Cards State ---
   const [creditCards, setCreditCards] = useState(currentSettings.creditCards || []);
 
+  // --- NEW: Mortgages State ---
+  const [mortgages, setMortgages] = useState(currentSettings.mortgages || []);
+
   const toggleCreditCard = (card) => {
      if (creditCards.some(c => c.name === card.name)) {
         setCreditCards(creditCards.filter(c => c.name !== card.name));
@@ -2278,6 +2343,15 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
         setCreditCards([...creditCards, card]);
      }
   };
+
+  // --- NEW: Toggle Mortgage ---
+  const toggleMortgage = (lender) => {
+    if (mortgages.some(m => m.name === lender.name)) {
+       setMortgages(mortgages.filter(m => m.name !== lender.name));
+    } else {
+       setMortgages([...mortgages, lender]);
+    }
+ };
 
   const handleSave = () => {
     if (totalPercentage > 100) {
@@ -2295,7 +2369,8 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
       payDay,
       allocationRules: allocations,
       defaultFixedExpenses: defaultExpenses,
-      creditCards: creditCards
+      creditCards: creditCards,
+      mortgages: mortgages
     });
     onClose();
   };
@@ -2406,6 +2481,31 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
               <CreditCardSelector 
                  selectedCards={creditCards}
                  onToggle={toggleCreditCard}
+              />
+           </div>
+        </section>
+
+        {/* --- NEW: MORTGAGES SECTION (Insert after Credit Cards) --- */}
+        <section className="space-y-3">
+           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">My Mortgages</h3>
+           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+              <p className="text-xs text-slate-500 leading-relaxed">
+                 Select your mortgage provider.
+              </p>
+              
+              <div className="flex flex-wrap gap-2 mb-2">
+                 {mortgages.map(m => (
+                    <div key={m.name} className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-blue-100 shadow-sm animate-in zoom-in">
+                       {m.logo && <img src={m.logo} className="w-4 h-4 object-contain" />}
+                       <span className="text-xs font-bold text-slate-700">{m.name}</span>
+                       <button onClick={() => toggleMortgage(m)} className="text-slate-300 hover:text-red-500"><X className="w-3 h-3" /></button>
+                    </div>
+                 ))}
+              </div>
+
+              <MortgageSelector 
+                 selectedLenders={mortgages}
+                 onToggle={toggleMortgage}
               />
            </div>
         </section>
@@ -2938,6 +3038,22 @@ const UK_CREDIT_CARDS = [
   { id: 'virgin', name: 'Virgin Money', domain: 'virginmoney.com' },
 ];
 
+// --- NEW: UK MORTGAGE LENDERS ---
+const UK_MORTGAGE_LENDERS = [
+  { id: 'nationwide', name: 'Nationwide', domain: 'nationwide.co.uk' },
+  { id: 'halifax_mort', name: 'Halifax', domain: 'halifax.co.uk' },
+  { id: 'santander_mort', name: 'Santander', domain: 'santander.co.uk' },
+  { id: 'barclays_mort', name: 'Barclays', domain: 'barclays.co.uk' },
+  { id: 'natwest_mort', name: 'NatWest', domain: 'natwest.com' },
+  { id: 'hsbc_mort', name: 'HSBC', domain: 'hsbc.co.uk' },
+  { id: 'lloyds_mort', name: 'Lloyds Bank', domain: 'lloydsbank.com' },
+  { id: 'coventry', name: 'Coventry BS', domain: 'coventrybuildingsociety.co.uk' },
+  { id: 'tsb_mort', name: 'TSB', domain: 'tsb.co.uk' },
+  { id: 'virgin_mort', name: 'Virgin Money', domain: 'virginmoney.com' },
+  { id: 'yorkshire', name: 'Yorkshire BS', domain: 'ybs.co.uk' },
+  { id: 'skipton', name: 'Skipton BS', domain: 'skipton.co.uk' },
+];
+
 // --- ADMIN TEST LAB SCENARIOS ---
 // --- ADMIN TEST LAB SCENARIOS ---
 const DEMO_SCENARIOS = {
@@ -3049,6 +3165,9 @@ const OnboardingWizard = ({ user, onComplete }) => {
   
   // --- NEW: Credit Cards State ---
   const [creditCards, setCreditCards] = useState([]);
+
+  // --- NEW: Mortgages State ---
+  const [mortgages, setMortgages] = useState([]);
   
   // Pots State (User defined pots only - Current Account is calculated automatically)
   const [pots, setPots] = useState([
@@ -3110,6 +3229,7 @@ const OnboardingWizard = ({ user, onComplete }) => {
       bankDetails: bank, 
       payDay: payDay,
       creditCards: creditCards,
+      mortgages: mortgages,
       allocationRules: pots,
       defaultFixedExpenses: bills,
       dailyPaceTargets: paceTargets 
@@ -3125,13 +3245,21 @@ const OnboardingWizard = ({ user, onComplete }) => {
     }
  };
 
+ const toggleMortgage = (lender) => {
+  if (mortgages.some(m => m.name === lender.name)) {
+     setMortgages(mortgages.filter(m => m.name !== lender.name));
+  } else {
+     setMortgages([...mortgages, lender]);
+  }};
+
+
   return (
     <div className="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 overflow-y-auto">
       <div className="max-w-md w-full space-y-8 py-10">
         
-        {/* Progress Dots - 8 Steps total */}
+        {/* Progress Dots - 9 Steps total */}
         <div className="flex justify-center gap-2 mb-8">
-          {[0, 1, 2, 3, 4, 5, 6, 7].map(i => (
+          {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => (
             <div key={i} className={`w-3 h-3 rounded-full transition-all ${step === i ? 'bg-slate-900 scale-125' : 'bg-slate-200'}`} />
           ))}
         </div>
@@ -3200,8 +3328,33 @@ const OnboardingWizard = ({ user, onComplete }) => {
            </div>
         )}
 
-        {/* STEP 3: CREDIT CARDS */}
+        {/* --- NEW STEP 3: MORTGAGES --- */}
         {step === 3 && (
+          <div className="space-y-6 animate-in slide-in-from-right-8">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-800">Mortgages</h2>
+              <p className="text-slate-500">Do you have a mortgage?</p>
+            </div>
+
+            <div className="flex flex-wrap gap-2 justify-center">
+                 {mortgages.map(m => (
+                    <span key={m.name} className="text-xs font-bold bg-slate-900 text-white px-2 py-1 rounded animate-in zoom-in">{m.name}</span>
+                 ))}
+            </div>
+
+            <MortgageSelector 
+                selectedLenders={mortgages}
+                onToggle={toggleMortgage}
+            />
+
+            <button onClick={() => setStep(4)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
+              {mortgages.length === 0 ? 'No Mortgage' : 'Next'}
+            </button>
+          </div>
+        )}
+
+        {/* STEP 4: CREDIT CARDS */}
+        {step === 4 && (
           <div className="space-y-6 animate-in slide-in-from-right-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-slate-800">Credit Cards</h2>
@@ -3219,14 +3372,14 @@ const OnboardingWizard = ({ user, onComplete }) => {
                 onToggle={toggleCard}
             />
 
-            <button onClick={() => setStep(4)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
+            <button onClick={() => setStep(5)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
               {creditCards.length === 0 ? 'I don\'t have any cards' : 'Next'}
             </button>
           </div>
         )}
 
-        {/* STEP 4: CURRENCY */}
-        {step === 4 && (
+        {/* STEP 5: CURRENCY */}
+        {step === 5 && (
           <div className="space-y-6 animate-in slide-in-from-right-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-slate-800">Your Currency</h2>
@@ -3244,14 +3397,14 @@ const OnboardingWizard = ({ user, onComplete }) => {
               ))}
             </div>
             {/* FIXED: Was setStep(4), changed to setStep(5) */}
-            <button onClick={() => setStep(5)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
+            <button onClick={() => setStep(6)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
               Next Step
             </button>
           </div>
         )}
 
-        {/* STEP 5: POTS & CURRENT ACCOUNT */}
-        {step === 5 && (
+        {/* STEP 6: POTS & CURRENT ACCOUNT */}
+        {step === 6 && (
           <div className="space-y-6 animate-in slide-in-from-right-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-slate-800">Savings & Pots</h2>
@@ -3306,7 +3459,7 @@ const OnboardingWizard = ({ user, onComplete }) => {
             {/* FIXED: Was setStep(5), changed to setStep(6) */}
             <button 
               disabled={totalPercent > 100}
-              onClick={() => setStep(6)} 
+              onClick={() => setStep(7)} 
               className="w-full bg-slate-900 disabled:bg-slate-300 disabled:text-slate-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition"
             >
               {totalPercent > 100 ? 'Total cannot exceed 100%' : 'Continue'}
@@ -3314,8 +3467,8 @@ const OnboardingWizard = ({ user, onComplete }) => {
           </div>
         )}
 
-        {/* STEP 6: FIXED EXPENSES */}
-        {step === 6 && (
+        {/* STEP 7: FIXED EXPENSES */}
+        {step === 7 && (
           <div className="space-y-6 animate-in slide-in-from-right-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-slate-800">Monthly Commitments</h2>
@@ -3362,14 +3515,14 @@ const OnboardingWizard = ({ user, onComplete }) => {
             </div>
 
             {/* FIXED: Was setStep(6), changed to setStep(7) */}
-            <button onClick={() => setStep(7)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
+            <button onClick={() => setStep(8)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
               Next
             </button>
           </div>
         )}
 
-        {/* STEP 7: DAILY PACE GOALS */}
-        {step === 7 && (
+        {/* STEP 8: DAILY PACE GOALS */}
+        {step === 8 && (
           <div className="space-y-6 animate-in slide-in-from-right-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-slate-800">Your Speed Limit</h2>
@@ -4195,7 +4348,8 @@ export default function App() {
     currency: 'GBP',
     allocationRules: DEFAULT_ALLOCATIONS,
     defaultFixedExpenses: DEFAULT_FIXED_EXPENSES,
-    creditCards: []
+    creditCards: [],
+    mortgages: []
   });
 
   const [editingExpenseId, setEditingExpenseId] = useState(null);
@@ -4294,10 +4448,10 @@ export default function App() {
         const data = docSnap.data();
         setUserSettings(data);
         
-        // CHECK IF LEGACY: Missing Bank or Payday OR Credit Cards Config
-        if (!data.bankDetails || !data.payDay || data.creditCards === undefined) {
+        // CHECK IF LEGACY: Missing Bank or Payday OR Credit Cards Config OR Mortgages
+        if (!data.bankDetails || !data.payDay || data.creditCards === undefined || data.mortgages === undefined) {
           setIsLegacyUser(true);
-          setShowSettings(true); // Force open settings
+          setShowSettings(true); 
         } else {
           setIsLegacyUser(false);
         }
@@ -4325,13 +4479,11 @@ export default function App() {
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-
-        // --- START CHANGE: Inject Credit Cards into Existing Month ---
         let currentExpenses = data.expenses || [];
-        
-        // Check if the user has Credit Cards in settings that are missing from this month's data
+        let needsUpdate = false; // Track if we need to save changes to DB
+
+        // --- 1. Inject Credit Cards if missing ---
         if (userSettings.creditCards && userSettings.creditCards.length > 0) {
-           let cardsAdded = false;
            userSettings.creditCards.forEach(card => {
               // Check if this card exists in expenses (by name and type)
               const exists = currentExpenses.some(e => e.name === card.name && e.type === 'credit_card');
@@ -4339,45 +4491,58 @@ export default function App() {
                  currentExpenses.push({
                     id: `cc_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
                     name: card.name,
-                    amount: 0, // Starts at 0 (Variable)
+                    amount: 0, 
                     type: 'credit_card',
                     logo: card.logo
                  });
-                 cardsAdded = true;
+                 needsUpdate = true;
               }
            });
+        }
+
+        // --- 2. Inject Mortgages if missing (NEW) ---
+        if (userSettings.mortgages && userSettings.mortgages.length > 0) {
+           userSettings.mortgages.forEach(mort => {
+              const exists = currentExpenses.some(e => e.name === mort.name && e.type === 'mortgage');
+              if (!exists) {
+                 currentExpenses.push({
+                    id: `mort_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
+                    name: mort.name,
+                    amount: 0, 
+                    type: 'mortgage',
+                    logo: mort.logo
+                 });
+                 needsUpdate = true;
+              }
+           });
+        }
            
-           // If we added cards, save them to DB immediately (unless in Sandbox/Demo)
-           if (cardsAdded && !isSandbox && !activeDemoId) {
-              setDoc(docRef, { ...data, expenses: currentExpenses }, { merge: true });
-           }
+        // If we added cards OR mortgages, save to DB immediately (unless in Sandbox/Demo)
+        if (needsUpdate && !isSandbox && !activeDemoId) {
+            setDoc(docRef, { ...data, expenses: currentExpenses }, { merge: true });
         }
         
         setExpenses(currentExpenses);
-        // --- END CHANGE ---
 
         setSalary(data.salary || '');
         setActualSavings(data.actualSavings || {});
 
-        // --- NEW: AUTO-LOCK LOGIC (Keep your existing code here) ---
+        // --- AUTO-LOCK LOGIC ---
         if (data.salary && !data.allocationRules) {
-           // This is a "Legacy Month" (Has data, but no rules saved).
-           // We automatically save the current global rules to it to lock it.
            setDoc(docRef, { ...data, allocationRules: userSettings.allocationRules }, { merge: true });
-           
-           // Temporarily show global rules until the save confirms
            setMonthAllocations(userSettings.allocationRules);
         } else {
-           // Normal load: use the saved rules (or null if it's a fresh/empty month)
            setMonthAllocations(data.allocationRules || null);
         }
+
       } else {
-        // New/Empty Month
+        // --- NEW/EMPTY MONTH INITIALIZATION ---
         setSalary('');
         
-        // --- START CHANGE: Initialize New Month with Bills AND Credit Cards ---
+        // Start with Fixed Expenses
         const initialExpenses = [...(userSettings.defaultFixedExpenses || [])];
         
+        // Append Credit Cards
         if (userSettings.creditCards) {
            userSettings.creditCards.forEach(card => {
               initialExpenses.push({
@@ -4389,10 +4554,21 @@ export default function App() {
               });
            });
         }
+
+        // Append Mortgages (NEW)
+        if (userSettings.mortgages) {
+           userSettings.mortgages.forEach(mort => {
+              initialExpenses.push({
+                 id: `mort_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
+                 name: mort.name,
+                 amount: 0,
+                 type: 'mortgage',
+                 logo: mort.logo
+              });
+           });
+        }
         
         setExpenses(initialExpenses);
-        // --- END CHANGE ---
-
         setActualSavings({});
         setMonthAllocations(null);
       }
@@ -5542,9 +5718,11 @@ export default function App() {
                 const fixed = finalExpenses.filter(e => e.type === 'fixed');
                 const variable = finalExpenses.filter(e => e.type === 'variable');
                 const cards = finalExpenses.filter(e => e.type === 'credit_card');
+                const mortgages = finalExpenses.filter(e => e.type === 'mortgage'); // <--- ADD THIS
 
                 // 2. Define Groups
                 const groups = [
+                  { id: 'mort', title: 'Mortgages', items: mortgages, defaultOpen: true }, // <--- ADD THIS
                   { id: 'fix', title: 'Fixed Bills', items: fixed, defaultOpen: true },
                   { id: 'var', title: 'Variable Spending', items: variable, defaultOpen: true },
                   { id: 'cc',  title: 'Credit Cards', items: cards, defaultOpen: true } 
@@ -5590,7 +5768,7 @@ export default function App() {
                                         )}
                                         {/* Updated Type Badge Logic for Credit Cards */}
                                         <p className="text-xs text-slate-400 capitalize flex items-center gap-1">
-                                           <span className={`w-1.5 h-1.5 rounded-full ${expense.type === 'fixed' ? 'bg-indigo-400' : expense.type === 'credit_card' ? 'bg-purple-400' : 'bg-emerald-400'}`}></span>
+                                           <span className={`w-1.5 h-1.5 rounded-full ${expense.type === 'fixed' ? 'bg-indigo-400' : expense.type === 'credit_card' ? 'bg-purple-400' : expense.type === 'mortgage' ? 'bg-blue-500' : 'bg-emerald-400'}`}></span>
                                            {expense.type.replace('_', ' ')}
                                         </p>
                                       </div>
