@@ -249,31 +249,6 @@ const VacuumItem = ({ children, onRemove, className = '' }) => {
   );
 };
 
-// HELPER 5: MORPH BUTTON (The Success Morph)
-const MorphButton = ({ children, onClick, className = '', ...props }) => {
-  const [status, setStatus] = useState('idle'); // idle, loading, success
-
-  const handleClick = async (e) => {
-     if (status !== 'idle') return;
-     
-     // 1. Start Loading (Visual feedback)
-     setStatus('loading');
-     
-     // 2. Artificial processing wait (600ms) to give it "weight"
-     await new Promise(r => setTimeout(r, 600));
-     
-     // 3. Show Success State
-     setStatus('success');
-     if (window.navigator.vibrate) window.navigator.vibrate([50, 50, 50]);
-
-     // 4. Wait for user to admire the checkmark (700ms), THEN fire the actual action
-     setTimeout(() => {
-        onClick(e); // This executes the save & close logic
-        // Reset after action is done (in case component doesn't unmount)
-        setTimeout(() => setStatus('idle'), 500);
-     }, 700);
-  };
-
 // HELPER 6: SPRING DRAWER (Mobile Bottom Sheet)
 const SpringDrawer = ({ isOpen, onClose, children, title }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -362,12 +337,36 @@ const SpringDrawer = ({ isOpen, onClose, children, title }) => {
   );
 };
 
+// HELPER 5: MORPH BUTTON (The Success Morph)
+const MorphButton = ({ children, onClick, className = '', ...props }) => {
+  const [status, setStatus] = useState('idle'); // idle, loading, success
+
+  const handleClick = async (e) => {
+     if (status !== 'idle') return;
+     
+     // 1. Start Loading
+     setStatus('loading');
+     
+     // 2. Artificial wait
+     await new Promise(r => setTimeout(r, 600));
+     
+     // 3. Show Success
+     setStatus('success');
+     if (window.navigator.vibrate) window.navigator.vibrate([50, 50, 50]);
+
+     // 4. Wait, then fire action
+     setTimeout(() => {
+        onClick(e); 
+        setTimeout(() => setStatus('idle'), 500);
+     }, 700);
+  };
+
   return (
     <button 
        onClick={handleClick}
        disabled={status !== 'idle'}
        className={`relative transition-all duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center justify-center overflow-hidden shadow-xl ${status === 'idle' ? className : 'w-14 rounded-full bg-emerald-500 text-white border-transparent'}`}
-       style={{ minHeight: '56px' }} // Keeps height consistent during morph
+       style={{ minHeight: '56px' }} 
        {...props}
     >
        {/* Original Button Text */}
@@ -375,7 +374,7 @@ const SpringDrawer = ({ isOpen, onClose, children, title }) => {
           {children}
        </div>
 
-       {/* Loading Spinner (CSS only, no new imports needed) */}
+       {/* Loading Spinner */}
        <div className={`absolute transition-all duration-300 transform ${status === 'loading' ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}>
           <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
        </div>
