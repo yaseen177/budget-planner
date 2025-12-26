@@ -2762,9 +2762,10 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           </SettingsGroup>
 
 
+         
           {/* GROUP 5: APP PREFERENCES */}
-          <SettingsGroup title="Preferences" subtitle="Pace Targets, Reset" icon={Target}>
-              <div className="grid grid-cols-2 gap-4 mb-6">
+          <SettingsGroup title="Preferences" subtitle="Pace Targets" icon={Target}>
+              <div className="grid grid-cols-2 gap-4">
                  <div>
                     <label className="block text-xs font-bold text-rose-500 mb-1">Low Warning</label>
                     <input 
@@ -2784,25 +2785,44 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                     />
                  </div>
               </div>
+          </SettingsGroup>
 
-              {!isLegacyMode && (
-                <div className="bg-red-50 p-4 rounded-xl border border-red-100">
-                    <h4 className="font-bold text-red-800 text-sm mb-2 flex items-center gap-2"><AlertTriangle className="w-4 h-4"/> Danger Zone</h4>
-                    <p className="text-xs text-red-600/80 mb-3">Clear specific month data if things get messy.</p>
-                    <button 
+          {/* --- NEW: DANGER ZONE (SEPARATE SECTION) --- */}
+          {!isLegacyMode && (
+            <div className="mt-8 pt-6 border-t border-slate-200">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Data Management</h4>
+                
+                <div className="bg-white border border-rose-100 rounded-2xl p-4 shadow-sm">
+                   <div className="flex items-start gap-3 mb-3">
+                      <div className="bg-rose-50 p-2 rounded-lg shrink-0">
+                         <AlertTriangle className="w-5 h-5 text-rose-500" />
+                      </div>
+                      <div>
+                         <h3 className="font-bold text-slate-900 text-sm">Reset Monthly Data</h3>
+                         <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                            This will clear your Salary and Expenses for the current month only. Your settings and pots will be saved.
+                         </p>
+                      </div>
+                   </div>
+                   
+                   <button 
                       onClick={() => {
-                         if (confirm("Reset current month? This clears salary and expenses for this month only.")) {
+                         // 1. Get current month string (e.g. "Dec 2025")
+                         const dateStr = new Date().toLocaleString('default', { month: 'short', year: 'numeric' });
+                         
+                         // 2. Show dynamic confirmation
+                         if (confirm(`Are you sure you want to RESET your data for ${dateStr}?\n\nThis action cannot be undone.`)) {
                             onResetMonth();
                             onClose();
                          }
                       }}
-                      className="w-full bg-white border border-red-200 text-red-600 py-3 rounded-lg font-bold text-xs hover:bg-red-50 transition"
-                    >
-                      Reset Current Month Data
-                    </button>
+                      className="w-full py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl font-bold text-sm transition"
+                   >
+                      Reset {new Date().toLocaleString('default', { month: 'short' })} Data
+                   </button>
                 </div>
-              )}
-          </SettingsGroup>
+            </div>
+          )}
 
         </div>
       </div>
