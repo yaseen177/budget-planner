@@ -2523,7 +2523,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
               {/* Payday */}
               <div>
                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Payday (Day of Month)</label>
-                 <div className="grid grid-cols-7 gap-2">
+                 <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
                    {[1, 25, 26, 28, 30, 31].map(d => (
                       <button 
                         key={d} 
@@ -2536,7 +2536,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                    <select 
                       value={payDay} 
                       onChange={(e) => setPayDay(e.target.value)} 
-                      className="py-2 px-1 text-center rounded-lg font-bold text-sm border border-slate-200 bg-white outline-none focus:border-slate-900"
+                      className="py-2 pl-3 rounded-lg font-bold text-sm border border-slate-200 bg-white outline-none focus:border-slate-900 w-full"
                    >
                       <option value="">Other</option>
                       {Array.from({length: 31}, (_, i) => i + 1).map(day => (
