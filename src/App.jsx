@@ -747,38 +747,61 @@ const getExpenseIcon = (name) => {
 
 // --- CHART COMPONENTS ---
 
-const SimpleLineChart = ({ data, dataKey, color, height = 64, showArea = false }) => {
+// REPLACEMENT FOR SimpleLineChart
+const SimpleLineChart = ({ data, dataKey, color, secondDataKey = null, secondColor = null, height = 64, showArea = false }) => {
   if (!data || data.length === 0) return null;
-  const values = data.map(d => d[dataKey]);
-  const max = Math.max(...values, 1);
-  const min = Math.min(...values, 0); // Optional: set to 0 for absolute scale
-  const range = max - 0; // Base on 0
   
-  const points = values.map((val, i) => {
-    const x = (i / (values.length - 1)) * 100;
+  // Calculate range based on ONE or BOTH keys to ensure lines scale together
+  const values1 = data.map(d => d[dataKey]);
+  const values2 = secondDataKey ? data.map(d => d[secondDataKey]) : [];
+  const allValues = [...values1, ...values2];
+
+  const max = Math.max(...allValues, 1);
+  const range = max - 0; // Min is 0
+  
+  const getPoints = (vals) => vals.map((val, i) => {
+    const x = (i / (data.length - 1)) * 100;
     const y = 100 - ((val / range) * 100);
     return `${x},${y}`;
   }).join(' ');
 
-  const areaPoints = `0,100 ${points} 100,100`;
+  const points1 = getPoints(values1);
+  const areaPoints = `0,100 ${points1} 100,100`;
 
   return (
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
       {showArea && (
          <polygon points={areaPoints} fill={color} fillOpacity="0.2" />
       )}
+      
+      {/* SECONDARY LINE (Target) - Rendered behind with dashes */}
+      {secondDataKey && (
+        <polyline 
+            fill="none" 
+            stroke={secondColor} 
+            strokeWidth="2" 
+            strokeDasharray="4 4"
+            points={getPoints(values2)} 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+            className="opacity-60"
+        />
+      )}
+
+      {/* PRIMARY LINE (Actual) */}
       <polyline 
         fill="none" 
         stroke={color} 
         strokeWidth="3" 
-        points={points} 
+        points={points1} 
         strokeLinecap="round" 
         strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
       />
-      {/* Dots */}
-      {values.map((val, i) => {
-         const x = (i / (values.length - 1)) * 100;
+      {/* Dots for Primary */}
+      {values1.map((val, i) => {
+         const x = (i / (values1.length - 1)) * 100;
          const y = 100 - ((val / range) * 100);
          return <circle key={i} cx={x} cy={y} r="1.5" fill="white" stroke={color} strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
       })}
@@ -1105,12 +1128,29 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
 
             {/* 3. POTS MINI GRAPHS GRID */}
             <div>
-              <h3 className="text-sm font-bold text-slate-800 mb-3 px-2">Savings Performance</h3>
+              <div className="flex justify-between items-end mb-3 px-2">
+                  <h3 className="text-sm font-bold text-slate-800">Savings Performance</h3>
+                  
+                  {/* TOGGLE BUTTON */}
+                  <button 
+                    onClick={() => setShowTargets(!showTargets)}
+                    className={`text-[10px] font-bold px-3 py-1.5 rounded-full border transition-all flex items-center gap-2 ${showTargets ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'}`}
+                  >
+                     {showTargets ? (
+                        <>Hide Targets</> 
+                     ) : (
+                        <>Show vs Target</>
+                     )}
+                  </button>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                  {allocationRules.map(rule => {
+                    // Prepare Data with Target included
                     const potHistory = filteredData.map(d => ({ 
                         label: d.label, 
-                        value: d.pots[rule.id]?.actual || 0 
+                        value: d.pots[rule.id]?.actual || 0,
+                        target: d.pots[rule.id]?.target || 0 
                     }));
                     const totalSaved = potHistory.reduce((sum, x) => sum + x.value, 0);
                     
@@ -1127,10 +1167,23 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                             <Maximize2 className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
                          </div>
                          <div className="h-12 mb-2">
-                            <SimpleLineChart data={potHistory} dataKey="value" color={color} />
+                            <SimpleLineChart 
+                                data={potHistory} 
+                                dataKey="value" 
+                                color={color}
+                                // Pass target config if toggled on
+                                secondDataKey={showTargets ? "target" : null}
+                                secondColor="#cbd5e1" // Slate-300 (Grey)
+                            />
                          </div>
                          <div className="text-lg font-bold text-slate-800">{formatCurrency(totalSaved, currency)}</div>
-                         <div className="text-[10px] text-slate-400">Total Saved ({timeRange})</div>
+                         <div className="text-[10px] text-slate-400">
+                             {showTargets ? (
+                                <span className="flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span> vs Target
+                                </span>
+                             ) : `Total Saved (${timeRange})`}
+                         </div>
                       </button>
                     );
                  })}
