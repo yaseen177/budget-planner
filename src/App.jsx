@@ -2344,7 +2344,7 @@ const SettingsGroup = ({ title, icon: Icon, children, defaultOpen = false, subti
 };
 
 // --- SETTINGS SCREEN (UX IMPROVED) ---
-const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onResetMonth, isTutorial, onExitTutorial, isLegacyMode }) => {
+const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onResetMonth, isTutorial, onExitTutorial, isLegacyMode, currentMonthId }) => {
   // --- STATE MANAGEMENT ---
   const [displayName, setDisplayName] = useState(currentSettings.displayName || user.displayName || '');
   const [currency, setCurrency] = useState(currentSettings.currency || 'GBP');
@@ -2787,7 +2787,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
               </div>
           </SettingsGroup>
 
-          {/* --- NEW: DANGER ZONE (SEPARATE SECTION) --- */}
+          {/* --- NEW: DANGER ZONE (CONTEXT AWARE) --- */}
           {!isLegacyMode && (
             <div className="mt-8 pt-6 border-t border-slate-200">
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Data Management</h4>
@@ -2800,16 +2800,21 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                       <div>
                          <h3 className="font-bold text-slate-900 text-sm">Reset Monthly Data</h3>
                          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                            This will clear your Salary and Expenses for the current month only. Your settings and pots will be saved.
+                            This will clear your Salary and Expenses for <strong className="text-rose-600">{currentMonthId}</strong> only. Your settings and pots will be saved.
                          </p>
                       </div>
                    </div>
                    
                    <button 
                       onClick={() => {
-                         // 1. Get current month string (e.g. "Dec 2025")
-                         const dateStr = new Date().toLocaleString('default', { month: 'short', year: 'numeric' });
-                         
+                         // 1. Format the date for the popup
+                         let dateStr = "this month";
+                         if (currentMonthId) {
+                            const [year, month] = currentMonthId.split('-');
+                            const date = new Date(parseInt(year), parseInt(month) - 1);
+                            dateStr = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+                         }
+
                          // 2. Show dynamic confirmation
                          if (confirm(`Are you sure you want to RESET your data for ${dateStr}?\n\nThis action cannot be undone.`)) {
                             onResetMonth();
@@ -2818,7 +2823,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                       }}
                       className="w-full py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl font-bold text-sm transition"
                    >
-                      Reset {new Date().toLocaleString('default', { month: 'short' })} Data
+                      Reset Data
                    </button>
                 </div>
             </div>
@@ -5400,6 +5405,7 @@ export default function App() {
           }}
           // --- ADD THIS LINE ---
           isLegacyMode={isEffectiveLegacyUser} // <--- CHANGED
+          currentMonthId={currentMonthId}
           // --------------------
         />
       )}
