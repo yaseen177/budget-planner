@@ -2308,43 +2308,68 @@ const CollapsibleSection = ({ title, count, children, defaultOpen = true }) => {
   );
 };
 
+// --- NEW: COLLAPSIBLE SETTINGS GROUP COMPONENT ---
+const SettingsGroup = ({ title, icon: Icon, children, defaultOpen = false, subtitle }) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
 
+  return (
+    <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm mb-4 transition-all duration-300">
+      <button 
+        onClick={() => setIsOpen(!isOpen)} 
+        className={`w-full flex items-center justify-between p-4 transition-colors ${isOpen ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'}`}
+      >
+         <div className="flex items-center gap-4 text-left">
+            <div className={`p-2.5 rounded-xl shadow-sm transition-colors ${isOpen ? 'bg-slate-900 text-white' : 'bg-white border border-slate-100 text-slate-500'}`}>
+               <Icon className="w-5 h-5" />
+            </div>
+            <div>
+               <h3 className="font-bold text-slate-800 text-sm">{title}</h3>
+               {subtitle && <p className="text-[10px] text-slate-400 font-medium">{subtitle}</p>}
+            </div>
+         </div>
+         <div className={`p-2 rounded-full transition-all duration-300 ${isOpen ? 'bg-slate-200 rotate-180' : 'bg-transparent'}`}>
+            <ChevronDown className="w-4 h-4 text-slate-500" />
+         </div>
+      </button>
+      
+      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+         <div className="p-4 border-t border-slate-100 space-y-4">
+            {children}
+         </div>
+      </div>
+    </div>
+  );
+};
+
+// --- SETTINGS SCREEN (UX IMPROVED) ---
 const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onResetMonth, isTutorial, onExitTutorial, isLegacyMode }) => {
+  // --- STATE MANAGEMENT ---
   const [displayName, setDisplayName] = useState(currentSettings.displayName || user.displayName || '');
   const [currency, setCurrency] = useState(currentSettings.currency || 'GBP');
   const [bank, setBank] = useState(currentSettings.bankDetails || null);
+  const [payDay, setPayDay] = useState(currentSettings.payDay || '1');
   
+  // Lists
   const [allocations, setAllocations] = useState(currentSettings.allocationRules || []);
   const [defaultExpenses, setDefaultExpenses] = useState(currentSettings.defaultFixedExpenses || []);
-  
-  // ... (keep existing state for new pots/colors etc) ...
+  const [creditCards, setCreditCards] = useState(currentSettings.creditCards || []);
+  const [mortgages, setMortgages] = useState(currentSettings.mortgages || []);
+  const [paceTargets, setPaceTargets] = useState(currentSettings.dailyPaceTargets || { low: 10, high: 30 });
+
+  // Inputs for New Items
   const [newPlanName, setNewPlanName] = useState('');
   const [newPlanPercent, setNewPlanPercent] = useState('');
   const [openColorMenuId, setOpenColorMenuId] = useState(null);
   const [newPlanColor, setNewPlanColor] = useState(POT_COLORS[0]);
   const [showNewPotColorMenu, setShowNewPotColorMenu] = useState(false);
+  
   const [newDefExpName, setNewDefExpName] = useState('');
   const [newDefExpAmount, setNewDefExpAmount] = useState('');
   const [newDefExpLogo, setNewDefExpLogo] = useState(null);
 
+  // --- CALCULATIONS & HANDLERS ---
   const totalPercentage = allocations.reduce((sum, item) => sum + parseFloat(item.percentage), 0);
   const remainderPercent = Math.max(0, 100 - totalPercentage);
-
-  const [payDay, setPayDay] = useState(currentSettings.payDay || '1');
-  
-
-  // --- NEW: Local State for Pace Targets ---
-  const [paceTargets, setPaceTargets] = useState(currentSettings.dailyPaceTargets || { low: 10, high: 30 });
-  // --- NEW: Credit Cards State ---
-  const [creditCards, setCreditCards] = useState(currentSettings.creditCards || []);
-
-  // --- UPDATED: Mortgages State ---
-  const [mortgages, setMortgages] = useState(currentSettings.mortgages || []);
-
-  // --- NEW: Update Mortgage Amount ---
-  const updateMortgageAmount = (name, amount) => {
-     setMortgages(mortgages.map(m => m.name === name ? { ...m, amount: parseFloat(amount) || 0 } : m));
-  };
 
   const toggleCreditCard = (card) => {
      if (creditCards.some(c => c.name === card.name)) {
@@ -2354,15 +2379,49 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
      }
   };
 
-  // --- NEW: Toggle Mortgage ---
   const toggleMortgage = (lender) => {
     if (mortgages.some(m => m.name === lender.name)) {
        setMortgages(mortgages.filter(m => m.name !== lender.name));
     } else {
-       // Default amount to 0 if adding new
        setMortgages([...mortgages, { ...lender, amount: '' }]);
     }
- };
+  };
+
+  const updateMortgageAmount = (name, amount) => {
+     setMortgages(mortgages.map(m => m.name === name ? { ...m, amount: parseFloat(amount) || 0 } : m));
+  };
+
+  const addAllocation = () => {
+    if(!newPlanName || !newPlanPercent) return;
+    setAllocations([...allocations, { 
+      id: Date.now().toString(), 
+      name: newPlanName, 
+      percentage: parseFloat(newPlanPercent),
+      color: newPlanColor.tailwind, 
+      hex: newPlanColor.hex 
+    }]);
+    setNewPlanName('');
+    setNewPlanPercent('');
+    setNewPlanColor(POT_COLORS[0]);
+    setShowNewPotColorMenu(false);
+  };
+  const removeAllocation = (id) => setAllocations(allocations.filter(a => a.id !== id));
+
+  const addDefaultExpense = () => {
+    if(!newDefExpName) return; 
+    const amountVal = parseFloat(newDefExpAmount) || 0;
+    setDefaultExpenses([...defaultExpenses, {
+      id: Date.now().toString(),
+      name: newDefExpName,
+      amount: amountVal,
+      type: 'fixed',
+      logo: newDefExpLogo
+    }]);
+    setNewDefExpName('');
+    setNewDefExpAmount('');
+    setNewDefExpLogo(null);
+  };
+  const removeDefaultExpense = (id) => setDefaultExpenses(defaultExpenses.filter(e => e.id !== id));
 
   const handleSave = () => {
     if (totalPercentage > 100) {
@@ -2380,462 +2439,384 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
       payDay,
       allocationRules: allocations,
       defaultFixedExpenses: defaultExpenses,
-      creditCards: creditCards,
-      mortgages: mortgages,
+      creditCards,
+      mortgages,
       dailyPaceTargets: paceTargets
     });
     onClose();
   };
 
-  // ... (Keep addAllocation, removeAllocation, addDefaultExpense, removeDefaultExpense functions exactly as they are) ...
-  const addAllocation = () => {
-    if(!newPlanName || !newPlanPercent) return;
-    setAllocations([...allocations, { 
-      id: Date.now().toString(), 
-      name: newPlanName, 
-      percentage: parseFloat(newPlanPercent),
-      color: 'bg-slate-100 text-slate-600'
-    }]);
-    setNewPlanName('');
-    setNewPlanPercent('');
-  };
-  const removeAllocation = (id) => setAllocations(allocations.filter(a => a.id !== id));
-  const addDefaultExpense = () => {
-    if(!newDefExpName) return; 
-    const amountVal = parseFloat(newDefExpAmount) || 0;
-    setDefaultExpenses([...defaultExpenses, {
-      id: Date.now().toString(),
-      name: newDefExpName,
-      amount: amountVal,
-      type: 'fixed',
-      logo: newDefExpLogo
-    }]);
-    setNewDefExpName('');
-    setNewDefExpAmount('');
-    setNewDefExpLogo(null);
-  };
-  const removeDefaultExpense = (id) => setDefaultExpenses(defaultExpenses.filter(e => e.id !== id));
-
-
   return (
-    <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 overflow-y-auto animate-in slide-in-from-bottom-10 print:hidden">
-      <div className="bg-white border-b border-slate-100 p-4 sticky top-0 z-10 flex justify-between items-center shadow-sm">
-        <h2 className="text-lg font-bold flex items-center gap-2 text-slate-800">
-          <Settings className="w-5 h-5 text-slate-500" /> {isTutorial ? 'Settings Demo' : isLegacyMode ? 'Complete Setup' : 'Settings'}
-        </h2>
-        {!isLegacyMode && (
-           <button onClick={isTutorial ? onExitTutorial : onClose} className="p-2 hover:bg-slate-100 rounded-full transition">
-             <X className="w-6 h-6 text-slate-500" />
+    <div className="fixed inset-0 bg-slate-100 z-[100] flex flex-col animate-in slide-in-from-bottom-10 print:hidden">
+      
+      {/* HEADER */}
+      <div className="bg-white px-6 py-4 border-b border-slate-200 flex justify-between items-center shadow-sm shrink-0 z-10">
+         <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <Settings className="w-5 h-5 text-slate-900" /> 
+            {isTutorial ? 'Settings Demo' : isLegacyMode ? 'Complete Setup' : 'Settings'}
+         </h2>
+         {!isLegacyMode && (
+           <button onClick={isTutorial ? onExitTutorial : onClose} className="p-2 bg-slate-50 hover:bg-slate-100 rounded-full transition">
+              <X className="w-6 h-6 text-slate-500" />
            </button>
-        )}
+         )}
       </div>
 
-      <div className="max-w-xl mx-auto p-6 space-y-8 pb-20">
-        
-        {isLegacyMode && (
-          <div className="bg-amber-50 text-amber-800 p-4 rounded-xl border border-amber-200 text-sm font-bold mb-4">
-             Please complete your setup: Add Bank, Payday, and any Credit Cards.
-          </div>
-        )}
+      {/* SCROLLABLE CONTENT AREA */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-32">
+        <div className="max-w-2xl mx-auto">
+          
+          {isLegacyMode && (
+             <div className="bg-amber-50 text-amber-800 p-4 rounded-xl border border-amber-200 text-sm font-bold mb-6 flex items-start gap-3 animate-pulse">
+               <AlertTriangle className="w-5 h-5 shrink-0" />
+               <p>Welcome! Please set up your Bank, Payday, and Debts to get started.</p>
+             </div>
+          )}
 
-        {/* BANK & PAYDAY */}
-        <section className="space-y-3">
-           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Bank & Payday</h3>
-           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-              
+          {/* GROUP 1: PROFILE & INCOME */}
+          <SettingsGroup title="Profile & Income" subtitle="Name, Bank, Payday" icon={User} defaultOpen={isLegacyMode}>
+              {/* Display Name */}
               <div>
-                 <label className="block text-xs font-semibold text-slate-500 mb-2">Main Current Account</label>
+                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Display Name</label>
+                 <input 
+                   value={displayName} 
+                   onChange={(e) => setDisplayName(e.target.value)} 
+                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-200"
+                   placeholder="Your Name"
+                 />
+              </div>
+
+              {/* Currency */}
+              <div>
+                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Currency</label>
+                 <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-200">
+                    {['GBP', 'USD', 'EUR'].map(c => (
+                       <button 
+                         key={c}
+                         onClick={() => setCurrency(c)}
+                         className={`flex-1 py-2 rounded-lg text-sm font-bold transition ${currency === c ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                       >
+                         {c}
+                       </button>
+                    ))}
+                 </div>
+              </div>
+
+              {/* Bank Selector */}
+              <div>
+                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Main Current Account</label>
                  {bank ? (
-                    <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200">
+                    <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-emerald-200 ring-2 ring-emerald-50">
                        <div className="flex items-center gap-3">
-                          <img src={bank.logo} className="w-8 h-8 rounded-full object-contain" />
+                          <img src={bank.logo} className="w-8 h-8 rounded-full object-contain bg-slate-50" />
                           <span className="font-bold text-slate-700">{bank.name}</span>
                        </div>
-                       <button onClick={() => setBank(null)} className="text-xs font-bold text-indigo-500">Change</button>
+                       <button onClick={() => setBank(null)} className="text-xs font-bold text-indigo-500 hover:text-indigo-600">Change</button>
                     </div>
                  ) : (
                     <BankSelector selectedBank={bank} onSelect={setBank} />
                  )}
               </div>
 
+              {/* Payday */}
               <div>
-                 <label className="block text-xs font-semibold text-slate-500 mb-2">Payday (Day of Month)</label>
-                 <select value={payDay} onChange={(e) => setPayDay(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold">
-                    {Array.from({length: 31}, (_, i) => i + 1).map(day => (
-                       <option key={day} value={day}>{day}</option>
-                    ))}
-                 </select>
+                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Payday (Day of Month)</label>
+                 <div className="grid grid-cols-7 gap-2">
+                   {[1, 25, 26, 28, 30, 31].map(d => (
+                      <button 
+                        key={d} 
+                        onClick={() => setPayDay(String(d))}
+                        className={`py-2 rounded-lg font-bold text-sm border transition ${payDay === String(d) ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'}`}
+                      >
+                        {d}
+                      </button>
+                   ))}
+                   <select 
+                      value={payDay} 
+                      onChange={(e) => setPayDay(e.target.value)} 
+                      className="py-2 px-1 text-center rounded-lg font-bold text-sm border border-slate-200 bg-white outline-none focus:border-slate-900"
+                   >
+                      <option value="">Other</option>
+                      {Array.from({length: 31}, (_, i) => i + 1).map(day => (
+                         <option key={day} value={day}>{day}</option>
+                      ))}
+                   </select>
+                 </div>
+              </div>
+          </SettingsGroup>
+
+
+          {/* GROUP 2: DEBTS & LIABILITIES */}
+          <SettingsGroup title="Debts & Liabilities" subtitle="Credit Cards, Mortgages" icon={CreditCard} defaultOpen={isLegacyMode}>
+             
+             {/* Credit Cards */}
+             <div className="space-y-3 mb-6">
+                <div className="flex items-center justify-between">
+                   <h4 className="text-xs font-bold text-slate-900">Credit Cards (Variable)</h4>
+                   <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Starts at 0/mo</span>
+                </div>
+                
+                {/* Active Cards Pills */}
+                <div className="flex flex-wrap gap-2">
+                   {creditCards.map(c => (
+                      <div key={c.name} className="flex items-center gap-2 bg-purple-50 px-3 py-2 rounded-lg border border-purple-100 shadow-sm">
+                         {c.logo && <img src={c.logo} className="w-4 h-4 object-contain" />}
+                         <span className="text-xs font-bold text-purple-700">{c.name}</span>
+                         <button onClick={() => toggleCreditCard(c)} className="text-purple-300 hover:text-purple-500"><X className="w-3 h-3" /></button>
+                      </div>
+                   ))}
+                   {creditCards.length === 0 && <span className="text-xs text-slate-400 italic">No cards selected</span>}
+                </div>
+                
+                <CreditCardSelector selectedCards={creditCards} onToggle={toggleCreditCard} />
+             </div>
+
+             <div className="h-px bg-slate-100 my-6" />
+
+             {/* Mortgages */}
+             <div className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-900">Mortgages (Fixed)</h4>
+                <div className="space-y-2">
+                   {mortgages.map(m => (
+                      <div key={m.name} className="flex items-center gap-2 bg-blue-50 p-2 rounded-xl border border-blue-100 shadow-sm animate-in zoom-in">
+                         <div className="flex items-center gap-2 flex-1">
+                             {m.logo && <img src={m.logo} className="w-6 h-6 object-contain" />}
+                             <span className="text-sm font-bold text-blue-800">{m.name}</span>
+                         </div>
+                         <div className="relative w-24">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-blue-300 text-xs font-bold">£</span>
+                            <input 
+                              type="number" 
+                              placeholder="0"
+                              value={m.amount}
+                              onChange={(e) => updateMortgageAmount(m.name, e.target.value)}
+                              className="w-full pl-5 pr-2 py-1.5 bg-white border border-blue-200 rounded-lg text-sm font-bold text-blue-600 outline-none focus:ring-2 focus:ring-blue-200"
+                            />
+                         </div>
+                         <button onClick={() => toggleMortgage(m)} className="p-2 hover:bg-white text-blue-300 hover:text-red-500 rounded-lg transition"><X className="w-4 h-4" /></button>
+                      </div>
+                   ))}
+                </div>
+                <MortgageSelector selectedLenders={mortgages} onToggle={toggleMortgage} />
+             </div>
+          </SettingsGroup>
+
+
+          {/* GROUP 3: SAVINGS POTS */}
+          <SettingsGroup title="Savings Pots" subtitle="Spending Plan" icon={Wallet}>
+              <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-xl flex items-center gap-3 mb-4">
+                  <div className="bg-white p-1.5 rounded-full shadow-sm">
+                     {bank?.logo ? <img src={bank.logo} className="w-5 h-5 rounded-full object-contain"/> : <Wallet className="w-5 h-5 text-indigo-500"/>}
+                  </div>
+                  <div className="flex-1">
+                     <p className="text-xs font-bold text-indigo-400 uppercase">{bank?.name || 'Current Account'} (Remainder)</p>
+                  </div>
+                  <div className="text-lg font-black text-indigo-900">{remainderPercent}%</div>
               </div>
 
-           </div>
-        </section>
-
-        {/* --- NEW: CREDIT CARDS SECTION (Insert after Bank/Payday section) --- */}
-        <section className="space-y-3">
-           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">My Credit Cards</h3>
-           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-              <p className="text-xs text-slate-500 leading-relaxed">
-                 Select cards you use. These will appear in your budget with a variable amount (starting at 0) each month.
-              </p>
-              
-              {/* Selected Cards Pills */}
-              <div className="flex flex-wrap gap-2 mb-2">
-                 {creditCards.map(c => (
-                    <div key={c.name} className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-emerald-100 shadow-sm animate-in zoom-in">
-                       {c.logo && <img src={c.logo} className="w-4 h-4 object-contain" />}
-                       <span className="text-xs font-bold text-slate-700">{c.name}</span>
-                       <button onClick={() => toggleCreditCard(c)} className="text-slate-300 hover:text-red-500"><X className="w-3 h-3" /></button>
-                    </div>
-                 ))}
-                 {creditCards.length === 0 && <span className="text-xs text-slate-400 italic">No cards selected</span>}
-              </div>
-
-              <CreditCardSelector 
-                 selectedCards={creditCards}
-                 onToggle={toggleCreditCard}
-              />
-           </div>
-        </section>
-
-        {/* --- UPDATED: MORTGAGES SECTION --- */}
-        <section className="space-y-3">
-           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">My Mortgages</h3>
-           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-              <p className="text-xs text-slate-500 leading-relaxed">
-                 Select your mortgage provider and enter your <strong>fixed monthly repayment</strong>.
-              </p>
-              
-              {/* Selected Mortgages with Amount Input */}
-              <div className="space-y-2 mb-2">
-                 {mortgages.map(m => (
-                    <div key={m.name} className="flex items-center gap-2 bg-white p-2 rounded-xl border border-blue-200 shadow-sm animate-in zoom-in">
-                       <div className="flex items-center gap-2 flex-1">
-                           {m.logo && <img src={m.logo} className="w-6 h-6 object-contain" />}
-                           <span className="text-sm font-bold text-slate-700">{m.name}</span>
+              <div className="space-y-3">
+                 {/* Existing Allocations */}
+                 {allocations.map(plan => (
+                    <div key={plan.id} className="relative group">
+                       <div className="flex items-center gap-2 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm z-10 relative overflow-hidden">
+                          <button 
+                            onClick={() => setOpenColorMenuId(openColorMenuId === plan.id ? null : plan.id)}
+                            className="w-10 h-10 rounded-full border-2 border-slate-50 shadow-sm shrink-0 hover:scale-105 transition active:scale-95"
+                            style={{ backgroundColor: plan.hex || '#10b981' }}
+                          />
+                          <input 
+                            value={plan.name}
+                            onChange={(e) => setAllocations(allocations.map(a => a.id === plan.id ? {...a, name: e.target.value} : a))}
+                            className="flex-1 min-w-0 font-bold text-slate-700 bg-transparent border-none outline-none focus:ring-0 text-base" 
+                          />
+                          <div className="flex items-center gap-1 bg-slate-50 px-2 py-2 rounded-xl border border-slate-100 shrink-0">
+                            <input 
+                              type="number"
+                              value={plan.percentage}
+                              onChange={(e) => setAllocations(allocations.map(a => a.id === plan.id ? {...a, percentage: parseFloat(e.target.value) || 0} : a))}
+                              className="w-10 bg-transparent text-right font-bold text-slate-800 outline-none p-0 text-base"
+                            />
+                            <span className="text-slate-400 text-xs font-bold">%</span>
+                          </div>
+                          <button onClick={() => removeAllocation(plan.id)} className="shrink-0 text-slate-300 hover:text-red-500 p-2 hover:bg-red-50 rounded-xl transition">
+                              <Trash2 className="w-4 h-4" />
+                          </button>
                        </div>
                        
-                       {/* Amount Input */}
-                       <div className="relative w-24">
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">£</span>
-                          <input 
-                            type="number" 
-                            placeholder="0"
-                            value={m.amount}
-                            onChange={(e) => updateMortgageAmount(m.name, e.target.value)}
-                            className="w-full pl-5 pr-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100"
-                          />
-                       </div>
-
-                       <button onClick={() => toggleMortgage(m)} className="p-2 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition"><X className="w-4 h-4" /></button>
-                    </div>
+                       {/* Color Menu Dropdown */}
+                       {openColorMenuId === plan.id && (
+                        <div className="absolute top-14 left-0 z-20 bg-white p-3 rounded-2xl shadow-xl border border-slate-100 w-full animate-in slide-in-from-top-2">
+                          <div className="text-xs font-bold text-slate-400 uppercase mb-2">Select Color</div>
+                          <div className="flex gap-2 flex-wrap justify-start">
+                            {POT_COLORS.map((colorOption) => (
+                              <button
+                                key={colorOption.id}
+                                onClick={() => {
+                                  setAllocations(allocations.map(a => a.id === plan.id ? { ...a, hex: colorOption.hex, color: colorOption.tailwind } : a));
+                                  setOpenColorMenuId(null);
+                                }}
+                                className={`w-8 h-8 rounded-full shadow-sm hover:scale-110 transition border-2 ${plan.hex === colorOption.hex ? 'border-slate-800 scale-110' : 'border-transparent'}`}
+                                style={{ backgroundColor: colorOption.hex }}
+                              >
+                                 {plan.hex === colorOption.hex && <Check className="w-4 h-4 text-white mx-auto" />}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                   </div>
                  ))}
-              </div>
 
-              <MortgageSelector 
-                 selectedLenders={mortgages}
-                 onToggle={toggleMortgage}
-              />
-           </div>
-        </section>
-
-        {/* DAILY PACE SETTINGS */}
-        <section className="space-y-3">
-           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Daily Pace Targets</h3>
-           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-              <p className="text-xs text-slate-500 leading-relaxed">
-                 Customize when the heartbeat widget warns you (red throb) or celebrates (green breathing).
-              </p>
-              
-              <div className="grid grid-cols-2 gap-4">
-                 <div>
-                    <label className="block text-xs font-bold text-rose-500 mb-1">Low Warning (&lt;)</label>
-                    <div className="relative">
-                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
-                       <input 
-                         type="number" 
-                         value={paceTargets.low}
-                         onChange={(e) => setPaceTargets({ ...paceTargets, low: parseFloat(e.target.value) || 0 })}
-                         className="w-full pl-7 p-3 bg-white border border-rose-200 rounded-xl text-rose-600 font-bold outline-none focus:ring-2 focus:ring-rose-100"
-                       />
-                    </div>
-                 </div>
-
-                 <div>
-                    <label className="block text-xs font-bold text-emerald-600 mb-1">Healthy Goal (&gt;)</label>
-                    <div className="relative">
-                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
-                       <input 
-                         type="number" 
-                         value={paceTargets.high}
-                         onChange={(e) => setPaceTargets({ ...paceTargets, high: parseFloat(e.target.value) || 0 })}
-                         className="w-full pl-7 p-3 bg-white border border-emerald-200 rounded-xl text-emerald-600 font-bold outline-none focus:ring-2 focus:ring-emerald-100"
-                       />
-                    </div>
-                 </div>
-              </div>
-           </div>
-        </section>
-
-
-        {/* Profile Name */}
-        <section className="space-y-3">
-          <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Profile & Currency</h3>
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1">Display Name</label>
-              <input 
-                type="text" 
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full p-2 rounded-lg border border-slate-300 focus:border-emerald-500 outline-none transition text-base"
-                disabled={isTutorial}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1">Currency</label>
-              <div className="flex gap-2">
-                 {['GBP', 'USD', 'EUR'].map(c => (
-                   <button
-                     key={c}
-                     onClick={() => setCurrency(c)}
-                     disabled={isTutorial}
-                     className={`px-4 py-2 rounded-lg font-bold text-sm transition ${currency === c ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}
-                   >
-                     {c}
-                   </button>
-                 ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Spending Plan */}
-        <section className="space-y-3" id="settings-spending-plan">
-          <div className="flex justify-between items-center">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Spending Plan</h3>
-            <span className={`px-2 py-0.5 rounded text-xs font-bold ${totalPercentage <= 100 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-              Allocated: {totalPercentage}%
-            </span>
-          </div>
-          
-          <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-xl flex items-center gap-3 mb-2">
-              <div className="bg-white p-1.5 rounded-full shadow-sm">
-                 {bank?.logo ? <img src={bank.logo} className="w-5 h-5 rounded-full object-contain"/> : <Wallet className="w-5 h-5 text-indigo-500"/>}
-              </div>
-              <div className="flex-1">
-                 <p className="text-xs font-bold text-indigo-400 uppercase">{bank?.name || 'Current Account'} (Remainder)</p>
-              </div>
-              <div className="text-lg font-black text-indigo-900">{remainderPercent}%</div>
-          </div>
-
-          <div className="space-y-3">
-             {/* ... (Keep existing POT list rendering logic) ... */}
-              {allocations.map(plan => (
-              <div key={plan.id} className="relative">
-                <div className="flex items-center gap-2 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm z-10 relative overflow-hidden">
-                  <button 
-                    onClick={() => setOpenColorMenuId(openColorMenuId === plan.id ? null : plan.id)}
-                    className="w-10 h-10 rounded-full border-2 border-slate-50 shadow-sm shrink-0 hover:scale-105 transition active:scale-95 group relative"
-                    style={{ backgroundColor: plan.hex || '#10b981' }}
-                    disabled={isTutorial}
-                  >
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/10 rounded-full">
-                      <Edit2 className="w-4 h-4 text-white drop-shadow-md" />
-                    </div>
-                  </button>
-                  <input 
-                    value={plan.name}
-                    onChange={(e) => setAllocations(allocations.map(a => a.id === plan.id ? {...a, name: e.target.value} : a))}
-                    className="flex-1 min-w-0 font-bold text-slate-700 bg-transparent border-none outline-none focus:ring-0 text-base truncate" 
-                    disabled={isTutorial}
-                  />
-                  <div className="flex items-center gap-1 bg-slate-50 px-2 py-2 rounded-xl border border-slate-100 shrink-0">
-                    <input 
-                      type="number"
-                      value={plan.percentage}
-                      onChange={(e) => setAllocations(allocations.map(a => a.id === plan.id ? {...a, percentage: parseFloat(e.target.value) || 0} : a))}
-                      className="w-9 bg-transparent text-right font-bold text-slate-800 outline-none p-0 text-base"
-                      disabled={isTutorial}
-                    />
-                    <span className="text-slate-400 text-xs font-bold">%</span>
-                  </div>
-                  {!isTutorial && (
-                    <button onClick={() => removeAllocation(plan.id)} className="shrink-0 text-slate-300 hover:text-red-500 p-2 hover:bg-red-50 rounded-xl transition">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-                 {/* ... (Keep Color Menu Logic) ... */}
-                 {openColorMenuId === plan.id && (
-                  <div className="absolute top-14 left-0 z-20 bg-white p-3 rounded-2xl shadow-xl border border-slate-100 animate-in slide-in-from-top-2 fade-in w-full">
-                    <div className="text-xs font-bold text-slate-400 uppercase mb-2">Select Color</div>
-                    <div className="flex gap-2 flex-wrap justify-start">
-                      {POT_COLORS.map((colorOption) => (
-                        <button
-                          key={colorOption.id}
-                          onClick={() => {
-                            setAllocations(allocations.map(a => a.id === plan.id ? {
-                                ...a,
-                                hex: colorOption.hex,
-                                color: colorOption.tailwind
-                            } : a));
-                            setOpenColorMenuId(null);
-                          }}
-                          className={`w-8 h-8 rounded-full shadow-sm hover:scale-110 transition border-2 ${plan.hex === colorOption.hex ? 'border-slate-800 scale-110' : 'border-transparent'}`}
-                          style={{ backgroundColor: colorOption.hex }}
-                        >
-                           {plan.hex === colorOption.hex && <Check className="w-4 h-4 text-white mx-auto" />}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {/* ... (Keep Create Pot Logic) ... */}
-             <div className={`bg-slate-50 rounded-2xl p-3 border border-slate-200/60 ${isTutorial ? 'opacity-50 pointer-events-none' : ''}`}>
-                <div className="flex justify-between items-center mb-2">
-                   <p className="text-xs font-bold text-slate-400 uppercase">Create New Pot</p>
-                </div>
-                <div className="flex gap-2 items-center relative">
-                    <input 
-                      placeholder="Name"
-                      value={newPlanName}
-                      onChange={(e) => setNewPlanName(e.target.value)}
-                      className="flex-1 min-w-0 p-3 text-base border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-slate-200 transition font-medium"
-                    />
-                    <div className="relative w-20 shrink-0">
+                 {/* New Pot Creator */}
+                 <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200/60 mt-4">
+                    <p className="text-xs font-bold text-slate-400 uppercase mb-2">Add New Pot</p>
+                    <div className="flex gap-2 items-center relative">
                         <input 
-                          type="number"
-                          placeholder="0"
-                          value={newPlanPercent}
-                          onChange={(e) => setNewPlanPercent(e.target.value)}
-                          className="w-full p-3 text-base border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-slate-200 transition font-bold text-center"
+                          placeholder="Name (e.g. Holiday)"
+                          value={newPlanName}
+                          onChange={(e) => setNewPlanName(e.target.value)}
+                          className="flex-1 min-w-0 p-3 text-base border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-slate-200 transition font-medium"
                         />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
-                    </div>
-                    {/* ... (Color Dropdown for new pot - keep existing logic) ... */}
-                     <div className="relative shrink-0">
-                        <button 
-                            onClick={() => setShowNewPotColorMenu(!showNewPotColorMenu)}
-                            className="w-11 h-11 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center transition hover:scale-105 active:scale-95"
-                            style={{ backgroundColor: newPlanColor.hex }}
-                        >
-                           <div className="bg-black/10 rounded-full p-1"><Edit2 className="w-3 h-3 text-white" /></div>
+                        <div className="relative w-20 shrink-0">
+                            <input 
+                              type="number"
+                              placeholder="0"
+                              value={newPlanPercent}
+                              onChange={(e) => setNewPlanPercent(e.target.value)}
+                              className="w-full p-3 text-base border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-slate-200 transition font-bold text-center"
+                            />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
+                        </div>
+                         
+                         {/* New Pot Color Picker */}
+                         <div className="relative shrink-0">
+                            <button 
+                                onClick={() => setShowNewPotColorMenu(!showNewPotColorMenu)}
+                                className="w-11 h-11 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center transition hover:scale-105 active:scale-95"
+                                style={{ backgroundColor: newPlanColor.hex }}
+                            >
+                               <div className="bg-black/10 rounded-full p-1"><Edit2 className="w-3 h-3 text-white" /></div>
+                            </button>
+                            {showNewPotColorMenu && (
+                                <div className="absolute bottom-full right-0 mb-2 p-3 bg-white rounded-2xl shadow-xl border border-slate-100 w-48 z-50 grid grid-cols-5 gap-2">
+                                    {POT_COLORS.map((colorOption) => (
+                                        <button
+                                            key={colorOption.id}
+                                            onClick={() => { setNewPlanColor(colorOption); setShowNewPotColorMenu(false); }}
+                                            className="w-7 h-7 rounded-full shadow-sm border transition hover:scale-110"
+                                            style={{ backgroundColor: colorOption.hex }}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <button onClick={addAllocation} className="bg-slate-900 text-white w-11 h-11 rounded-xl shadow-lg hover:bg-slate-800 transition active:scale-95 flex items-center justify-center shrink-0">
+                          <Plus className="w-5 h-5" />
                         </button>
-                        {showNewPotColorMenu && (
-                            <div className="absolute bottom-full right-0 mb-2 p-3 bg-white rounded-2xl shadow-xl border border-slate-100 w-48 z-50 animate-in zoom-in-95 grid grid-cols-5 gap-2">
-                                {POT_COLORS.map((colorOption) => (
-                                    <button
-                                        key={colorOption.id}
-                                        onClick={() => {
-                                            setNewPlanColor(colorOption);
-                                            setShowNewPotColorMenu(false);
-                                        }}
-                                        className={`w-7 h-7 rounded-full shadow-sm border transition hover:scale-110 ${newPlanColor.id === colorOption.id ? 'border-slate-800 scale-110' : 'border-transparent'}`}
-                                        style={{ backgroundColor: colorOption.hex }}
-                                    />
-                                ))}
-                            </div>
-                        )}
                     </div>
+                 </div>
+              </div>
+          </SettingsGroup>
+
+
+          {/* GROUP 4: RECURRING BILLS */}
+          <SettingsGroup title="Recurring Bills" subtitle="Default Fixed Expenses" icon={RefreshCw}>
+              <div className="space-y-3">
+                 {defaultExpenses.map(exp => (
+                    <div key={exp.id} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                       <div className="flex items-center gap-2">
+                          {exp.logo ? <img src={exp.logo} className="w-6 h-6 object-contain rounded-full bg-slate-50" /> : <div className="w-6 h-6 bg-slate-100 rounded-full" />}
+                          <span className="font-bold text-slate-700 text-sm">{exp.name}</span>
+                       </div>
+                       <div className="flex items-center gap-3">
+                          <span className={`font-medium text-sm ${exp.amount === 0 ? 'text-orange-500 bg-orange-50 px-2 py-0.5 rounded text-xs' : 'text-slate-600'}`}>
+                            {exp.amount > 0 ? formatCurrency(exp.amount, currency) : 'Variable'}
+                          </span>
+                          <button onClick={() => removeDefaultExpense(exp.id)} className="text-slate-300 hover:text-red-500"><X className="w-4 h-4" /></button>
+                       </div>
+                    </div>
+                 ))}
+
+                 <div className="flex gap-2 items-start pt-2">
+                     <div className="flex-1">
+                       <BrandSearchInput
+                          placeholder="New Bill Name"
+                          value={newDefExpName}
+                          onChange={setNewDefExpName}
+                          onSelectBrand={(name, logo) => { setNewDefExpName(name); setNewDefExpLogo(logo); }}
+                          className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold"
+                       />
+                     </div>
+                     <input 
+                        type="number" 
+                        className="w-24 p-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold" 
+                        placeholder="£0" 
+                        value={newDefExpAmount} 
+                        onChange={e => setNewDefExpAmount(e.target.value)} 
+                     />
+                     <button onClick={addDefaultExpense} className="bg-slate-900 text-white p-3 rounded-xl"><Plus className="w-5 h-5" /></button>
+                 </div>
+              </div>
+          </SettingsGroup>
+
+
+          {/* GROUP 5: APP PREFERENCES */}
+          <SettingsGroup title="Preferences" subtitle="Pace Targets, Reset" icon={Target}>
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                 <div>
+                    <label className="block text-xs font-bold text-rose-500 mb-1">Low Warning</label>
+                    <input 
+                      type="number" 
+                      value={paceTargets.low}
+                      onChange={(e) => setPaceTargets({ ...paceTargets, low: parseFloat(e.target.value) || 0 })}
+                      className="w-full p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 font-bold"
+                    />
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-emerald-600 mb-1">Healthy Goal</label>
+                    <input 
+                      type="number" 
+                      value={paceTargets.high}
+                      onChange={(e) => setPaceTargets({ ...paceTargets, high: parseFloat(e.target.value) || 0 })}
+                      className="w-full p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600 font-bold"
+                    />
+                 </div>
+              </div>
+
+              {!isLegacyMode && (
+                <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                    <h4 className="font-bold text-red-800 text-sm mb-2 flex items-center gap-2"><AlertTriangle className="w-4 h-4"/> Danger Zone</h4>
+                    <p className="text-xs text-red-600/80 mb-3">Clear specific month data if things get messy.</p>
                     <button 
-                        onClick={() => {
-                             if(!newPlanName || !newPlanPercent) return;
-                             setAllocations([...allocations, { 
-                               id: Date.now().toString(), 
-                               name: newPlanName, 
-                               percentage: parseFloat(newPlanPercent),
-                               color: newPlanColor.tailwind, 
-                               hex: newPlanColor.hex 
-                             }]);
-                             setNewPlanName('');
-                             setNewPlanPercent('');
-                             setNewPlanColor(POT_COLORS[0]); 
-                             setShowNewPotColorMenu(false);
-                        }} 
-                        className="bg-slate-900 text-white w-11 h-11 rounded-xl shadow-lg hover:bg-slate-800 transition active:scale-95 flex items-center justify-center shrink-0"
+                      onClick={() => {
+                         if (confirm("Reset current month? This clears salary and expenses for this month only.")) {
+                            onResetMonth();
+                            onClose();
+                         }
+                      }}
+                      className="w-full bg-white border border-red-200 text-red-600 py-3 rounded-lg font-bold text-xs hover:bg-red-50 transition"
                     >
-                      <Plus className="w-5 h-5" />
+                      Reset Current Month Data
                     </button>
                 </div>
-            </div>
-          </div>
-        </section>
+              )}
+          </SettingsGroup>
 
-        {/* 2. Fixed Expenses (Keep existing) */}
-        <section className="space-y-3" id="settings-fixed-expenses">
-           {/* ... (Existing Fixed Expenses Logic) ... */}
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Default Monthly Bills</h3>
-             <div className="space-y-2">
-            {defaultExpenses.map(exp => (
-              <div key={exp.id} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                <div className="flex items-center gap-3">
-                   {exp.logo && <img src={exp.logo} className="w-6 h-6 object-contain rounded-full bg-slate-50" alt="" />}
-                   <span className="font-medium text-slate-700">{exp.name}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`font-medium text-sm ${exp.amount === 0 ? 'text-orange-500 bg-orange-50 px-2 py-0.5 rounded text-xs' : 'text-slate-600'}`}>
-                    {exp.amount > 0 ? formatCurrency(exp.amount, currency) : 'Variable'}
-                  </span>
-                  {!isTutorial && (
-                    <button onClick={() => removeDefaultExpense(exp.id)} className="text-slate-300 hover:text-red-500">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-            <div className={`flex gap-2 pt-2 items-start ${isTutorial ? 'opacity-50 pointer-events-none' : ''}`}>
-              <div className="flex-1">
-                <BrandSearchInput
-                  placeholder="Bill Name (e.g. AMEX)"
-                  value={newDefExpName}
-                  onChange={setNewDefExpName}
-                  onSelectBrand={(brandName, brandLogo) => {
-                    setNewDefExpName(brandName);
-                    setNewDefExpLogo(brandLogo);
-                  }}
-                  className="w-full p-3 text-base border border-slate-200 rounded-xl bg-slate-50"
-                />
-              </div>
-              <div id="settings-new-expense-amount">
-                <input 
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="£"
-                    value={newDefExpAmount}
-                    onChange={(e) => setNewDefExpAmount(e.target.value)}
-                    onBlur={() => setNewDefExpAmount(safeCalculate(newDefExpAmount))}
-                    className="w-24 p-3 text-base border border-slate-200 rounded-xl bg-slate-50"
-                />
-              </div>
-              <button onClick={addDefaultExpense} className="bg-slate-900 text-white p-3 rounded-xl">
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {!isTutorial && (
-          <section className="space-y-3 pt-6 border-t border-slate-100">
-             <h3 className="text-sm font-bold text-red-400 uppercase tracking-wider flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" /> Danger Zone
-            </h3>
-            <button onClick={onResetMonth} className="w-full border border-red-100 text-red-600 bg-red-50 py-4 rounded-xl font-semibold hover:bg-red-100 transition flex items-center justify-center gap-2">
-              Reset This Month Data
-            </button>
-          </section>
-        )}
-
-        <button 
-            onClick={handleSave}
-            className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 hover:bg-slate-800 transition transform active:scale-95"
-          >
-            <Save className="w-5 h-5" /> Save Changes
-        </button>
+        </div>
       </div>
+
+      {/* STICKY FOOTER ACTION BAR */}
+      <div className="bg-white p-4 border-t border-slate-200 shrink-0 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-20">
+         <div className="max-w-2xl mx-auto flex gap-3">
+             <button onClick={onClose} className="flex-1 py-4 font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
+               Cancel
+             </button>
+             <button onClick={handleSave} className="flex-[2] py-4 font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2">
+               <Save className="w-5 h-5" /> Save Changes
+             </button>
+         </div>
+      </div>
+
     </div>
   );
 };
