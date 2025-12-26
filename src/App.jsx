@@ -4155,32 +4155,7 @@ const LandingPage = ({ onGetStarted, onDemo }) => {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 overflow-x-hidden">
 
-      {/* --- NEW: DEMO MODE BANNER (FIXED TOP) --- */}
-      {user?.isAnonymous && (
-        <div className="fixed top-0 left-0 right-0 w-full bg-indigo-600 text-white px-4 py-3 shadow-md flex justify-between items-center z-[300] print:hidden animate-in slide-in-from-top">
-          <div className="flex items-center gap-3">
-             <div className="bg-white/20 p-1.5 rounded-full animate-pulse">
-                <FlaskConical className="w-4 h-4 text-white" />
-             </div>
-             <div>
-                <p className="text-xs font-bold opacity-80 uppercase tracking-wider">Demo Mode</p>
-                <p className="text-sm font-bold">You are using a temporary account.</p>
-             </div>
-          </div>
-          <button 
-            onClick={async () => {
-               await signOut(auth);
-               setShowLandingPage(true);
-            }}
-            className="bg-white text-indigo-700 hover:bg-indigo-50 px-4 py-2 rounded-lg text-xs font-bold transition shadow-sm"
-          >
-            EXIT DEMO
-          </button>
-        </div>
-      )}
       
-      {/* Add a spacer so the dashboard content doesn't get hidden behind the banner */}
-      {user?.isAnonymous && <div className="h-[60px]" />}
       
       {/* 1. NAVBAR */}
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
@@ -5456,6 +5431,31 @@ export default function App() {
         />
       )}
       
+
+      {/* --- 1. PASTE THE BANNER HERE --- */}
+      {user?.isAnonymous && (
+        <div className="fixed top-0 left-0 right-0 w-full bg-indigo-600 text-white px-4 py-3 shadow-md flex justify-between items-center z-[300] print:hidden animate-in slide-in-from-top">
+          <div className="flex items-center gap-3">
+             <div className="bg-white/20 p-1.5 rounded-full animate-pulse">
+                <FlaskConical className="w-4 h-4 text-white" />
+             </div>
+             <div>
+                <p className="text-xs font-bold opacity-80 uppercase tracking-wider">Demo Mode</p>
+                <p className="text-sm font-bold">You are using a temporary account.</p>
+             </div>
+          </div>
+          <button 
+            onClick={async () => {
+               await signOut(auth);
+               setShowLandingPage(true);
+            }}
+            className="bg-white text-indigo-700 hover:bg-indigo-50 px-4 py-2 rounded-lg text-xs font-bold transition shadow-sm"
+          >
+            EXIT DEMO
+          </button>
+        </div>
+      )}
+
       {/* Onboarding Wizard Logic */}
       {!loading && !effectiveOnboardingComplete && user && ( 
         <OnboardingWizard 
