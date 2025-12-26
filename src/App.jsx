@@ -1,5 +1,6 @@
 //REVERT BACK TO THIS IF ANY ERROR
 
+import { evaluate } from 'mathjs';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -547,14 +548,14 @@ const calculatePaydayLogic = (payDayStr, salaryInputted) => {
 
 const safeCalculate = (expression) => {
   try {
-    // 1. Remove characters that aren't numbers or math operators
-    const sanitized = String(expression).replace(/[^0-9+\-*/().]/g, '');
-    if (!sanitized) return expression;
-    // 2. Evaluate the math string
-    const result = new Function('return ' + sanitized)();
-    // 3. Return result as string, or original if invalid
+    if (!expression) return '';
+    // mathjs.evaluate() parses the math safely without using eval() or new Function()
+    const result = evaluate(String(expression));
+    
+    // Check if result is a valid finite number
     return isFinite(result) ? String(result) : expression;
   } catch (e) {
+    // If the user types "10+" (incomplete math), just return what they typed so far
     return expression;
   }
 };
