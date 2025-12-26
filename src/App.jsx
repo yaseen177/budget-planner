@@ -1,6 +1,5 @@
 //REVERT BACK TO THIS IF ANY ERROR
 
-import { evaluate } from 'mathjs';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -77,6 +76,8 @@ import {
   ChevronDown,
   RefreshCw
 } from 'lucide-react';
+
+import { evaluate } from 'mathjs';
 
 
 // --- JUICE ENHANCEMENTS START ---
