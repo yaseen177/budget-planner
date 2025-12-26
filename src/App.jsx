@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
+import { useBudgetData } from './useBudgetData';
+
 import { 
   getAuth, 
   signInWithPopup, 
@@ -78,6 +80,7 @@ import {
 } from 'lucide-react';
 
 import { evaluate } from 'mathjs';
+
 
 
 // --- JUICE ENHANCEMENTS START ---
@@ -4533,7 +4536,6 @@ export default function App() {
   const [reportData, setReportData] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false); // New state for analytics dashboard
-  const [isSandbox, setIsSandbox] = useState(false); // New state for sandbox mode
   const [showSandboxInfo, setShowSandboxInfo] = useState(false);
 
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -4565,18 +4567,25 @@ export default function App() {
   }, []);
 
   // Data State
-  const [salary, setSalary] = useState('');
-  const [expenses, setExpenses] = useState([]);
-  const [actualSavings, setActualSavings] = useState({}); // New State for Actuals
   const [monthAllocations, setMonthAllocations] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
   
   // Sandbox Data State
-  const [sandboxSalary, setSandboxSalary] = useState('');
-  const [sandboxExpenses, setSandboxExpenses] = useState([]);
-  const [sandboxActualSavings, setSandboxActualSavings] = useState({});
   const [sandboxSettings, setSandboxSettings] = useState(null);
+
+  const {
+    salary,
+    expenses,
+    actualSavings,
+    isSandbox,
+    toggleSandbox,
+    updateSalary,
+    addExpense,
+    updateExpense,
+    removeExpense,
+    updateActuals
+  } = useBudgetData(user, currentDate);
 
   const [userSettings, setUserSettings] = useState({
     displayName: '',
@@ -4610,7 +4619,7 @@ export default function App() {
 
   // 4. Determine "Effective" Data
   // If Demo: Use Demo Data. If Sandbox: Use Sandbox Data. Else: Use Real DB Data.
-  const effectiveSalary = demoData?.salary !== undefined ? demoData.salary : (isSandbox ? sandboxSalary : salary);
+  const effectiveSalary = demoData?.salary !== undefined ? demoData.salary : salary;
   
   const effectiveExpenses = demoData?.expenses !== undefined ? demoData.expenses : (
      isTutorialMode ? TUTORIAL_EXPENSES : (isSandbox ? sandboxExpenses : expenses)
@@ -5039,15 +5048,6 @@ export default function App() {
     }
   };
 
-  const updateSalary = (val) => {
-    if (isSandbox) {
-        setSandboxSalary(val);
-    } else {
-      // Log removed from here to prevent spamming while typing
-      setSalary(val);
-      saveData(val, expenses, actualSavings);
-    }
-  };
 
   const fillRemainder = (targetPlanId) => {
     const salaryNum = parseFloat(displaySalary) || 0;
@@ -5126,18 +5126,9 @@ export default function App() {
     // Removed setEditingExpenseId(null)
   };
 
-  const removeExpense = (id) => {
-    triggerHaptic(); // Haptic
-    const expName = displayExpenses.find(e => e.id === id)?.name || 'Unknown Bill';
-    logSystemEvent(`Deleted expense: ${expName}`, 'action');
-    const updatedExpenses = displayExpenses.filter(e => e.id !== id);
-    
-    if (isSandbox) {
-        setSandboxExpenses(updatedExpenses);
-    } else {
-        setExpenses(updatedExpenses);
-        saveData(salary, updatedExpenses, actualSavings);
-    }
+  const handleRemoveExpense = (id) => {
+    triggerHaptic();
+    removeExpense(id); // <--- Calls the hook function
     showToast("Bill removed.");
   };
 
@@ -5174,30 +5165,28 @@ export default function App() {
     showToast(`Sorting by ${sortMode === 'date' ? 'Amount' : sortMode === 'amount-desc' ? 'Name' : 'Date'}`);
   };
 
-  const toggleSandbox = () => {
-      triggerHaptic();
-      playJuiceSound('toggle');
-      if (isSandbox) {
-          // Exit immediately
-          setIsSandbox(false);
-          showToast("Exited Sandbox Mode.");
-      } else {
-          // Show info modal before entering
-          setShowSandboxInfo(true);
-      }
-  };
+  const handleSandboxUiToggle = () => {
+    triggerHaptic();
+    playJuiceSound('toggle');
+    
+    // Use the variable from the hook
+    if (isSandbox) {
+        toggleSandbox(); // Call the hook function to Exit
+        showToast("Exited Sandbox Mode.");
+    } else {
+        // If entering, show the modal first (don't call hook yet)
+        setShowSandboxInfo(true);
+    }
+};
 
-  const confirmEnterSandbox = () => {
-    setSandboxSalary(salary);
-    setSandboxExpenses([...expenses]);
-    setSandboxActualSavings({...actualSavings});
-    
-    // FIX: Clone your real settings into the sandbox
-    setSandboxSettings(JSON.parse(JSON.stringify(userSettings))); 
-    
-    setIsSandbox(true);
-    setShowSandboxInfo(false);
-    showToast("Entered Sandbox Mode.");
+const confirmEnterSandbox = () => {
+  // ❌ Remove all the manual copying lines (setSandboxSalary, etc.)
+  
+  // ✅ Just call the hook function
+  toggleSandbox(); 
+  
+  setShowSandboxInfo(false);
+  showToast("Entered Sandbox Mode.");
 };
 
   // --- UPDATED MATH USING EFFECTIVE DATA ---
@@ -5362,7 +5351,7 @@ export default function App() {
       {isSandbox && (
         <div className="bg-indigo-600 text-white px-4 py-2 text-center text-sm font-bold sticky top-0 z-50 shadow-md flex justify-between items-center animate-in slide-in-from-top-full">
             <span className="flex items-center gap-2"><FlaskConical className="w-4 h-4" /> Sandbox Mode Active - Changes are NOT saved</span>
-            <button onClick={toggleSandbox} className="bg-white/20 p-1 rounded hover:bg-white/30 transition"><X className="w-4 h-4" /></button>
+            <button onClick={handleSandboxUiToggle} className="bg-white/20 p-1 rounded hover:bg-white/30 transition"><X className="w-4 h-4" /></button>
         </div>
       )}
 
@@ -5584,7 +5573,7 @@ export default function App() {
                  <Shield className="w-5 h-5" />
                </button>
             )}
-             <button id="btn-sandbox" onClick={toggleSandbox} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white" title="Sandbox Mode">
+             <button id="btn-sandbox" onClick={handleSandboxUiToggle} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white" title="Sandbox Mode">
               <FlaskConical className={`w-5 h-5`} />
             </button>
             <button id="btn-analytics" onClick={() => setShowAnalytics(true)} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white" title="Trends">
