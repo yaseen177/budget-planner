@@ -1570,7 +1570,8 @@ const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, ac
   );
 };
 
-const LoginScreen = ({ onLogin, isLoggingIn }) => {
+// --- LOGIN SCREEN (UPDATED WITH BACK BUTTON) ---
+const LoginScreen = ({ onLogin, isLoggingIn, onBack }) => {
   // Typewriter Effect State
   const [textIndex, setTextIndex] = useState(0);
   const phrases = ["Expenses", "Savings", "Freedom", "Future"];
@@ -1585,44 +1586,31 @@ const LoginScreen = ({ onLogin, isLoggingIn }) => {
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
       
-      {/* 1. ANIMATED BACKGROUND ORBS (Slightly darker for better contrast) */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-        <style>{`
-          @keyframes float {
-            0% { transform: translate(0px, 0px) scale(1); }
-            33% { transform: translate(30px, -50px) scale(1.1); }
-            66% { transform: translate(-20px, 20px) scale(0.9); }
-            100% { transform: translate(0px, 0px) scale(1); }
-          }
-          .animate-float-slow { animation: float 10s infinite ease-in-out; }
-          .animate-float-medium { animation: float 8s infinite ease-in-out reverse; }
-          .animate-float-fast { animation: float 6s infinite ease-in-out; }
-        `}</style>
-        
-        <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-emerald-500/20 rounded-full blur-[100px] animate-float-slow"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px] animate-float-medium"></div>
-        <div className="absolute top-[30%] left-[30%] w-64 h-64 bg-cyan-500/10 rounded-full blur-[80px] animate-float-fast"></div>
-      </div>
+      {/* --- NEW: BACK BUTTON --- */}
+      <button 
+        onClick={onBack}
+        className="absolute top-6 left-6 z-50 flex items-center gap-2 text-slate-400 hover:text-white transition group"
+      >
+        <div className="p-2 bg-white/5 rounded-full group-hover:bg-white/10 border border-white/5 group-hover:border-white/20 transition">
+           <ChevronLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition" />
+        </div>
+        <span className="text-sm font-bold">Back to Home</span>
+      </button>
 
-      {/* 2. THE CARD (With Glowing Gradient Border) */}
-      <div className="relative group z-10 w-full max-w-md animate-in fade-in zoom-in-95 duration-700">
-        
-        {/* The Glow Effect behind the card */}
-        <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-indigo-500 rounded-[2rem] blur opacity-30 group-hover:opacity-60 transition duration-1000"></div>
-        
+      {/* Background Gradients */}
+      <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-emerald-500/20 rounded-full blur-[120px] animate-pulse"></div>
+      <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-indigo-500/20 rounded-full blur-[120px] animate-pulse delay-1000"></div>
+      
+      {/* The Card */}
+      <div className="relative w-full max-w-md animate-in zoom-in-50 duration-700">
         <div className="relative bg-slate-900/80 backdrop-blur-xl border border-white/10 p-8 rounded-[1.8rem] shadow-2xl text-center">
           
           {/* Logo */}
-          <div className="bg-slate-800/50 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner border border-white/5 ring-1 ring-white/10 rotate-3 group-hover:rotate-6 transition duration-500">
-            <Wallet className="w-9 h-9 text-emerald-400" />
+          <div className="w-20 h-20 bg-gradient-to-tr from-emerald-400 to-cyan-400 rounded-3xl mx-auto mb-8 shadow-lg shadow-emerald-500/20 flex items-center justify-center rotate-3 hover:rotate-6 transition duration-500">
+            <Wallet className="w-10 h-10 text-white" />
           </div>
           
-          {/* Gradient Text Title */}
-          <h1 className="text-4xl font-extrabold mb-3 tracking-tight">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-teal-400 to-indigo-400">
-              Budget Planner
-            </span>
-          </h1>
+          <h1 className="text-4xl font-black text-white tracking-tight mb-3">Budget Planner</h1>
           
           {/* Typewriter Subtitle */}
           <div className="h-6 mb-10 flex items-center justify-center gap-1.5 text-slate-400 font-medium">
@@ -1638,17 +1626,15 @@ const LoginScreen = ({ onLogin, isLoggingIn }) => {
           {/* Main Action Button */}
           <button 
             onClick={onLogin}
-            disabled={isLoggingIn} // Disable clicks
+            disabled={isLoggingIn} 
             className={`w-full bg-white hover:bg-emerald-50 text-slate-900 p-4 rounded-xl font-bold text-lg transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] flex items-center justify-center gap-3 group/btn ${isLoggingIn ? 'opacity-70 cursor-not-allowed' : 'hover:shadow-[0_0_25px_rgba(16,185,129,0.2)] active:scale-[0.98]'}`}
           >
             {isLoggingIn ? (
-               // Loading State
                <>
                  <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin" />
                  Signing in...
                </>
             ) : (
-               // Normal State
                <>
                  <div className="bg-slate-50 p-1.5 rounded-full border border-slate-200 group-hover/btn:scale-110 transition">
                     <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
@@ -1658,19 +1644,19 @@ const LoginScreen = ({ onLogin, isLoggingIn }) => {
             )}
           </button>
 
-          {/* 3. FEATURE MICRO-GRID (Shows what's inside) */}
+          {/* Feature Grid */}
           <div className="grid grid-cols-3 gap-2 mt-8 pt-8 border-t border-white/5">
-             <div className="flex flex-col items-center gap-2">
-                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400"><TrendingUp className="w-4 h-4" /></div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Trends</span>
+             <div className="text-center">
+                <div className="text-emerald-400 font-bold text-xl mb-1">100%</div>
+                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Free</div>
              </div>
-             <div className="flex flex-col items-center gap-2">
-                <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400"><FlaskConical className="w-4 h-4" /></div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Sandbox</span>
+             <div className="text-center border-l border-white/10">
+                <div className="text-cyan-400 font-bold text-xl mb-1">No</div>
+                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Ads</div>
              </div>
-             <div className="flex flex-col items-center gap-2">
-                <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400"><Target className="w-4 h-4" /></div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Goals</span>
+             <div className="text-center border-l border-white/10">
+                <div className="text-indigo-400 font-bold text-xl mb-1">Secure</div>
+                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Google Auth</div>
              </div>
           </div>
 
@@ -1678,14 +1664,12 @@ const LoginScreen = ({ onLogin, isLoggingIn }) => {
       </div>
       
       {/* Footer */}
-      <div className="mt-8 text-center text-slate-600 text-xs font-medium animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300 relative z-10">
-        <p>Designed & Built by <span className="text-slate-400 font-bold">Yaseen Hussain</span></p>
-        <p className="opacity-50 mt-1">© {new Date().getFullYear()} Budget Planner • All Rights Reserved</p>
+      <div className="absolute bottom-6 text-slate-600 text-xs font-medium">
+        © {new Date().getFullYear()} Budget Planner. Built for peace of mind.
       </div>
     </div>
   );
 };
-
 const StatCard = ({ label, amount, icon: Icon, colorClass, subText, currency }) => (
   <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-full print:border-slate-300 print:shadow-none">
     <div className="flex justify-between items-start mb-2">
@@ -4166,7 +4150,7 @@ const DailyPaceModal = ({ isOpen, onClose, currentTargets, onSave, currency }) =
   );
 };
 
-// --- MARKETING LANDING PAGE (UPDATED) ---
+// --- MARKETING LANDING PAGE ---
 const LandingPage = ({ onGetStarted, onDemo }) => {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 overflow-x-hidden">
@@ -4178,7 +4162,6 @@ const LandingPage = ({ onGetStarted, onDemo }) => {
              <div className="bg-slate-900 text-white p-2 rounded-xl"><Wallet className="w-6 h-6" /></div>
              <span className="font-bold text-xl tracking-tight">Budget Planner</span>
           </div>
-          {/* REMOVED LOGIN BUTTON, KEPT LAUNCH APP */}
           <div className="flex items-center gap-4">
              <button onClick={onGetStarted} className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-full font-bold text-sm transition shadow-lg shadow-emerald-500/20 active:scale-95">
                Launch App
@@ -4194,7 +4177,7 @@ const LandingPage = ({ onGetStarted, onDemo }) => {
          <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-indigo-300/20 rounded-full blur-[100px] -z-10"></div>
 
          <div className="max-w-4xl mx-auto text-center space-y-8 relative z-10">
-            {/* UPDATED: LIVE DEMO BUTTON */}
+            {/* LIVE DEMO BUTTON */}
             <button 
                onClick={onDemo}
                className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider animate-in slide-in-from-bottom-4 fade-in duration-700 transition cursor-pointer hover:scale-105"
@@ -4263,7 +4246,7 @@ const LandingPage = ({ onGetStarted, onDemo }) => {
                                 <span className="text-2xl md:text-3xl font-black text-slate-800">£1,240</span>
                              </div>
                         </div>
-                        {/* Legend (Hidden on very small screens to save space) */}
+                        {/* Legend */}
                         <div className="hidden xs:flex gap-4 mt-6">
                            <div className="flex items-center gap-2"><span className="w-2 h-2 md:w-3 md:h-3 bg-emerald-500 rounded-full"></span> <span className="text-[10px] md:text-xs font-bold text-slate-500">Free</span></div>
                            <div className="flex items-center gap-2"><span className="w-2 h-2 md:w-3 md:h-3 bg-indigo-500 rounded-full"></span> <span className="text-[10px] md:text-xs font-bold text-slate-500">Saved</span></div>
@@ -4296,7 +4279,7 @@ const LandingPage = ({ onGetStarted, onDemo }) => {
          </div>
       </section>
 
-      {/* 4. FEATURES GRID (Unchanged) */}
+      {/* 4. FEATURES GRID */}
       <section id="features" className="py-24 bg-white">
          <div className="max-w-6xl mx-auto px-6">
             <div className="text-center max-w-2xl mx-auto mb-16">
@@ -4322,7 +4305,7 @@ const LandingPage = ({ onGetStarted, onDemo }) => {
          </div>
       </section>
 
-      {/* 5. FOOTER (Unchanged) */}
+      {/* 5. FOOTER */}
       <footer className="bg-slate-900 text-slate-400 py-12 border-t border-slate-800">
          <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="flex items-center gap-2 text-white">
@@ -5257,18 +5240,23 @@ export default function App() {
 
   // 2. If User is NOT logged in...
   if (!user) {
-     // ...and we are showing the Landing Page
-     if (showLandingPage) {
-        return (
-           <LandingPage 
-              onGetStarted={() => setShowLandingPage(false)} 
-              onDemo={handleDemoLogin}
-              onLogin={() => setShowLandingPage(false)} 
-           />
-        );
-     }
-     // ...otherwise show the Login Screen (The existing "App" login)
-     return <LoginScreen onLogin={handleLogin} isLoggingIn={isLoggingIn} />;
+    if (showLandingPage) {
+       return (
+          <LandingPage 
+             onGetStarted={() => setShowLandingPage(false)} 
+             onDemo={handleDemoLogin} 
+             onLogin={() => setShowLandingPage(false)} 
+          />
+       );
+    }
+    // Pass the onBack prop here
+    return (
+      <LoginScreen 
+        onLogin={handleLogin} 
+        isLoggingIn={isLoggingIn} 
+        onBack={() => setShowLandingPage(true)} 
+      />
+    );
   }
 
   // --- ADMIN RENDER CHECK ---
