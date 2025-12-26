@@ -2,9 +2,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
-import { useBudgetData } from './useBudgetData';
-import { auth, db } from './firebase';
-
 import { 
   getAuth, 
   signInWithPopup, 
@@ -81,7 +78,6 @@ import {
 } from 'lucide-react';
 
 import { evaluate } from 'mathjs';
-
 
 
 // --- JUICE ENHANCEMENTS START ---
@@ -456,11 +452,27 @@ const SpotlightCard = ({ children, className = "", spotlightColor = "rgba(16, 18
 };
 // --- JUICE ENHANCEMENTS END ---
 
-
+// --- FIREBASE CONFIGURATION AREA ---
+const YOUR_FIREBASE_KEYS = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
+};
 
 // --- APP INITIALIZATION ---
+const getFirebaseConfig = () => {
+  if (YOUR_FIREBASE_KEYS.apiKey) {
+    return YOUR_FIREBASE_KEYS;
+  }
+  return JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+};
 
-
+const app = initializeApp(getFirebaseConfig());
+const auth = getAuth(app);
+const db = getFirestore(app);
 const appId = 'nuha-budget-app';
 
 // --- CONSTANTS & DEFAULTS ---
@@ -4521,6 +4533,7 @@ export default function App() {
   const [reportData, setReportData] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false); // New state for analytics dashboard
+  const [isSandbox, setIsSandbox] = useState(false); // New state for sandbox mode
   const [showSandboxInfo, setShowSandboxInfo] = useState(false);
 
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -4552,25 +4565,18 @@ export default function App() {
   }, []);
 
   // Data State
+  const [salary, setSalary] = useState('');
+  const [expenses, setExpenses] = useState([]);
+  const [actualSavings, setActualSavings] = useState({}); // New State for Actuals
   const [monthAllocations, setMonthAllocations] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
   
   // Sandbox Data State
+  const [sandboxSalary, setSandboxSalary] = useState('');
+  const [sandboxExpenses, setSandboxExpenses] = useState([]);
+  const [sandboxActualSavings, setSandboxActualSavings] = useState({});
   const [sandboxSettings, setSandboxSettings] = useState(null);
-
-  const {
-    salary,
-    expenses,
-    actualSavings,
-    isSandbox,
-    toggleSandbox,
-    updateSalary,
-    addExpense,
-    updateExpense,
-    removeExpense,
-    updateActuals
-  } = useBudgetData(user, currentDate);
 
   const [userSettings, setUserSettings] = useState({
     displayName: '',
@@ -4604,11 +4610,15 @@ export default function App() {
 
   // 4. Determine "Effective" Data
   // If Demo: Use Demo Data. If Sandbox: Use Sandbox Data. Else: Use Real DB Data.
-  const effectiveSalary = demoData?.salary !== undefined ? demoData.salary : salary;
+  const effectiveSalary = demoData?.salary !== undefined ? demoData.salary : (isSandbox ? sandboxSalary : salary);
   
-  const effectiveExpenses = demoData?.expenses || (isTutorialMode ? TUTORIAL_EXPENSES : expenses);
+  const effectiveExpenses = demoData?.expenses !== undefined ? demoData.expenses : (
+     isTutorialMode ? TUTORIAL_EXPENSES : (isSandbox ? sandboxExpenses : expenses)
+  );
 
-const effectiveActuals = demoData?.actualSavings || (isTutorialMode ? { t1: 400, t2: 240 } : actualSavings);
+  const effectiveActuals = demoData?.actualSavings !== undefined ? demoData.actualSavings : (
+     isTutorialMode ? { t1: 400, t2: 240 } : (isSandbox ? sandboxActualSavings : actualSavings)
+  );
 
   // 5. Settings & Onboarding Overrides
   const effectiveSettings = demoData?.userSettings || (
@@ -4640,24 +4650,38 @@ const effectiveActuals = demoData?.actualSavings || (isTutorialMode ? { t1: 400,
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // ✅ ADD THIS REPLACEMENT
-useEffect(() => {
-  const initAuth = async () => {
-    try {
-      // Set persistence (keep user logged in)
-      await setPersistence(auth, browserSessionPersistence);
-    } catch (e) {
-      console.error("Persistence error", e);
-    }
-  };
-  initAuth();
+  useEffect(() => {
+    const initAuth = async () => {
+      const config = getFirebaseConfig();
+      if (!config.apiKey) return;
 
-  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-    setUser(currentUser);
-    setLoading(false);
-  });
-  return () => unsubscribe();
-}, []);
+      // --- FIX 1: Set Persistence Here (Once on Load) ---
+      try {
+        await setPersistence(auth, browserSessionPersistence);
+      } catch (e) {
+        console.error("Persistence setting failed", e);
+      }
+
+      // Check for custom tokens (existing logic)
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        try {
+          if (YOUR_FIREBASE_KEYS.apiKey === "") {
+             await signInWithCustomToken(auth, __initial_auth_token);
+          }
+        } catch (e) {
+          console.error("Auth error", e);
+        }
+      }
+    };
+    initAuth();
+
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log("Auth State Changed:", currentUser ? "User Found" : "No User");
+      setUser(currentUser);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -4689,6 +4713,139 @@ useEffect(() => {
     return () => unsub();
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const monthId = getMonthId(currentDate);
+    const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgetData', monthId);
+
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        let currentExpenses = data.expenses || [];
+        let needsUpdate = false; 
+
+        // 1. Inject Credit Cards (Variable = 0)
+        if (userSettings.creditCards && userSettings.creditCards.length > 0) {
+           userSettings.creditCards.forEach(card => {
+              const exists = currentExpenses.some(e => e.name === card.name && e.type === 'credit_card');
+              if (!exists) {
+                 currentExpenses.push({
+                    id: `cc_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
+                    name: card.name,
+                    amount: 0, // Credit cards are variable
+                    type: 'credit_card',
+                    logo: card.logo
+                 });
+                 needsUpdate = true;
+              }
+           });
+        }
+
+        // 2. Inject Mortgages (FIXED AMOUNT)
+        if (userSettings.mortgages && userSettings.mortgages.length > 0) {
+           userSettings.mortgages.forEach(mort => {
+              const exists = currentExpenses.some(e => e.name === mort.name && e.type === 'mortgage');
+              // Only inject if it doesn't exist. If it exists, we respect the existing month's data.
+              if (!exists) {
+                 currentExpenses.push({
+                    id: `mort_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
+                    name: mort.name,
+                    amount: parseFloat(mort.amount) || 0, // <--- USE USER SETTING AMOUNT
+                    type: 'mortgage',
+                    logo: mort.logo
+                 });
+                 needsUpdate = true;
+              }
+           });
+        }
+           
+        if (needsUpdate && !isSandbox && !activeDemoId) {
+            setDoc(docRef, { ...data, expenses: currentExpenses }, { merge: true });
+        }
+        
+        setExpenses(currentExpenses);
+        setSalary(data.salary || '');
+        setActualSavings(data.actualSavings || {});
+
+        if (data.salary && !data.allocationRules) {
+           setDoc(docRef, { ...data, allocationRules: userSettings.allocationRules }, { merge: true });
+           setMonthAllocations(userSettings.allocationRules);
+        } else {
+           setMonthAllocations(data.allocationRules || null);
+        }
+
+      } else {
+        // --- NEW/EMPTY MONTH INITIALIZATION ---
+        
+        // CHECK: Is this a Demo User? If so, SEED DATA!
+        const isDemo = auth.currentUser?.isAnonymous;
+
+        if (isDemo) {
+           // --- SEED DEMO DATA ---
+           setSalary(3200); // Fake Salary
+           
+           // Fake Expenses
+           const demoExpenses = [
+             { id: 'd1', name: 'Rent', amount: 1200, type: 'fixed' },
+             { id: 'd2', name: 'Council Tax', amount: 150, type: 'fixed' },
+             { id: 'd3', name: 'Netflix', amount: 15.99, type: 'fixed' },
+             { id: 'd4', name: 'Grocery Run', amount: 85.50, type: 'variable' },
+             { id: 'd5', name: 'Uber Eats', amount: 24.00, type: 'variable' },
+           ];
+           setExpenses(demoExpenses);
+           
+           // Fake Pots
+           const demoPots = [
+             { id: 'p1', name: 'Holiday', percentage: 10, hex: '#10b981' }, // Emerald
+             { id: 'p2', name: 'Emergency', percentage: 20, hex: '#6366f1' }, // Indigo
+           ];
+           setMonthAllocations(demoPots);
+           
+        } else {
+           // --- NORMAL NEW USER (Empty) ---
+           setSalary('');
+           
+           // Start with Fixed Expenses
+           const initialExpenses = [...(userSettings.defaultFixedExpenses || [])];
+           
+           // Add Credit Cards
+           if (userSettings.creditCards) {
+              userSettings.creditCards.forEach(card => {
+                 initialExpenses.push({
+                    id: `cc_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
+                    name: card.name,
+                    amount: 0,
+                    type: 'credit_card',
+                    logo: card.logo
+                 });
+              });
+           }
+
+           // Add Mortgages with FIXED AMOUNT
+           if (userSettings.mortgages) {
+              userSettings.mortgages.forEach(mort => {
+                 initialExpenses.push({
+                    id: `mort_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
+                    name: mort.name,
+                    amount: parseFloat(mort.amount) || 0,
+                    type: 'mortgage',
+                    logo: mort.logo
+                 });
+              });
+           }
+           
+           setExpenses(initialExpenses);
+           setMonthAllocations(null);
+        }
+
+        setActualSavings({});
+        setMonthAllocations(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user, currentDate, userSettings.defaultFixedExpenses]);
 
   const handleReportSelection = async (type) => {
     if (type === 'month') {
@@ -4882,6 +5039,15 @@ useEffect(() => {
     }
   };
 
+  const updateSalary = (val) => {
+    if (isSandbox) {
+        setSandboxSalary(val);
+    } else {
+      // Log removed from here to prevent spamming while typing
+      setSalary(val);
+      saveData(val, expenses, actualSavings);
+    }
+  };
 
   const fillRemainder = (targetPlanId) => {
     const salaryNum = parseFloat(displaySalary) || 0;
@@ -4960,9 +5126,18 @@ useEffect(() => {
     // Removed setEditingExpenseId(null)
   };
 
-  const handleRemoveExpense = (id) => {
-    triggerHaptic();
-    removeExpense(id); // <--- Calls the hook function
+  const removeExpense = (id) => {
+    triggerHaptic(); // Haptic
+    const expName = displayExpenses.find(e => e.id === id)?.name || 'Unknown Bill';
+    logSystemEvent(`Deleted expense: ${expName}`, 'action');
+    const updatedExpenses = displayExpenses.filter(e => e.id !== id);
+    
+    if (isSandbox) {
+        setSandboxExpenses(updatedExpenses);
+    } else {
+        setExpenses(updatedExpenses);
+        saveData(salary, updatedExpenses, actualSavings);
+    }
     showToast("Bill removed.");
   };
 
@@ -4999,28 +5174,30 @@ useEffect(() => {
     showToast(`Sorting by ${sortMode === 'date' ? 'Amount' : sortMode === 'amount-desc' ? 'Name' : 'Date'}`);
   };
 
-  const handleSandboxUiToggle = () => {
-    triggerHaptic();
-    playJuiceSound('toggle');
-    
-    // Use the variable from the hook
-    if (isSandbox) {
-        toggleSandbox(); // Call the hook function to Exit
-        showToast("Exited Sandbox Mode.");
-    } else {
-        // If entering, show the modal first (don't call hook yet)
-        setShowSandboxInfo(true);
-    }
-};
+  const toggleSandbox = () => {
+      triggerHaptic();
+      playJuiceSound('toggle');
+      if (isSandbox) {
+          // Exit immediately
+          setIsSandbox(false);
+          showToast("Exited Sandbox Mode.");
+      } else {
+          // Show info modal before entering
+          setShowSandboxInfo(true);
+      }
+  };
 
-const confirmEnterSandbox = () => {
-  // ❌ Remove all the manual copying lines (setSandboxSalary, etc.)
-  
-  // ✅ Just call the hook function
-  toggleSandbox(); 
-  
-  setShowSandboxInfo(false);
-  showToast("Entered Sandbox Mode.");
+  const confirmEnterSandbox = () => {
+    setSandboxSalary(salary);
+    setSandboxExpenses([...expenses]);
+    setSandboxActualSavings({...actualSavings});
+    
+    // FIX: Clone your real settings into the sandbox
+    setSandboxSettings(JSON.parse(JSON.stringify(userSettings))); 
+    
+    setIsSandbox(true);
+    setShowSandboxInfo(false);
+    showToast("Entered Sandbox Mode.");
 };
 
   // --- UPDATED MATH USING EFFECTIVE DATA ---
@@ -5185,7 +5362,7 @@ const confirmEnterSandbox = () => {
       {isSandbox && (
         <div className="bg-indigo-600 text-white px-4 py-2 text-center text-sm font-bold sticky top-0 z-50 shadow-md flex justify-between items-center animate-in slide-in-from-top-full">
             <span className="flex items-center gap-2"><FlaskConical className="w-4 h-4" /> Sandbox Mode Active - Changes are NOT saved</span>
-            <button onClick={handleSandboxUiToggle} className="bg-white/20 p-1 rounded hover:bg-white/30 transition"><X className="w-4 h-4" /></button>
+            <button onClick={toggleSandbox} className="bg-white/20 p-1 rounded hover:bg-white/30 transition"><X className="w-4 h-4" /></button>
         </div>
       )}
 
@@ -5407,7 +5584,7 @@ const confirmEnterSandbox = () => {
                  <Shield className="w-5 h-5" />
                </button>
             )}
-             <button id="btn-sandbox" onClick={handleSandboxUiToggle} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white" title="Sandbox Mode">
+             <button id="btn-sandbox" onClick={toggleSandbox} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white" title="Sandbox Mode">
               <FlaskConical className={`w-5 h-5`} />
             </button>
             <button id="btn-analytics" onClick={() => setShowAnalytics(true)} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white" title="Trends">
@@ -5532,8 +5709,7 @@ const confirmEnterSandbox = () => {
                       value={formatNumberWithCommas(effectiveSalary)} 
                       onChange={(e) => {
                           const rawVal = e.target.value.replace(/,/g, '');
-                          if (!isNaN(rawVal)) 
-                            {updateSalary(rawVal);}
+                          if (!isNaN(rawVal)) updateSalary(rawVal);
                       }}
                       onBlur={(e) => {
                           const finalVal = safeCalculate(e.target.value.replace(/,/g, ''));
