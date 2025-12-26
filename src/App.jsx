@@ -4606,13 +4606,9 @@ export default function App() {
   // If Demo: Use Demo Data. If Sandbox: Use Sandbox Data. Else: Use Real DB Data.
   const effectiveSalary = demoData?.salary !== undefined ? demoData.salary : salary;
   
-  const effectiveExpenses = demoData?.expenses !== undefined ? demoData.expenses : (
-     isTutorialMode ? TUTORIAL_EXPENSES : (isSandbox ? sandboxExpenses : expenses)
-  );
+  const effectiveExpenses = demoData?.expenses || (isTutorialMode ? TUTORIAL_EXPENSES : expenses);
 
-  const effectiveActuals = demoData?.actualSavings !== undefined ? demoData.actualSavings : (
-     isTutorialMode ? { t1: 400, t2: 240 } : (isSandbox ? sandboxActualSavings : actualSavings)
-  );
+const effectiveActuals = demoData?.actualSavings || (isTutorialMode ? { t1: 400, t2: 240 } : actualSavings);
 
   // 5. Settings & Onboarding Overrides
   const effectiveSettings = demoData?.userSettings || (
@@ -4644,38 +4640,24 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  useEffect(() => {
-    const initAuth = async () => {
-      const config = getFirebaseConfig();
-      if (!config.apiKey) return;
+  // ✅ ADD THIS REPLACEMENT
+useEffect(() => {
+  const initAuth = async () => {
+    try {
+      // Set persistence (keep user logged in)
+      await setPersistence(auth, browserSessionPersistence);
+    } catch (e) {
+      console.error("Persistence error", e);
+    }
+  };
+  initAuth();
 
-      // --- FIX 1: Set Persistence Here (Once on Load) ---
-      try {
-        await setPersistence(auth, browserSessionPersistence);
-      } catch (e) {
-        console.error("Persistence setting failed", e);
-      }
-
-      // Check for custom tokens (existing logic)
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        try {
-          if (YOUR_FIREBASE_KEYS.apiKey === "") {
-             await signInWithCustomToken(auth, __initial_auth_token);
-          }
-        } catch (e) {
-          console.error("Auth error", e);
-        }
-      }
-    };
-    initAuth();
-
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      console.log("Auth State Changed:", currentUser ? "User Found" : "No User");
-      setUser(currentUser);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    setUser(currentUser);
+    setLoading(false);
+  });
+  return () => unsubscribe();
+}, []);
 
   useEffect(() => {
     if (!user) return;
@@ -4707,139 +4689,6 @@ export default function App() {
     return () => unsub();
   }, [user]);
 
-  useEffect(() => {
-    if (!user) return;
-
-    const monthId = getMonthId(currentDate);
-    const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgetData', monthId);
-
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        let currentExpenses = data.expenses || [];
-        let needsUpdate = false; 
-
-        // 1. Inject Credit Cards (Variable = 0)
-        if (userSettings.creditCards && userSettings.creditCards.length > 0) {
-           userSettings.creditCards.forEach(card => {
-              const exists = currentExpenses.some(e => e.name === card.name && e.type === 'credit_card');
-              if (!exists) {
-                 currentExpenses.push({
-                    id: `cc_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
-                    name: card.name,
-                    amount: 0, // Credit cards are variable
-                    type: 'credit_card',
-                    logo: card.logo
-                 });
-                 needsUpdate = true;
-              }
-           });
-        }
-
-        // 2. Inject Mortgages (FIXED AMOUNT)
-        if (userSettings.mortgages && userSettings.mortgages.length > 0) {
-           userSettings.mortgages.forEach(mort => {
-              const exists = currentExpenses.some(e => e.name === mort.name && e.type === 'mortgage');
-              // Only inject if it doesn't exist. If it exists, we respect the existing month's data.
-              if (!exists) {
-                 currentExpenses.push({
-                    id: `mort_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
-                    name: mort.name,
-                    amount: parseFloat(mort.amount) || 0, // <--- USE USER SETTING AMOUNT
-                    type: 'mortgage',
-                    logo: mort.logo
-                 });
-                 needsUpdate = true;
-              }
-           });
-        }
-           
-        if (needsUpdate && !isSandbox && !activeDemoId) {
-            setDoc(docRef, { ...data, expenses: currentExpenses }, { merge: true });
-        }
-        
-        setExpenses(currentExpenses);
-        setSalary(data.salary || '');
-        setActualSavings(data.actualSavings || {});
-
-        if (data.salary && !data.allocationRules) {
-           setDoc(docRef, { ...data, allocationRules: userSettings.allocationRules }, { merge: true });
-           setMonthAllocations(userSettings.allocationRules);
-        } else {
-           setMonthAllocations(data.allocationRules || null);
-        }
-
-      } else {
-        // --- NEW/EMPTY MONTH INITIALIZATION ---
-        
-        // CHECK: Is this a Demo User? If so, SEED DATA!
-        const isDemo = auth.currentUser?.isAnonymous;
-
-        if (isDemo) {
-           // --- SEED DEMO DATA ---
-           setSalary(3200); // Fake Salary
-           
-           // Fake Expenses
-           const demoExpenses = [
-             { id: 'd1', name: 'Rent', amount: 1200, type: 'fixed' },
-             { id: 'd2', name: 'Council Tax', amount: 150, type: 'fixed' },
-             { id: 'd3', name: 'Netflix', amount: 15.99, type: 'fixed' },
-             { id: 'd4', name: 'Grocery Run', amount: 85.50, type: 'variable' },
-             { id: 'd5', name: 'Uber Eats', amount: 24.00, type: 'variable' },
-           ];
-           setExpenses(demoExpenses);
-           
-           // Fake Pots
-           const demoPots = [
-             { id: 'p1', name: 'Holiday', percentage: 10, hex: '#10b981' }, // Emerald
-             { id: 'p2', name: 'Emergency', percentage: 20, hex: '#6366f1' }, // Indigo
-           ];
-           setMonthAllocations(demoPots);
-           
-        } else {
-           // --- NORMAL NEW USER (Empty) ---
-           setSalary('');
-           
-           // Start with Fixed Expenses
-           const initialExpenses = [...(userSettings.defaultFixedExpenses || [])];
-           
-           // Add Credit Cards
-           if (userSettings.creditCards) {
-              userSettings.creditCards.forEach(card => {
-                 initialExpenses.push({
-                    id: `cc_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
-                    name: card.name,
-                    amount: 0,
-                    type: 'credit_card',
-                    logo: card.logo
-                 });
-              });
-           }
-
-           // Add Mortgages with FIXED AMOUNT
-           if (userSettings.mortgages) {
-              userSettings.mortgages.forEach(mort => {
-                 initialExpenses.push({
-                    id: `mort_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
-                    name: mort.name,
-                    amount: parseFloat(mort.amount) || 0,
-                    type: 'mortgage',
-                    logo: mort.logo
-                 });
-              });
-           }
-           
-           setExpenses(initialExpenses);
-           setMonthAllocations(null);
-        }
-
-        setActualSavings({});
-        setMonthAllocations(null);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [user, currentDate, userSettings.defaultFixedExpenses]);
 
   const handleReportSelection = async (type) => {
     if (type === 'month') {
