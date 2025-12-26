@@ -5532,7 +5532,8 @@ const confirmEnterSandbox = () => {
                       value={formatNumberWithCommas(effectiveSalary)} 
                       onChange={(e) => {
                           const rawVal = e.target.value.replace(/,/g, '');
-                          if (!isNaN(rawVal)) updateSalary(rawVal);
+                          if (!isNaN(rawVal)) 
+                            {updateSalary(rawVal);}
                       }}
                       onBlur={(e) => {
                           const finalVal = safeCalculate(e.target.value.replace(/,/g, ''));

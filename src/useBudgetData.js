@@ -53,8 +53,13 @@ export const useBudgetData = (user, currentDate, appId = 'nuha-budget-app') => {
       setSandboxActuals({ ...realActuals });
       setIsSandbox(true);
     } else {
-      // EXITING: Just switch flag
+      // EXITING: 
       setIsSandbox(false);
+      
+      // OPTIONAL SAFETY: Clear the sandbox buffers so they can't be shown
+      setSandboxSalary('');
+      setSandboxExpenses([]);
+      setSandboxActuals({});
     }
   };
 
