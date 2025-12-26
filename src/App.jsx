@@ -4991,16 +4991,25 @@ export default function App() {
     // GUARD: Block saving in Demo Mode
     if (activeDemoId) {
        showToast("Demo Mode: Settings NOT saved to database.");
-       // Optional: You could locally update 'userSettings' state here if you wanted 
-       // the UI to update instantly, but for a "safe" test, just blocking is best.
        return;
     }
+
+    // ---------------------------------------------------------
+    // FIX: BLOCK DATABASE WRITES IN SANDBOX MODE
+    // ---------------------------------------------------------
+    if (isSandbox) {
+       showToast("Sandbox: Settings updated temporarily.");
+       setUserSettings(newSettings); // Update UI so you can see the simulation
+       return; // STOP HERE - Do not save to Firebase
+    }
+    // ---------------------------------------------------------
     
     if (!user) return;
     triggerHaptic(); 
     logSystemEvent('Settings & Pots Configuration Saved', 'config');
     const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
     await setDoc(settingsRef, newSettings);
+    
     // Update local state immediately so the UI reflects changes
     setUserSettings(newSettings); 
     showToast("Settings saved!");
