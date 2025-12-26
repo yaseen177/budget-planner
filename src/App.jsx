@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { useBudgetData } from './useBudgetData';
+import { auth, db } from './firebase';
 
 import { 
   getAuth, 
@@ -455,27 +456,11 @@ const SpotlightCard = ({ children, className = "", spotlightColor = "rgba(16, 18
 };
 // --- JUICE ENHANCEMENTS END ---
 
-// --- FIREBASE CONFIGURATION AREA ---
-const YOUR_FIREBASE_KEYS = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
-};
+
 
 // --- APP INITIALIZATION ---
-const getFirebaseConfig = () => {
-  if (YOUR_FIREBASE_KEYS.apiKey) {
-    return YOUR_FIREBASE_KEYS;
-  }
-  return JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-};
 
-const app = initializeApp(getFirebaseConfig());
-const auth = getAuth(app);
-const db = getFirestore(app);
+
 const appId = 'nuha-budget-app';
 
 // --- CONSTANTS & DEFAULTS ---
