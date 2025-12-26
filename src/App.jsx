@@ -894,7 +894,7 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
           });
 
           // Only push if there is some meaningful data
-          if (salary > 0 || Object.keys(potData).length > 0) {
+          if (salary > 0) {
             rawData.push({
               id: doc.id, // YYYY-MM
               label: MONTH_NAMES[parseInt(doc.id.split('-')[1]) - 1],
