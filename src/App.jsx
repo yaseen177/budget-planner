@@ -5405,7 +5405,7 @@ export default function App() {
           }}
           // --- ADD THIS LINE ---
           isLegacyMode={isEffectiveLegacyUser} // <--- CHANGED
-          currentMonthId={currentMonth}
+          currentMonthId={getMonthId(currentDate)}
           // --------------------
         />
       )}
