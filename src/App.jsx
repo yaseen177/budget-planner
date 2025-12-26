@@ -72,7 +72,9 @@ import {
   Maximize2,
   HelpCircle,
   Menu,
-  Shield
+  Shield,
+  ChevronDown,
+  RefreshCw
 } from 'lucide-react';
 
 
