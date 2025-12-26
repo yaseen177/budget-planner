@@ -866,6 +866,7 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
   const [timeRange, setTimeRange] = useState('6M'); // 3M, 6M, 12M, ALL
   const [loading, setLoading] = useState(true);
   const [selectedPot, setSelectedPot] = useState(null);
+  const [showTargets, setShowTargets] = useState(false);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -1136,11 +1137,7 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                     onClick={() => setShowTargets(!showTargets)}
                     className={`text-[10px] font-bold px-3 py-1.5 rounded-full border transition-all flex items-center gap-2 ${showTargets ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'}`}
                   >
-                     {showTargets ? (
-                        <>Hide Targets</> 
-                     ) : (
-                        <>Show vs Target</>
-                     )}
+                     {showTargets ? "Hide Targets" : "Show vs Target"}
                   </button>
               </div>
 
@@ -1171,9 +1168,8 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                                 data={potHistory} 
                                 dataKey="value" 
                                 color={color}
-                                // Pass target config if toggled on
                                 secondDataKey={showTargets ? "target" : null}
-                                secondColor="#cbd5e1" // Slate-300 (Grey)
+                                secondColor="#cbd5e1"
                             />
                          </div>
                          <div className="text-lg font-bold text-slate-800">{formatCurrency(totalSaved, currency)}</div>
