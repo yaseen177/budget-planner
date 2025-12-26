@@ -4574,6 +4574,7 @@ export default function App() {
   const [sandboxSalary, setSandboxSalary] = useState('');
   const [sandboxExpenses, setSandboxExpenses] = useState([]);
   const [sandboxActualSavings, setSandboxActualSavings] = useState({});
+  const [sandboxSettings, setSandboxSettings] = useState(null);
 
   const [userSettings, setUserSettings] = useState({
     displayName: '',
@@ -4619,12 +4620,12 @@ export default function App() {
 
   // 5. Settings & Onboarding Overrides
   const effectiveSettings = demoData?.userSettings || (
-     isTutorialMode ? { 
-       ...userSettings, 
-       allocationRules: tutorialAllocations, 
-       defaultFixedExpenses: tutorialDefaultExpenses 
-     } : userSettings
-  );
+    isTutorialMode ? { 
+      ...userSettings, 
+      allocationRules: tutorialAllocations, 
+      defaultFixedExpenses: tutorialDefaultExpenses 
+    } : (isSandbox && sandboxSettings ? sandboxSettings : userSettings) // <--- UPDATED THIS LINE
+ );
 
   const effectiveOnboardingComplete = demoData?.onboardingComplete !== undefined ? demoData.onboardingComplete : onboardingComplete;
   
@@ -4999,7 +5000,7 @@ export default function App() {
     // ---------------------------------------------------------
     if (isSandbox) {
        showToast("Sandbox: Settings updated temporarily.");
-       setUserSettings(newSettings); // Update UI so you can see the simulation
+       setSandboxSettings(newSettings); // Update UI so you can see the simulation
        return; // STOP HERE - Do not save to Firebase
     }
     // ---------------------------------------------------------
@@ -5185,13 +5186,17 @@ export default function App() {
   };
 
   const confirmEnterSandbox = () => {
-      setSandboxSalary(salary);
-      setSandboxExpenses([...expenses]);
-      setSandboxActualSavings({...actualSavings});
-      setIsSandbox(true);
-      setShowSandboxInfo(false);
-      showToast("Entered Sandbox Mode.");
-  };
+    setSandboxSalary(salary);
+    setSandboxExpenses([...expenses]);
+    setSandboxActualSavings({...actualSavings});
+    
+    // FIX: Clone your real settings into the sandbox
+    setSandboxSettings(JSON.parse(JSON.stringify(userSettings))); 
+    
+    setIsSandbox(true);
+    setShowSandboxInfo(false);
+    showToast("Entered Sandbox Mode.");
+};
 
   // --- UPDATED MATH USING EFFECTIVE DATA ---
   const totalExpenses = effectiveExpenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
@@ -5397,11 +5402,7 @@ export default function App() {
   {showSettings && (
         <SettingsScreen 
           user={user} 
-          currentSettings={isTutorialMode ? {
-            ...userSettings,
-            allocationRules: displayAllocations,
-            defaultFixedExpenses: displayDefaultExpenses
-          } : userSettings}
+          currentSettings={effectiveSettings}
           onClose={() => setShowSettings(false)}
           onSaveSettings={saveSettings}
           onResetMonth={resetCurrentMonth}
