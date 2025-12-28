@@ -577,6 +577,13 @@ const springStyles = `
     50% { transform: scale(1.02); }
     100% { transform: scale(1); opacity: 1; }
   }
+  @keyframes fade-slide-up {
+    0% { opacity: 0; transform: translateY(10px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-slide {
+    animation: fade-slide-up 0.5s ease-out forwards;
+  }
   .animate-spring {
     animation: spring-popup 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
   }
@@ -1625,16 +1632,42 @@ const BudgetWheel = ({ salary, expenses, allocations, currency, onSliceClick, ac
 
 // --- LOGIN SCREEN (UPDATED WITH BACK BUTTON) ---
 const LoginScreen = ({ onLogin, isLoggingIn, onBack }) => {
-  // Typewriter Effect State
-  const [textIndex, setTextIndex] = useState(0);
-  const phrases = ["Expenses", "Savings", "Freedom", "Future"];
+  // --- CONCEPT 2: VALUE-FIRST CAROUSEL STATE ---
+  const [slideIndex, setSlideIndex] = useState(0);
   
+  const slides = [
+    {
+      id: 1,
+      icon: PieChart,
+      color: "text-emerald-400",
+      title: "Visual Budgeting",
+      desc: "Stop tracking. Start forecasting."
+    },
+    {
+      id: 2,
+      icon: TrendingUp,
+      color: "text-indigo-400",
+      title: "Daily Pace™",
+      desc: "Your safe-to-spend limit, updated daily."
+    },
+    {
+      id: 3,
+      icon: FlaskConical,
+      color: "text-amber-400",
+      title: "Sandbox Mode",
+      desc: "Simulate big purchases safely."
+    }
+  ];
+
+  // Auto-rotate slides every 4 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      setTextIndex((prev) => (prev + 1) % phrases.length);
-    }, 2500);
+      setSlideIndex((prev) => (prev + 1) % slides.length);
+    }, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  const ActiveIcon = slides[slideIndex].icon;
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
@@ -1656,61 +1689,74 @@ const LoginScreen = ({ onLogin, isLoggingIn, onBack }) => {
       
       {/* The Card */}
       <div className="relative w-full max-w-md animate-in zoom-in-50 duration-700">
-        <div className="relative bg-slate-900/80 backdrop-blur-xl border border-white/10 p-8 rounded-[1.8rem] shadow-2xl text-center">
+      <div className="relative bg-slate-900/90 backdrop-blur-2xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl text-center overflow-hidden max-w-sm w-full">
           
-          {/* Logo */}
-          <div className="w-20 h-20 bg-gradient-to-tr from-emerald-400 to-cyan-400 rounded-3xl mx-auto mb-8 shadow-lg shadow-emerald-500/20 flex items-center justify-center rotate-3 hover:rotate-6 transition duration-500">
-            <Wallet className="w-10 h-10 text-white" />
-          </div>
-          
-          <h1 className="text-4xl font-black text-white tracking-tight mb-3">Budget Planner</h1>
-          
-          {/* Typewriter Subtitle */}
-          <div className="h-6 mb-10 flex items-center justify-center gap-1.5 text-slate-400 font-medium">
-            <span>Master your</span>
-            <span 
-              key={textIndex} 
-              className="text-white font-bold animate-in slide-in-from-bottom-2 fade-in duration-300"
-            >
-              {phrases[textIndex]}
-            </span>
-          </div>
-          
-          {/* Main Action Button */}
-          <button 
-            onClick={onLogin}
-            disabled={isLoggingIn} 
-            className={`w-full bg-white hover:bg-emerald-50 text-slate-900 p-4 rounded-xl font-bold text-lg transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] flex items-center justify-center gap-3 group/btn ${isLoggingIn ? 'opacity-70 cursor-not-allowed' : 'hover:shadow-[0_0_25px_rgba(16,185,129,0.2)] active:scale-[0.98]'}`}
-          >
-            {isLoggingIn ? (
-               <>
-                 <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin" />
-                 Signing in...
-               </>
-            ) : (
-               <>
-                 <div className="bg-slate-50 p-1.5 rounded-full border border-slate-200 group-hover/btn:scale-110 transition">
-                    <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-                 </div>
-                 Sign in with Google
-               </>
-            )}
-          </button>
+          {/* --- CONCEPT 2: CAROUSEL DISPLAY --- */}
+          <div className="h-48 flex flex-col items-center justify-center mb-6 relative">
+             {/* Background Glow for Active Slide */}
+             <div className={`absolute inset-0 opacity-20 blur-[60px] transition-colors duration-1000 ${slideIndex === 0 ? 'bg-emerald-500' : slideIndex === 1 ? 'bg-indigo-500' : 'bg-amber-500'}`}></div>
+             
+             {/* Animated Icon & Text Wrapper */}
+             <div key={slideIndex} className="relative z-10 flex flex-col items-center animate-fade-slide">
+                <div className={`w-20 h-20 rounded-3xl bg-slate-800 border border-white/10 flex items-center justify-center mb-6 shadow-xl ${slides[slideIndex].color}`}>
+                   <ActiveIcon className="w-10 h-10" />
+                </div>
+                <h2 className="text-2xl font-bold text-white tracking-tight mb-2">
+                  {slides[slideIndex].title}
+                </h2>
+                <p className="text-slate-400 text-sm font-medium leading-relaxed max-w-[240px]">
+                  {slides[slideIndex].desc}
+                </p>
+             </div>
 
-          {/* Feature Grid */}
-          <div className="grid grid-cols-3 gap-2 mt-8 pt-8 border-t border-white/5">
-             <div className="text-center">
-                <div className="text-emerald-400 font-bold text-xl mb-1">100%</div>
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Free</div>
+             {/* Slide Indicators */}
+             <div className="absolute -bottom-4 flex gap-2">
+                {slides.map((_, i) => (
+                  <div 
+                    key={i} 
+                    className={`h-1.5 rounded-full transition-all duration-500 ${i === slideIndex ? 'w-6 bg-white' : 'w-1.5 bg-white/20'}`} 
+                  />
+                ))}
              </div>
-             <div className="text-center border-l border-white/10">
-                <div className="text-cyan-400 font-bold text-xl mb-1">No</div>
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Ads</div>
-             </div>
-             <div className="text-center border-l border-white/10">
-                <div className="text-indigo-400 font-bold text-xl mb-1">Secure</div>
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Google Auth</div>
-             </div>
+          </div>
+          
+          {/* --- CONCEPT 1: PORTAL BUTTON --- */}
+          <div className="mt-8 space-y-4">
+            <button 
+              onClick={onLogin}
+              disabled={isLoggingIn} 
+              className={`
+                relative w-full p-4 rounded-2xl font-bold text-lg transition-all duration-500 
+                overflow-hidden group
+                ${isLoggingIn 
+                  ? 'bg-slate-800 text-slate-500 cursor-wait scale-[0.98]' 
+                  : 'bg-white text-slate-900 hover:scale-[1.02] hover:shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)]'
+                }
+              `}
+            >
+              <div className="relative z-10 flex items-center justify-center gap-3">
+                {isLoggingIn ? (
+                   <>
+                     <div className="w-5 h-5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
+                     <span>Opening Portal...</span>
+                   </>
+                ) : (
+                   <>
+                     <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="G" />
+                     <span>Enter Budget Planner</span>
+                     <ArrowRight className="w-5 h-5 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all duration-300" />
+                   </>
+                )}
+              </div>
+            </button>
+
+            {/* Privacy / Guest Hint */}
+            <p className="text-[10px] text-slate-500 font-medium">
+               Secure Google Authentication • 
+               <button onClick={onBack} className="hover:text-white transition ml-1 underline decoration-slate-600 underline-offset-2">
+                 Guest Mode
+               </button>
+            </p>
           </div>
 
         </div>
