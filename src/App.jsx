@@ -30,6 +30,7 @@ import {
 import { 
   PieChart, 
   Wallet, 
+  Landmark,
   TrendingDown, 
   Plus, 
   Trash2, 
@@ -5648,53 +5649,67 @@ export default function App() {
       />
 
       {/* --- 2. PREMIUM HEADER --- */}
-      <header className={`pt-8 pb-32 px-6 rounded-b-[3rem] shadow-xl relative z-10 print:hidden transition-all duration-500 ease-in-out ${isSandbox ? 'bg-gradient-to-br from-indigo-900 to-indigo-800' : 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'}`}>
-        <div className="max-w-3xl mx-auto flex justify-between items-center mb-6 relative">
+      <header className={`pt-8 pb-32 px-6 rounded-b-[3rem] shadow-2xl relative z-10 print:hidden transition-all duration-500 ease-in-out overflow-hidden ${isSandbox ? 'bg-indigo-900' : 'bg-slate-900'}`}>
+        
+        {/* TEXTURE OVERLAY (The "Nice" Part) */}
+        <div className="absolute inset-0 opacity-20 mix-blend-overlay pointer-events-none" 
+             style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}>
+        </div>
+
+        {/* GRADIENT BLOBS (Subtle Lighting) */}
+        <div className={`absolute top-[-50%] left-[-20%] w-[600px] h-[600px] rounded-full blur-[100px] opacity-40 pointer-events-none ${isSandbox ? 'bg-indigo-500' : 'bg-emerald-900'}`}></div>
+        <div className={`absolute top-[-50%] right-[-20%] w-[600px] h-[600px] rounded-full blur-[100px] opacity-40 pointer-events-none ${isSandbox ? 'bg-purple-500' : 'bg-teal-900'}`}></div>
+
+        <div className="max-w-3xl mx-auto flex justify-between items-center mb-6 relative z-10">
           
           {/* Logo & Title */}
-          <div className="flex items-center gap-4">
-            <div className={`p-3 rounded-2xl shadow-inner border border-white/10 ${isSandbox ? 'bg-indigo-500 text-white' : 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white'}`}>
-              {isSandbox ? <FlaskConical className="w-6 h-6" /> : <Wallet className="w-6 h-6" />}
+          <div className="flex items-center gap-5">
+            {/* ICON CHANGE: Replaced Wallet with Landmark, cleaner container */}
+            <div className={`p-3.5 rounded-2xl shadow-lg border border-white/10 backdrop-blur-md ${isSandbox ? 'bg-indigo-500/20 text-indigo-200' : 'bg-white/10 text-emerald-100'}`}>
+              {isSandbox ? <FlaskConical className="w-6 h-6" /> : <Landmark className="w-6 h-6" />}
             </div>
+            
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-white leading-tight">
-                {/* CHANGED: effectiveSettings.displayName */}
+              <h1 className="text-2xl font-black tracking-tight text-white leading-none mb-1">
                 {effectiveSettings.displayName || (user.displayName ? user.displayName.split(' ')[0] : 'Guest')}
               </h1>
-              <p className={`text-xs font-bold tracking-wide uppercase opacity-80 ${isSandbox ? 'text-indigo-200' : 'text-emerald-200'}`}>
-                {isSandbox ? 'Simulation Mode' : 'Wealth Planner'}
-              </p>
+              <div className="flex items-center gap-2">
+                 <div className={`w-1.5 h-1.5 rounded-full ${isSandbox ? 'bg-indigo-400 animate-pulse' : 'bg-emerald-400'}`}></div>
+                 <p className={`text-xs font-bold tracking-wide uppercase opacity-70 ${isSandbox ? 'text-indigo-200' : 'text-slate-300'}`}>
+                   {isSandbox ? 'Simulation Mode' : 'Financial Dashboard'}
+                 </p>
+              </div>
             </div>
           </div>
 
           {/* DESKTOP ACTIONS */}
-          <div className="hidden md:flex gap-2">
-             {/* --- PASTE HERE: ADMIN BUTTON --- */}
+          <div className="hidden md:flex gap-3">
+             {/* Admin Button */}
             {user.email === "yaseen.hussain2001@gmail.com" && (
                <button 
                  onClick={() => setIsAdminMode(true)} 
-                 className="p-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-400 transition shadow-lg shadow-indigo-500/20 border border-white/10"
+                 className="p-3 rounded-xl bg-indigo-500 text-white hover:bg-indigo-400 transition shadow-lg shadow-indigo-500/20 border border-white/10 group"
                  title="Admin Panel"
                >
-                 <Shield className="w-5 h-5" />
+                 <Shield className="w-5 h-5 group-hover:scale-110 transition" />
                </button>
             )}
-             <button id="btn-sandbox" onClick={toggleSandbox} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white" title="Sandbox Mode">
+             <button id="btn-sandbox" onClick={toggleSandbox} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition border border-white/5 text-white/70 hover:text-white backdrop-blur-md" title="Sandbox Mode">
               <FlaskConical className={`w-5 h-5`} />
             </button>
-            <button id="btn-analytics" onClick={() => setShowAnalytics(true)} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white" title="Trends">
+            <button id="btn-analytics" onClick={() => setShowAnalytics(true)} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition border border-white/5 text-white/70 hover:text-white backdrop-blur-md" title="Trends">
               <BarChart3 className={`w-5 h-5`} />
             </button>
-            <button onClick={() => setShowReportSelector(true)} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white" title="Reports">
+            <button onClick={() => setShowReportSelector(true)} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition border border-white/5 text-white/70 hover:text-white backdrop-blur-md" title="Reports">
               <FileText className={`w-5 h-5`} />
             </button>
-            <button id="btn-settings" onClick={() => setShowSettings(true)} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white">
+            <button id="btn-settings" onClick={() => setShowSettings(true)} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition border border-white/5 text-white/70 hover:text-white backdrop-blur-md">
               <Settings className="w-5 h-5" />
             </button>
-            <button onClick={() => setShowHelp(true)} className="p-2.5 rounded-xl hover:bg-white/10 transition border border-transparent hover:border-white/10 text-white/70 hover:text-white">
+            <button onClick={() => setShowHelp(true)} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition border border-white/5 text-white/70 hover:text-white backdrop-blur-md">
               <HelpCircle className="w-5 h-5" />
             </button>
-            <button onClick={handleLogout} className="p-2.5 rounded-xl hover:bg-red-500/20 text-white/70 hover:text-red-200 transition border border-transparent hover:border-red-500/20">
+            <button onClick={handleLogout} className="p-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-200 hover:text-white transition border border-white/5 backdrop-blur-md">
               <LogOut className="w-5 h-5" />
             </button>
           </div>
