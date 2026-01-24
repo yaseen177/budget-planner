@@ -11,7 +11,7 @@ import {
   signInWithCustomToken,
   signInAnonymously,
   setPersistence,           // <--- ADDED
-  browserSessionPersistence
+  browserLocalPersistence
 } from 'firebase/auth';
 import { 
   getFirestore, 
