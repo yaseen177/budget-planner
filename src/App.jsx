@@ -475,6 +475,7 @@ const app = initializeApp(getFirebaseConfig());
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = 'nuha-budget-app';
+const provider = new GoogleAuthProvider();
 
 // --- CONSTANTS & DEFAULTS ---
 const MONTH_NAMES = [
