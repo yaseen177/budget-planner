@@ -4753,7 +4753,7 @@ export default function App() {
 
       // --- FIX 1: Set Persistence Here (Once on Load) ---
       try {
-        await setPersistence(auth, browserSessionPersistence);
+        await setPersistence(auth, browserLocalPersistence);
       } catch (e) {
         console.error("Persistence setting failed", e);
       }
@@ -4970,47 +4970,29 @@ export default function App() {
   };
 
   const handleLogin = async () => {
-    // 1. Prevent double-clicks
-    if (isLoggingIn) return; 
-    setIsLoggingIn(true);
-
+    // ❌ DELETE THIS LINE
+    // setIsLoggingIn(true); <--- This state change causes a tiny delay that triggers iPhone popup blockers
+    
     try {
-      // --- FIX 2: REMOVED setPersistence FROM HERE ---
-      // It caused the "Popup Blocked" error by delaying the window open event.
-      
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      
-      // This now runs immediately on click, satisfying the browser's popup blocker
-      const result = await signInWithPopup(auth, provider);
-      
-      console.log("Login successful:", result.user.email);
-      setUser(result.user); 
-      logSystemEvent('User Logged In', 'login', result.user);
-      
+        // ✅ The popup must be the VERY FIRST thing that happens when the user clicks
+        await signInWithPopup(auth, provider);
+        
+        // You don't need to manually set user/loading here.
+        // The 'onAuthStateChanged' listener in the useEffect will handle it automatically.
+        showToast("Welcome back!");
     } catch (error) {
-      console.error("Login Failed:", error);
-      
-      // Ignore popup cancellations/blocks to avoid confusing the user
-      if (
-        error.code === 'auth/cancelled-popup-request' || 
-        error.code === 'auth/popup-closed-by-user' ||
-        error.code === 'auth/popup-blocked'
-      ) {
-         console.log("Login popup cancelled or blocked. Ignoring.");
-         setIsLoggingIn(false);
-         return;
-      }
-
-      if (!YOUR_FIREBASE_KEYS.apiKey) {
-        await signInAnonymously(auth);
-      } else {
-        alert(`Login failed: ${error.message}`);
-      }
+        console.error("Login failed", error);
+        
+        // Handle the specific "Popup Closed" error nicely
+        if (error.code === 'auth/popup-closed-by-user') {
+            showToast("Login cancelled.");
+        } else {
+            showToast("Login failed. Please try again.");
+        }
     } finally {
-       setIsLoggingIn(false);
+        setIsLoggingIn(false); 
     }
-  };
+};
 
   const handleDemoLogin = async () => {
     if (isLoggingIn) return;
