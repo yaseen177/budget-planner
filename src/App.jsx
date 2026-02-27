@@ -5205,6 +5205,20 @@ export default function App() {
     // Removed setEditingExpenseId(null)
   };
 
+  const toggleExpensePaid = (id) => {
+    triggerHaptic();
+    const updatedExpenses = displayExpenses.map(e => 
+      e.id === id ? { ...e, paid: !e.paid } : e
+    );
+
+    if (isSandbox) {
+        setSandboxExpenses(updatedExpenses);
+    } else {
+        setExpenses(updatedExpenses);
+        saveData(salary, updatedExpenses, actualSavings);
+    }
+  };
+
   const removeExpense = (id) => {
     triggerHaptic(); // Haptic
     const expName = displayExpenses.find(e => e.id === id)?.name || 'Unknown Bill';
@@ -6162,11 +6176,11 @@ export default function App() {
                 const fixed = finalExpenses.filter(e => e.type === 'fixed');
                 const variable = finalExpenses.filter(e => e.type === 'variable');
                 const cards = finalExpenses.filter(e => e.type === 'credit_card');
-                const mortgages = finalExpenses.filter(e => e.type === 'mortgage'); // <--- ADD THIS
+                const mortgages = finalExpenses.filter(e => e.type === 'mortgage');
 
                 // 2. Define Groups
                 const groups = [
-                  { id: 'mort', title: 'Mortgages', items: mortgages, defaultOpen: true }, // <--- ADD THIS
+                  { id: 'mort', title: 'Mortgages', items: mortgages, defaultOpen: true },
                   { id: 'fix', title: 'Fixed Bills', items: fixed, defaultOpen: true },
                   { id: 'var', title: 'One-Off Expenses', items: variable, defaultOpen: true },
                   { id: 'cc',  title: 'Credit Cards', items: cards, defaultOpen: true } 
@@ -6190,14 +6204,26 @@ export default function App() {
                                 >
                                   <div className="p-4 sm:px-6 flex justify-between items-center group hover:bg-slate-50/80 transition-all duration-200">
                                     <div className="flex items-center gap-4 flex-1">
-                                      <div className={`p-2.5 rounded-2xl bg-slate-50 text-slate-400 w-12 h-12 flex items-center justify-center border border-slate-100 shadow-sm group-hover:scale-110 transition duration-300`}>
+                                      
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleExpensePaid(expense.id);
+                                        }}
+                                        className={`shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${expense.paid ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm' : 'border-slate-300 bg-slate-50 hover:border-emerald-400'}`}
+                                      >
+                                        {expense.paid && <Check className="w-4 h-4 stroke-[3]" />}
+                                      </button>
+
+                                      <div className={`p-2.5 rounded-2xl bg-slate-50 text-slate-400 w-12 h-12 flex items-center justify-center border border-slate-100 shadow-sm group-hover:scale-110 transition duration-300 ${expense.paid ? 'opacity-40 grayscale' : ''}`}>
                                          {expense.logo ? (
                                            <img src={expense.logo} alt={expense.name} className="w-full h-full object-contain mix-blend-multiply" />
                                          ) : (
                                            <Icon className="w-5 h-5" />
                                          )}
                                       </div>
-                                      <div className="flex-1 min-w-0">
+                                      
+                                      <div className={`flex-1 min-w-0 transition-opacity duration-300 ${expense.paid ? 'opacity-40' : 'opacity-100'}`}>
                                         {isEditing ? (
                                           <input 
                                             autoFocus
@@ -6208,9 +6234,8 @@ export default function App() {
                                             onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
                                           />
                                         ) : (
-                                          <p className="font-bold text-slate-700 truncate">{expense.name}</p>
+                                          <p className={`font-bold text-slate-700 truncate transition-all ${expense.paid ? 'line-through decoration-slate-500 decoration-2' : ''}`}>{expense.name}</p>
                                         )}
-                                        {/* Updated Type Badge Logic for Credit Cards */}
                                         <p className="text-xs text-slate-400 capitalize flex items-center gap-1">
                                            <span className={`w-1.5 h-1.5 rounded-full ${expense.type === 'fixed' ? 'bg-indigo-400' : expense.type === 'credit_card' ? 'bg-purple-400' : expense.type === 'mortgage' ? 'bg-blue-500' : 'bg-emerald-400'}`}></span>
                                            {expense.type.replace('_', ' ')}
@@ -6238,7 +6263,7 @@ export default function App() {
                                       ) : (
                                         <button 
                                           onClick={() => { triggerHaptic(); setEditingExpenseId(expense.id); }}
-                                          className={`flex items-center gap-2 hover:bg-white px-3 py-1.5 rounded-xl transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200 text-orange-600' : 'text-slate-700'} print:hover:bg-transparent print:p-0 print:ring-0`}
+                                          className={`flex items-center gap-2 hover:bg-white px-3 py-1.5 rounded-xl transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200 text-orange-600' : 'text-slate-700'} ${expense.paid ? 'line-through decoration-slate-500 decoration-2 opacity-40' : ''} print:hover:bg-transparent print:p-0 print:ring-0`}
                                         >
                                           {expense.amount === 0 ? (
                                             <span className="text-sm font-bold flex items-center gap-1">
