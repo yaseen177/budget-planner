@@ -4971,29 +4971,19 @@ export default function App() {
   };
 
   const handleLogin = async () => {
-    // ❌ DELETE THIS LINE
-    // setIsLoggingIn(true); <--- This state change causes a tiny delay that triggers iPhone popup blockers
-    
     try {
-        // ✅ The popup must be the VERY FIRST thing that happens when the user clicks
+        // Must be Popup, NOT Redirect
         await signInWithPopup(auth, provider);
-        
-        // You don't need to manually set user/loading here.
-        // The 'onAuthStateChanged' listener in the useEffect will handle it automatically.
-        showToast("Welcome back!");
+        triggerHaptic();
     } catch (error) {
         console.error("Login failed", error);
-        
-        // Handle the specific "Popup Closed" error nicely
         if (error.code === 'auth/popup-closed-by-user') {
             showToast("Login cancelled.");
         } else {
             showToast("Login failed. Please try again.");
         }
-    } finally {
-        setIsLoggingIn(false); 
     }
-};
+  };
 
   const handleDemoLogin = async () => {
     if (isLoggingIn) return;
