@@ -6192,24 +6192,28 @@ export default function App() {
                                    onEdit={() => { triggerHaptic(); setEditingExpenseId(expense.id); }}
                                    onDelete={handleVacuum}
                                 >
-                                  <div className="p-4 sm:px-6 flex justify-between items-center group hover:bg-slate-50/80 transition-all duration-200">
-                                    <div className="flex items-center gap-4 flex-1">
+                                  <div className="p-3 sm:p-4 sm:px-6 flex justify-between items-center group hover:bg-slate-50/80 transition-all duration-200 gap-2 sm:gap-4">
+                                    
+                                    {/* ✅ LEFT SIDE: Added min-w-0 to force the title to truncate if it gets too long */}
+                                    <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
                                       
+                                      {/* ✅ CHECKBOX: Made slightly smaller on mobile (w-5 h-5) */}
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           toggleExpensePaid(expense.id);
                                         }}
-                                        className={`shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${expense.paid ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm' : 'border-slate-300 bg-slate-50 hover:border-emerald-400'}`}
+                                        className={`shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-md border-2 flex items-center justify-center transition-all ${expense.paid ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm' : 'border-slate-300 bg-slate-50 hover:border-emerald-400'}`}
                                       >
-                                        {expense.paid && <Check className="w-4 h-4 stroke-[3]" />}
+                                        {expense.paid && <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" />}
                                       </button>
 
-                                      <div className={`p-2.5 rounded-2xl bg-slate-50 text-slate-400 w-12 h-12 flex items-center justify-center border border-slate-100 shadow-sm group-hover:scale-110 transition duration-300 ${expense.paid ? 'opacity-40 grayscale' : ''}`}>
+                                      {/* ✅ ICON: Made slightly smaller on mobile */}
+                                      <div className={`shrink-0 p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-slate-50 text-slate-400 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center border border-slate-100 shadow-sm group-hover:scale-110 transition duration-300 ${expense.paid ? 'opacity-40 grayscale' : ''}`}>
                                          {expense.logo ? (
                                            <img src={expense.logo} alt={expense.name} className="w-full h-full object-contain mix-blend-multiply" />
                                          ) : (
-                                           <Icon className="w-5 h-5" />
+                                            <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                                          )}
                                       </div>
                                       
@@ -6219,21 +6223,22 @@ export default function App() {
                                             autoFocus
                                             type="text"
                                             defaultValue={expense.name}
-                                            className="font-medium text-slate-800 w-full bg-white border border-emerald-200 rounded px-2 py-1 outline-none ring-2 ring-emerald-100"
+                                            className="font-medium text-slate-800 w-full bg-white border border-emerald-200 rounded px-2 py-1 outline-none ring-2 ring-emerald-100 text-sm sm:text-base"
                                             onBlur={(e) => updateExpenseName(expense.id, e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
                                           />
                                         ) : (
-                                          <p className={`font-bold text-slate-700 truncate transition-all ${expense.paid ? 'line-through decoration-slate-500 decoration-2' : ''}`}>{expense.name}</p>
+                                          <p className={`font-bold text-slate-700 truncate text-sm sm:text-base transition-all ${expense.paid ? 'line-through decoration-slate-500 decoration-2' : ''}`}>{expense.name}</p>
                                         )}
-                                        <p className="text-xs text-slate-400 capitalize flex items-center gap-1">
-                                           <span className={`w-1.5 h-1.5 rounded-full ${expense.type === 'fixed' ? 'bg-indigo-400' : expense.type === 'credit_card' ? 'bg-purple-400' : expense.type === 'mortgage' ? 'bg-blue-500' : 'bg-emerald-400'}`}></span>
-                                           {expense.type.replace('_', ' ')}
+                                        <p className="text-[10px] sm:text-xs text-slate-400 capitalize flex items-center gap-1 truncate">
+                                           <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${expense.type === 'fixed' ? 'bg-indigo-400' : expense.type === 'credit_card' ? 'bg-purple-400' : expense.type === 'mortgage' ? 'bg-blue-500' : 'bg-emerald-400'}`}></span>
+                                           <span className="truncate">{expense.type.replace('_', ' ')}</span>
                                         </p>
                                       </div>
                                     </div>
                                     
-                                    <div className="flex items-center gap-3">
+                                    {/* ✅ RIGHT SIDE: Added 'shrink-0' so the amount NEVER gets squashed or cut off */}
+                                    <div className="flex items-center gap-1 sm:gap-3 shrink-0">
                                       {isEditing ? (
                                         <div className="flex items-center gap-1">
                                           <input 
@@ -6247,30 +6252,30 @@ export default function App() {
                                                  setEditingExpenseId(null);
                                               }
                                             }}
-                                            className="w-24 p-2 border border-emerald-200 rounded-lg bg-white text-right font-bold text-slate-800 ring-2 ring-emerald-100 outline-none"
+                                            className="w-20 sm:w-24 p-1.5 sm:p-2 border border-emerald-200 rounded-lg bg-white text-right font-bold text-slate-800 ring-2 ring-emerald-100 outline-none text-sm sm:text-base"
                                           />
                                         </div>
                                       ) : (
                                         <button 
                                           onClick={() => { triggerHaptic(); setEditingExpenseId(expense.id); }}
-                                          className={`flex items-center gap-2 hover:bg-white px-3 py-1.5 rounded-xl transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200 text-orange-600' : 'text-slate-700'} ${expense.paid ? 'line-through decoration-slate-500 decoration-2 opacity-40' : ''} print:hover:bg-transparent print:p-0 print:ring-0`}
+                                          className={`flex items-center gap-1 sm:gap-2 hover:bg-white px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200 text-orange-600' : 'text-slate-700'} ${expense.paid ? 'line-through decoration-slate-500 decoration-2 opacity-40' : ''} print:hover:bg-transparent print:p-0 print:ring-0`}
                                         >
                                           {expense.amount === 0 ? (
-                                            <span className="text-sm font-bold flex items-center gap-1">
-                                              Set Amount <Edit2 className="w-3 h-3" />
+                                            <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
+                                              Set <span className="hidden sm:inline">Amount</span> <Edit2 className="w-3 h-3" />
                                             </span>
                                           ) : (
-                                            <span className="font-bold text-lg">{formatCurrency(expense.amount, effectiveSettings.currency)}</span>
+                                            <span className="font-bold text-base sm:text-lg">{formatCurrency(expense.amount, effectiveSettings.currency)}</span>
                                           )}
                                         </button>
                                       )}
                                       
                                       {isEditing ? (
-                                         <button onClick={() => setEditingExpenseId(null)} className="bg-emerald-500 text-white p-2 rounded-full hover:bg-emerald-600 transition shadow-lg shadow-emerald-200">
-                                           <Check className="w-4 h-4" />
+                                         <button onClick={() => setEditingExpenseId(null)} className="bg-emerald-500 text-white p-1.5 sm:p-2 rounded-full hover:bg-emerald-600 transition shadow-lg shadow-emerald-200">
+                                           <Check className="w-3 h-3 sm:w-4 sm:h-4" />
                                          </button>
                                       ) : (
-                                        <button onClick={handleVacuum} className="text-slate-300 hover:text-red-500 transition p-2 rounded-xl hover:bg-red-50 opacity-0 group-hover:opacity-100 print:hidden hidden md:block">
+                                        <button onClick={handleVacuum} className="text-slate-300 hover:text-red-500 transition p-1.5 sm:p-2 rounded-xl hover:bg-red-50 opacity-0 group-hover:opacity-100 print:hidden hidden md:block">
                                           <Trash2 className="w-4 h-4" />
                                         </button>
                                       )}
