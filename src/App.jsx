@@ -5226,13 +5226,21 @@ export default function App() {
   // 2. Attach this to a "Connect Mortgage" button
   const startBankConnection = () => {
     const redirectUri = window.location.origin + '/callback'; 
-    const clientId = import.meta.env.VITE_TL_CLIENT_ID;
+    const clientId = import.meta.env.VITE_TL_CLIENT_ID; 
     
-    // LOG THIS: Copy the result from your browser console if it fails
-    console.log("SENDING REDIRECT_URI:", redirectUri);
-    console.log("USING CLIENT_ID:", clientId);
+    // Ensure we have a Client ID before trying to redirect
+    if (!clientId) {
+        showToast("Error: Client ID is missing. Check your Env Variables.");
+        return;
+    }
+
+    // We encode the redirectUri so it doesn't break the URL string
+    const encodedRedirect = encodeURIComponent(redirectUri);
     
-    const authUrl = `https://auth.truelayer-sandbox.com/?response_type=code&client_id=${clientId}&scope=info%20accounts%20balance%20cards%20transactions%20direct_debits%20standing_orders%20offline_access&redirect_uri=${redirectUri}&providers=uk-ob-all%20uk-oauth-all`;
+    // We also simplify the scopes for a cleaner request
+    const scopes = encodeURIComponent("info accounts balance cards transactions offline_access");
+
+    const authUrl = `https://auth.truelayer-sandbox.com/?response_type=code&client_id=${clientId}&scope=${scopes}&redirect_uri=${encodedRedirect}&providers=uk-ob-all%20uk-oauth-all`;
     
     window.location.href = authUrl;
 };
