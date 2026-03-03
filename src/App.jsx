@@ -471,6 +471,9 @@ const getFirebaseConfig = () => {
   return JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
 };
 
+// --- TRUELAYER CONFIG ---
+const TL_CLIENT_ID = import.meta.env.TL_CLIENT_ID
+
 const app = initializeApp(getFirebaseConfig());
 const auth = getAuth(app);
 const db = getFirestore(app);
