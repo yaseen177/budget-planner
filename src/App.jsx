@@ -1220,7 +1220,7 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                                     dataKey="value" 
                                     color={color}
                                     secondDataKey={showTargets ? "target" : null}
-                                    secondColor="#cbd5e1"
+                                    secondColor="#94a3b8" 
                                 />
                             ) : (
                                 <div className="h-full flex items-center text-[10px] text-slate-400">No data yet</div>
@@ -1230,7 +1230,7 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                          <div className="text-[10px] text-slate-400">
                              {showTargets ? (
                                 <span className="flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span> vs Target
+                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span> vs Target
                                 </span>
                              ) : `Total Saved (${potHistory.length}m)`}
                          </div>
@@ -1255,7 +1255,7 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                  <button onClick={() => setSelectedPot(null)} className="p-2 hover:bg-slate-200 rounded-full"><X className="w-5 h-5" /></button>
               </div>
               <div className="p-6">
-                 <div className="h-64 w-full">
+              <div className="h-64 w-full">
                     {/* NEW: Filter MultiBarChart to only show relevant active months */}
                     <MultiBarChart 
                        data={filteredData
@@ -1267,12 +1267,12 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                           actual: d.pots[selectedPot.id]?.actual || 0
                        }))}
                        keys={['target', 'actual']}
-                       colors={['bg-slate-300', selectedPot.colorCode]} 
+                       colors={['bg-slate-400', selectedPot.colorCode]} 
                     />
                  </div>
                  <div className="flex justify-center gap-6 mt-6">
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                       <div className="w-3 h-3 bg-slate-300 rounded-sm"></div> Target
+                       <div className="w-3 h-3 bg-slate-400 rounded-sm"></div> Target
                     </div>
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
                        <div className={`w-3 h-3 rounded-sm`} style={{ backgroundColor: selectedPot.colorCode }}></div> Actual
