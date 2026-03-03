@@ -5135,13 +5135,11 @@ export default function App() {
 
   // 1. This runs when they return from the bank
   useEffect(() => {
-    // Check if the URL has a TrueLayer code in it (e.g. ?code=12345)
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
 
     if (code) {
-      // Clean the URL so it doesn't look messy and doesn't run twice
-      window.history.replaceState({}, document.title, window.location.pathname);
+      window.history.replaceState({}, document.title, '/');
       fetchBankingData(code);
     }
   }, []);
@@ -5151,15 +5149,16 @@ export default function App() {
       showToast("Connecting to bank...");
       
       const redirectUri = window.location.origin + '/callback'; 
+      const clientId = import.meta.env.VITE_TL_CLIENT_ID; // Pulls from Cloudflare/Vite env
 
-      // 1. Call your own secure Cloudflare backend instead of TrueLayer directly
+      // 1. Call your secure Cloudflare backend
       const tokenResponse = await fetch('/api/truelayer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
               code: code,
               redirectUri: redirectUri,
-              clientId: TL_CLIENT_ID // Remember, the ID is safe to pass
+              clientId: clientId 
           })
       });
 
@@ -5169,29 +5168,68 @@ export default function App() {
         throw new Error("Failed to get token from our secure backend");
       }
 
-      // 2. Fetch the actual Bank Accounts (this is safe to do on the frontend now that we have the token)
+      // 2. Fetch the actual Bank Accounts
       const accountsResponse = await fetch(`https://api.truelayer-sandbox.com/data/v1/accounts`, {
           headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
       });
       const accountsData = await accountsResponse.json();
 
-      console.log("🏦 LIVE BANK DATA FETCHED:", accountsData);
-      showToast("Bank Connected Successfully!");
+      // 3. Filter to find ONLY the Mortgage (or Loan)
+      const mortgageAccount = accountsData.results?.find(
+          acc => acc.account_type === 'mortgage' || acc.account_type === 'loan'
+      );
+
+      if (!mortgageAccount) {
+          showToast("No mortgage found on this account.");
+          return;
+      }
+
+      // 4. Fetch the specific Balance for that Mortgage
+      const balanceResponse = await fetch(`https://api.truelayer-sandbox.com/data/v1/accounts/${mortgageAccount.account_id}/balance`, {
+          headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+      });
+      const balanceData = await balanceResponse.json();
       
+      const liveBalance = balanceData.results?.[0]?.current;
+
+      if (liveBalance !== undefined) {
+          // 5. Build the Mortgage Object
+          const currentMonthlyPayment = Math.abs(liveBalance); 
+
+          const newMortgage = {
+              name: mortgageAccount.provider?.display_name || "Live Mortgage",
+              amount: currentMonthlyPayment, 
+              logo: mortgageAccount.provider?.logo_uri || null,
+              type: 'mortgage',
+              isLive: true // Custom flag so you know this came from the bank
+          };
+
+          // 6. Save to Firebase Settings (Replaces any previous live mortgage, keeps manual ones)
+          const currentMortgages = userSettings.mortgages || [];
+          const updatedMortgages = [...currentMortgages.filter(m => !m.isLive), newMortgage];
+          
+          const newSettings = { ...userSettings, mortgages: updatedMortgages };
+          
+          const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
+          await setDoc(settingsRef, newSettings);
+          setUserSettings(newSettings); // Update UI instantly
+
+          showToast(`Live Mortgage Linked: £${currentMonthlyPayment.toFixed(2)}`);
+      }
+
     } catch (error) {
         console.error("Banking API Error:", error);
-        showToast("Failed to sync bank data.");
+        showToast("Failed to sync mortgage data.");
     }
   };
 
   // 2. Attach this to a "Connect Mortgage" button
   const startBankConnection = () => {
-      // Dynamically use localhost or your live pages.dev URL
       const redirectUri = window.location.origin + '/callback'; 
+      const clientId = import.meta.env.VITE_TL_CLIENT_ID; // Pulls from Cloudflare/Vite env
       
-      const authUrl = `https://auth.truelayer-sandbox.com/?response_type=code&client_id=${TL_CLIENT_ID}&scope=info%20accounts%20balance%20cards%20transactions%20direct_debits%20standing_orders%20offline_access&redirect_uri=${redirectUri}&providers=uk-ob-all%20uk-oauth-all`;
+      const authUrl = `https://auth.truelayer-sandbox.com/?response_type=code&client_id=${clientId}&scope=info%20accounts%20balance%20cards%20transactions%20direct_debits%20standing_orders%20offline_access&redirect_uri=${redirectUri}&providers=uk-ob-all%20uk-oauth-all`;
       
-      // Redirects the user to the TrueLayer mock bank login
       window.location.href = authUrl;
   };
 
