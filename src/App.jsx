@@ -842,31 +842,54 @@ const BarChart = ({ data, dataKey, color, height = 100 }) => {
 };
 
 const MultiBarChart = ({ data, keys, colors }) => {
-    const max = Math.max(...data.map(d => Math.max(d[keys[0]], d[keys[1]])), 100);
+  const max = Math.max(...data.map(d => Math.max(d[keys[0]], d[keys[1]])), 100);
 
-    return (
-      <div className="flex items-end justify-between gap-2 h-full w-full px-1">
-        {data.map((d, i) => {
-          const h1 = Math.max(2, (d[keys[0]] / max) * 100);
-          const h2 = Math.max(2, (d[keys[1]] / max) * 100);
-          return (
-            <div key={i} className="flex flex-col items-center justify-end flex-1 h-full gap-1 group relative">
-               <div className="flex items-end gap-[1px] w-full justify-center h-full">
-                  <div style={{height: `${h1}%`}} className={`flex-1 max-w-[12px] rounded-t-sm ${colors[0]} opacity-80`}></div>
-                  <div style={{height: `${h2}%`}} className={`flex-1 max-w-[12px] rounded-t-sm ${colors[1]}`}></div>
-               </div>
-               <div className="text-[8px] text-slate-400 mt-1">{d.label}</div>
-               {/* Tooltip */}
-               <div className="absolute bottom-full mb-1 opacity-0 group-hover:opacity-100 bg-slate-800 text-white text-[10px] p-2 rounded pointer-events-none z-10">
-                   <div className="font-bold mb-1">{d.fullLabel}</div>
-                   <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${colors[0]}`}></span> Target: {Math.round(d[keys[0]])}</div>
-                   <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${colors[1]}`}></span> Actual: {Math.round(d[keys[1]])}</div>
-               </div>
-            </div>
-          )
-        })}
-      </div>
-    );
+  return (
+    <div className="flex items-end justify-between gap-2 h-full w-full px-1">
+      {data.map((d, i) => {
+        const h1 = Math.max(2, (d[keys[0]] / max) * 100);
+        const h2 = Math.max(2, (d[keys[1]] / max) * 100);
+        
+        // NEW: Check if the colours provided are hex codes or Tailwind classes
+        const isColor1Hex = colors[0]?.startsWith('#');
+        const isColor2Hex = colors[1]?.startsWith('#');
+
+        return (
+          <div key={i} className="flex flex-col items-center justify-end flex-1 h-full gap-1 group relative">
+             <div className="flex items-end gap-[1px] w-full justify-center h-full">
+                
+                {/* Target Bar */}
+                <div 
+                  style={{ height: `${h1}%`, backgroundColor: isColor1Hex ? colors[0] : undefined }} 
+                  className={`flex-1 max-w-[12px] rounded-t-sm ${!isColor1Hex ? colors[0] : ''} opacity-80`}
+                ></div>
+                
+                {/* Actual Bar (FIXED) */}
+                <div 
+                  style={{ height: `${h2}%`, backgroundColor: isColor2Hex ? colors[1] : undefined }} 
+                  className={`flex-1 max-w-[12px] rounded-t-sm ${!isColor2Hex ? colors[1] : ''}`}
+                ></div>
+
+             </div>
+             <div className="text-[8px] text-slate-400 mt-1">{d.label}</div>
+             
+             {/* Tooltip */}
+             <div className="absolute bottom-full mb-1 opacity-0 group-hover:opacity-100 bg-slate-800 text-white text-[10px] p-2 rounded pointer-events-none z-10">
+                 <div className="font-bold mb-1">{d.fullLabel}</div>
+                 <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${!isColor1Hex ? colors[0] : ''}`} style={{ backgroundColor: isColor1Hex ? colors[0] : undefined }}></span> 
+                    Target: {Math.round(d[keys[0]])}
+                 </div>
+                 <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${!isColor2Hex ? colors[1] : ''}`} style={{ backgroundColor: isColor2Hex ? colors[1] : undefined }}></span> 
+                    Actual: {Math.round(d[keys[1]])}
+                 </div>
+             </div>
+          </div>
+        )
+      })}
+    </div>
+  );
 };
 
 // --- ANALYTICS DASHBOARD (FIXED WITH POT CREATION DATES) ---
