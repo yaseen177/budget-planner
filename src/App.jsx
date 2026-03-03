@@ -5128,6 +5128,70 @@ export default function App() {
     }
   };
 
+  // --- OPEN BANKING API LOGIC ---
+
+  // 1. This runs when they return from the bank
+  useEffect(() => {
+    // Check if the URL has a TrueLayer code in it (e.g. ?code=12345)
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+
+    if (code) {
+      // Clean the URL so it doesn't look messy and doesn't run twice
+      window.history.replaceState({}, document.title, window.location.pathname);
+      fetchBankingData(code);
+    }
+  }, []);
+
+  const fetchBankingData = async (code) => {
+    try {
+      showToast("Connecting to bank...");
+      
+      const redirectUri = window.location.origin + '/callback'; 
+
+      // 1. Call your own secure Cloudflare backend instead of TrueLayer directly
+      const tokenResponse = await fetch('/api/truelayer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+              code: code,
+              redirectUri: redirectUri,
+              clientId: TL_CLIENT_ID // Remember, the ID is safe to pass
+          })
+      });
+
+      const tokenData = await tokenResponse.json();
+      
+      if (!tokenData.access_token) {
+        throw new Error("Failed to get token from our secure backend");
+      }
+
+      // 2. Fetch the actual Bank Accounts (this is safe to do on the frontend now that we have the token)
+      const accountsResponse = await fetch(`https://api.truelayer-sandbox.com/data/v1/accounts`, {
+          headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+      });
+      const accountsData = await accountsResponse.json();
+
+      console.log("🏦 LIVE BANK DATA FETCHED:", accountsData);
+      showToast("Bank Connected Successfully!");
+      
+    } catch (error) {
+        console.error("Banking API Error:", error);
+        showToast("Failed to sync bank data.");
+    }
+  };
+
+  // 2. Attach this to a "Connect Mortgage" button
+  const startBankConnection = () => {
+      // Dynamically use localhost or your live pages.dev URL
+      const redirectUri = window.location.origin + '/callback'; 
+      
+      const authUrl = `https://auth.truelayer-sandbox.com/?response_type=code&client_id=${TL_CLIENT_ID}&scope=info%20accounts%20balance%20cards%20transactions%20direct_debits%20standing_orders%20offline_access&redirect_uri=${redirectUri}&providers=uk-ob-all%20uk-oauth-all`;
+      
+      // Redirects the user to the TrueLayer mock bank login
+      window.location.href = authUrl;
+  };
+
   const handleDemoLogin = async () => {
     if (isLoggingIn) return;
     setIsLoggingIn(true);
@@ -5734,6 +5798,8 @@ export default function App() {
         />
       )}
 
+      
+
       {showSandboxInfo && (
         <SandboxInfoModal 
             onClose={() => setShowSandboxInfo(false)}
@@ -5824,6 +5890,13 @@ export default function App() {
                  <Shield className="w-5 h-5 group-hover:scale-110 transition" />
                </button>
             )}
+
+            <button 
+              onClick={startBankConnection}
+              className="bg-blue-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-700 transition shadow-lg w-full flex justify-center items-center gap-2"
+            >
+              <Shield className="w-5 h-5" /> Connect Live Mortgage
+            </button>
              <button id="btn-sandbox" onClick={toggleSandbox} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition border border-white/5 text-white/70 hover:text-white backdrop-blur-md" title="Sandbox Mode">
               <FlaskConical className={`w-5 h-5`} />
             </button>
