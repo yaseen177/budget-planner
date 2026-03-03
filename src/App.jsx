@@ -869,7 +869,7 @@ const MultiBarChart = ({ data, keys, colors }) => {
     );
 };
 
-// --- ANALYTICS DASHBOARD (FIXED WITH SMART MATCHING) ---
+// --- ANALYTICS DASHBOARD (FIXED WITH POT CREATION DATES) ---
 const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
   const [history, setHistory] = useState([]);
   const [timeRange, setTimeRange] = useState('6M'); // 3M, 6M, 12M, ALL
@@ -895,18 +895,24 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
           const actuals = val.actualSavings || {};
           
           // --- SMART MAPPING LOGIC ---
-          // 1. Create a map of Name -> ID from this specific month's saved rules
-          // This allows us to link data even if Pot IDs have changed over time.
           const monthRules = val.allocationRules || [];
           const nameToIdMap = {};
+          const activePotIdsAndNames = new Set(); // NEW: Track if pot existed this month
+
           monthRules.forEach(r => {
-             if (r.name && r.id) nameToIdMap[r.name.toLowerCase().trim()] = r.id;
+             if (r.name && r.id) {
+               const lowerName = r.name.toLowerCase().trim();
+               nameToIdMap[lowerName] = r.id;
+               activePotIdsAndNames.add(r.id);
+               activePotIdsAndNames.add(lowerName);
+             }
           });
 
           // 2. Calculate target vs actual for each CURRENT pot
           const potData = {};
           allocationRules.forEach(rule => {
              let actualVal = 0;
+             const ruleNameLower = rule.name.toLowerCase().trim();
              
              // Try A: Direct ID Match (Best)
              if (actuals[rule.id] !== undefined) {
@@ -914,15 +920,19 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
              } 
              // Try B: Name Match (Fallback)
              else {
-                const historicalId = nameToIdMap[rule.name.toLowerCase().trim()];
+                const historicalId = nameToIdMap[ruleNameLower];
                 if (historicalId && actuals[historicalId] !== undefined) {
                    actualVal = parseFloat(actuals[historicalId]);
                 }
              }
              
+             // Check if pot was in the rules for this month, or if money was put in it
+             const potExists = activePotIdsAndNames.has(rule.id) || activePotIdsAndNames.has(ruleNameLower) || actualVal > 0;
+
              potData[rule.id] = {
-                 target: remainder * (rule.percentage / 100),
-                 actual: actualVal || 0
+                 target: potExists ? (remainder * (rule.percentage / 100)) : 0, // 0 target if didn't exist
+                 actual: actualVal || 0,
+                 exists: potExists // Tag the month so graphs and averages can filter it
              };
           });
 
@@ -959,18 +969,24 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
     return history.slice(-months);
   }, [history, timeRange]);
 
-  // 1. Pot-Specific Projections
+  // 1. Pot-Specific Projections (UPDATED)
   const potProjections = useMemo(() => {
     const projections = {};
     if (filteredData.length === 0) return {};
 
     allocationRules.forEach(rule => {
-      const totalActualForPot = filteredData.reduce((sum, m) => {
+      // NEW: Only look at months where this specific pot existed
+      const activeMonths = filteredData.filter(m => m.pots[rule.id]?.exists);
+      
+      // Prevent dividing by zero if the pot was just created and has no historical data yet
+      const monthCount = activeMonths.length > 0 ? activeMonths.length : 1;
+
+      const totalActualForPot = activeMonths.reduce((sum, m) => {
         const val = m.pots[rule.id]?.actual || 0;
         return sum + val;
       }, 0);
       
-      const avg = totalActualForPot / filteredData.length;
+      const avg = totalActualForPot / monthCount; // Averages based on active months only!
       
       projections[rule.id] = {
         avg: avg,
@@ -1152,14 +1168,16 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
 
               <div className="grid grid-cols-2 gap-3">
                  {allocationRules.map(rule => {
-                    // Prepare Data with Target included
-                    const potHistory = filteredData.map(d => ({ 
-                        label: d.label, 
-                        value: d.pots[rule.id]?.actual || 0,
-                        target: d.pots[rule.id]?.target || 0 
-                    }));
+                    // NEW: Filter out months where the pot didn't exist before mapping!
+                    const potHistory = filteredData
+                        .filter(d => d.pots[rule.id]?.exists)
+                        .map(d => ({ 
+                            label: d.label, 
+                            value: d.pots[rule.id]?.actual || 0,
+                            target: d.pots[rule.id]?.target || 0 
+                        }));
+                        
                     const totalSaved = potHistory.reduce((sum, x) => sum + x.value, 0);
-                    
                     let color = rule.hex || '#64748b';
 
                     return (
@@ -1173,13 +1191,17 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                             <Maximize2 className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
                          </div>
                          <div className="h-12 mb-2">
-                            <SimpleLineChart 
-                                data={potHistory} 
-                                dataKey="value" 
-                                color={color}
-                                secondDataKey={showTargets ? "target" : null}
-                                secondColor="#cbd5e1"
-                            />
+                            {potHistory.length > 0 ? (
+                                <SimpleLineChart 
+                                    data={potHistory} 
+                                    dataKey="value" 
+                                    color={color}
+                                    secondDataKey={showTargets ? "target" : null}
+                                    secondColor="#cbd5e1"
+                                />
+                            ) : (
+                                <div className="h-full flex items-center text-[10px] text-slate-400">No data yet</div>
+                            )}
                          </div>
                          <div className="text-lg font-bold text-slate-800">{formatCurrency(totalSaved, currency)}</div>
                          <div className="text-[10px] text-slate-400">
@@ -1187,7 +1209,7 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                                 <span className="flex items-center gap-1">
                                     <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span> vs Target
                                 </span>
-                             ) : `Total Saved (${timeRange})`}
+                             ) : `Total Saved (${potHistory.length}m)`}
                          </div>
                       </button>
                     );
@@ -1205,14 +1227,17 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                  <div>
                     <h3 className="font-bold text-lg text-slate-800">{selectedPot.name}</h3>
-                    <p className="text-xs text-slate-500">Target vs Actual • {timeRange}</p>
+                    <p className="text-xs text-slate-500">Target vs Actual</p>
                  </div>
                  <button onClick={() => setSelectedPot(null)} className="p-2 hover:bg-slate-200 rounded-full"><X className="w-5 h-5" /></button>
               </div>
               <div className="p-6">
                  <div className="h-64 w-full">
+                    {/* NEW: Filter MultiBarChart to only show relevant active months */}
                     <MultiBarChart 
-                       data={filteredData.map(d => ({
+                       data={filteredData
+                         .filter(d => d.pots[selectedPot.id]?.exists)
+                         .map(d => ({
                           label: d.label,
                           fullLabel: d.fullLabel,
                           target: d.pots[selectedPot.id]?.target || 0,
