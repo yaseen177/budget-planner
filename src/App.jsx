@@ -5182,24 +5182,24 @@ export default function App() {
   };
 
   const startBankConnection = () => {
-    // 1. Get the Client ID from Vite/Cloudflare env
-    const clientId = import.meta.env.VITE_TL_CLIENT_ID;
-    
-    // 2. SAFETY CHECK: If this logs 'undefined', the issue is in Cloudflare dashboard
-    console.log("Connecting with Client ID:", clientId);
+    const origin = window.location.origin;
+    const redirectUri = origin + '/callback'; 
+    const clientId = import.meta.env.VITE_TL_CLIENT_ID; 
     
     if (!clientId) {
-        showToast("Error: Client ID is missing. Check Cloudflare Env Variables.");
+        showToast("Error: Client ID is missing.");
         return;
     }
 
-    const redirectUri = window.location.origin + '/callback'; 
+    // FIX 1: Use only the essential scopes required for mortgage data
+    const scopes = "info accounts balance offline_access";
     
-    // 3. ENCODE EVERYTHING: Special characters in URLs must be encoded
-    const encodedRedirect = encodeURIComponent(redirectUri);
-    const encodedScopes = encodeURIComponent("info accounts balance cards transactions offline_access");
-    
-    const authUrl = `https://auth.truelayer-sandbox.com/?response_type=code&client_id=${clientId}&scope=${encodedScopes}&redirect_uri=${encodedRedirect}&providers=uk-ob-all%20uk-oauth-all`;
+    // FIX 2: Encode the redirect_uri and scopes properly
+    const authUrl = `https://auth.truelayer-sandbox.com/?response_type=code` +
+                    `&client_id=${clientId}` +
+                    `&scope=${encodeURIComponent(scopes)}` +
+                    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+                    `&providers=uk-ob-all%20uk-oauth-all`;
     
     window.location.href = authUrl;
 };
