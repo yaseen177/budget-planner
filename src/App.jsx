@@ -5186,25 +5186,27 @@ export default function App() {
     const redirectUri = window.location.origin + '/callback'; 
     
     if (!clientId) {
-        showToast("Error: Client ID is missing.");
+        showToast("Error: Client ID is missing. Check Cloudflare variables.");
         return;
     }
 
-    // URLSearchParams ensures every character (like spaces and colons) is perfectly encoded
+    // Use URLSearchParams to ensure the browser encodes the spaces and colons for us
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: clientId,
-        scope: 'info accounts balance offline_access', // Minimal scopes for mortgage data
+        // Minimal scopes required to see mortgage balances
+        scope: 'info accounts balance offline_access', 
         redirect_uri: redirectUri,
-        providers: 'uk-ob-all uk-oauth-all' // This list tells TrueLayer which banks to show
+        // This specific string tells TrueLayer to show ALL UK Open Banking banks
+        providers: 'uk-ob-all' 
     });
 
-    // We append our params to the base URL
+    // Construct the final URL
     const authUrl = `https://auth.truelayer-sandbox.com/?${params.toString()}`;
     
-    console.log("Redirecting to TrueLayer with URL:", authUrl);
+    console.log("Redirecting to TrueLayer:", authUrl);
     window.location.href = authUrl;
-};
+  };
 
   const handleDemoLogin = async () => {
     if (isLoggingIn) return;
