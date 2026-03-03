@@ -5228,14 +5228,10 @@ export default function App() {
     const redirectUri = window.location.origin + '/callback'; 
     const clientId = import.meta.env.VITE_TL_CLIENT_ID;
     
-    // ADD THIS LOG
-    console.log("Attempting connection with Client ID:", clientId);
+    // LOG THIS: Copy the result from your browser console if it fails
+    console.log("SENDING REDIRECT_URI:", redirectUri);
+    console.log("USING CLIENT_ID:", clientId);
     
-    if (!clientId) {
-        showToast("Error: Client ID is missing. Check Cloudflare Env Variables.");
-        return;
-    }
-
     const authUrl = `https://auth.truelayer-sandbox.com/?response_type=code&client_id=${clientId}&scope=info%20accounts%20balance%20cards%20transactions%20direct_debits%20standing_orders%20offline_access&redirect_uri=${redirectUri}&providers=uk-ob-all%20uk-oauth-all`;
     
     window.location.href = authUrl;
