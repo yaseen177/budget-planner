@@ -967,6 +967,7 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
               fullLabel: `${FULL_MONTH_NAMES[parseInt(doc.id.split('-')[1]) - 1]} ${doc.id.split('-')[0]}`,
               salary,
               expenses: expensesTotal,
+              rawExpenses: val.expenses || [],
               remainder,
               pots: potData
             });
@@ -1032,6 +1033,41 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
   
   const incomeVar = getVariance('salary');
   const expenseVar = getVariance('expenses');
+
+  // --- NEW: DEEP DIVE INSIGHTS CALCULATOR ---
+  const insights = useMemo(() => {
+    if (filteredData.length === 0) return { mortgageTotal: 0, ccTotal: 0, topExpenses: [] };
+    
+    let mTotal = 0;
+    let cTotal = 0;
+    const expenseMap = {};
+
+    filteredData.forEach(month => {
+        (month.rawExpenses || []).forEach(exp => {
+            const amt = parseFloat(exp.amount) || 0;
+            
+            // 1. Tally Debts
+            if (exp.type === 'mortgage') mTotal += amt;
+            if (exp.type === 'credit_card') cTotal += amt;
+            
+            // 2. Tally Standard Outgoings (Exclude debts from the "Top Expenses" list to focus on lifestyle)
+            if (exp.type === 'fixed' || exp.type === 'variable') {
+               if (!expenseMap[exp.name]) {
+                   expenseMap[exp.name] = { name: exp.name, total: 0, logo: exp.logo };
+               }
+               expenseMap[exp.name].total += amt;
+            }
+        });
+    });
+
+    // Sort to find the top 3 highest average expenses
+    const top = Object.values(expenseMap)
+        .map(e => ({ ...e, avg: e.total / filteredData.length }))
+        .sort((a, b) => b.avg - a.avg)
+        .slice(0, 3);
+
+    return { mortgageTotal: mTotal, ccTotal: cTotal, topExpenses: top };
+  }, [filteredData]);
 
   if (loading) return <div className="fixed inset-0 z-[100] bg-white flex items-center justify-center font-bold text-slate-500">Loading Analytics...</div>;
 
@@ -1173,6 +1209,65 @@ const AnalyticsDashboard = ({ user, onClose, currency, allocationRules }) => {
                     <span key={i} className="text-[10px] text-slate-400 font-mono">{d.label}</span>
                   ))}
                </div>
+            </div>
+
+            {/* --- NEW: INSIGHTS & HIGHLIGHTS GRID --- */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+               
+               {/* 2A. Highest Outgoings */}
+               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+                  <div className="flex items-center gap-2 mb-4">
+                     <TrendingDown className="w-4 h-4 text-rose-500" />
+                     <h3 className="text-sm font-bold text-slate-800">Highest Outgoings</h3>
+                  </div>
+                  <div className="space-y-3 flex-1 justify-center flex flex-col">
+                     {insights.topExpenses.length > 0 ? insights.topExpenses.map((exp, i) => (
+                        <div key={i} className="flex justify-between items-center">
+                           <div className="flex items-center gap-3">
+                              <span className="text-xs font-bold text-slate-300 w-3">{i + 1}.</span>
+                              {exp.logo ? (
+                                 <img src={exp.logo} className="w-6 h-6 rounded-md object-contain mix-blend-multiply" alt={exp.name} /> 
+                              ) : (
+                                 <div className="w-6 h-6 bg-slate-100 rounded-md flex items-center justify-center text-[10px] font-bold text-slate-400">{exp.name.charAt(0)}</div>
+                              )}
+                              <span className="text-sm font-bold text-slate-700 truncate max-w-[100px] sm:max-w-[140px]">{exp.name}</span>
+                           </div>
+                           <span className="text-sm font-bold text-slate-800">
+                              {formatCurrency(exp.avg, currency)} <span className="text-[10px] text-slate-400 font-normal">/mo</span>
+                           </span>
+                        </div>
+                     )) : (
+                        <p className="text-xs text-slate-400 italic text-center">Not enough expense data yet.</p>
+                     )}
+                  </div>
+               </div>
+
+               {/* 2B. Debt & Liabilities Tracking (Only shows if they have them) */}
+               {(insights.mortgageTotal > 0 || insights.ccTotal > 0) && (
+                  <div className="bg-slate-900 p-5 rounded-2xl shadow-lg border border-slate-800 flex flex-col justify-center relative overflow-hidden">
+                     {/* Decoration */}
+                     <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/20 rounded-full blur-xl"></div>
+                     
+                     <div className="flex items-center gap-2 mb-4 relative z-10">
+                        <Shield className="w-4 h-4 text-blue-400" />
+                        <h3 className="text-sm font-bold text-white">Debt Contributions</h3>
+                     </div>
+                     <div className="space-y-4 relative z-10">
+                         {insights.mortgageTotal > 0 && (
+                             <div>
+                                 <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Mortgage Paid ({timeRange})</p>
+                                 <p className="text-2xl font-black text-blue-400 tracking-tight">{formatCurrency(insights.mortgageTotal, currency)}</p>
+                             </div>
+                         )}
+                         {insights.ccTotal > 0 && (
+                             <div>
+                                 <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Credit Cards Paid ({timeRange})</p>
+                                 <p className="text-2xl font-black text-purple-400 tracking-tight">{formatCurrency(insights.ccTotal, currency)}</p>
+                             </div>
+                         )}
+                     </div>
+                  </div>
+               )}
             </div>
 
             {/* 3. POTS MINI GRAPHS GRID */}
