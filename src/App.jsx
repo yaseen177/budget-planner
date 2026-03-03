@@ -5182,25 +5182,26 @@ export default function App() {
   };
 
   const startBankConnection = () => {
-    const origin = window.location.origin;
-    const redirectUri = origin + '/callback'; 
-    const clientId = import.meta.env.VITE_TL_CLIENT_ID; 
+    const clientId = import.meta.env.VITE_TL_CLIENT_ID;
+    const redirectUri = window.location.origin + '/callback'; 
     
     if (!clientId) {
         showToast("Error: Client ID is missing.");
         return;
     }
 
-    // FIX 1: Use only the essential scopes required for mortgage data
-    const scopes = "info accounts balance offline_access";
+    // We use URLSearchParams to ensure every character is perfectly encoded
+    const params = new URLSearchParams({
+        response_type: 'code',
+        client_id: clientId,
+        scope: 'info accounts balance offline_access', // Minimal scopes needed for mortgage
+        redirect_uri: redirectUri,
+        providers: 'uk-ob-all uk-oauth-all' // The 'filter' that was causing the error
+    });
+
+    const authUrl = `https://auth.truelayer-sandbox.com/?${params.toString()}`;
     
-    // FIX 2: Encode the redirect_uri and scopes properly
-    const authUrl = `https://auth.truelayer-sandbox.com/?response_type=code` +
-                    `&client_id=${clientId}` +
-                    `&scope=${encodeURIComponent(scopes)}` +
-                    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-                    `&providers=uk-ob-all%20uk-oauth-all`;
-    
+    console.log("Redirecting to TrueLayer with URL:", authUrl);
     window.location.href = authUrl;
 };
 
