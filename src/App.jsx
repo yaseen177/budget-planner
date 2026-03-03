@@ -5190,15 +5190,16 @@ export default function App() {
         return;
     }
 
-    // We use URLSearchParams to ensure every character is perfectly encoded
+    // URLSearchParams ensures every character (like spaces and colons) is perfectly encoded
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: clientId,
-        scope: 'info accounts balance offline_access', // Minimal scopes needed for mortgage
+        scope: 'info accounts balance offline_access', // Minimal scopes for mortgage data
         redirect_uri: redirectUri,
-        providers: 'uk-ob-all uk-oauth-all' // The 'filter' that was causing the error
+        providers: 'uk-ob-all uk-oauth-all' // This list tells TrueLayer which banks to show
     });
 
+    // We append our params to the base URL
     const authUrl = `https://auth.truelayer-sandbox.com/?${params.toString()}`;
     
     console.log("Redirecting to TrueLayer with URL:", authUrl);
