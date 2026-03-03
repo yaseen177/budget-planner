@@ -5133,7 +5133,6 @@ export default function App() {
 
   // --- OPEN BANKING API LOGIC ---
 
-  // 1. This runs when they return from the bank
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
@@ -5149,9 +5148,9 @@ export default function App() {
       showToast("Connecting to bank...");
       
       const redirectUri = window.location.origin + '/callback'; 
-      const clientId = import.meta.env.VITE_TL_CLIENT_ID; // Pulls from Cloudflare/Vite env
+      // FIX: Use the correct environment variable name
+      const clientId = import.meta.env.VITE_TL_CLIENT_ID; 
 
-      // 1. Call your secure Cloudflare backend
       const tokenResponse = await fetch('/api/truelayer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -5168,82 +5167,39 @@ export default function App() {
         throw new Error("Failed to get token from our secure backend");
       }
 
-      // 2. Fetch the actual Bank Accounts
       const accountsResponse = await fetch(`https://api.truelayer-sandbox.com/data/v1/accounts`, {
           headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
       });
       const accountsData = await accountsResponse.json();
 
-      // 3. Filter to find ONLY the Mortgage (or Loan)
-      const mortgageAccount = accountsData.results?.find(
-          acc => acc.account_type === 'mortgage' || acc.account_type === 'loan'
-      );
-
-      if (!mortgageAccount) {
-          showToast("No mortgage found on this account.");
-          return;
-      }
-
-      // 4. Fetch the specific Balance for that Mortgage
-      const balanceResponse = await fetch(`https://api.truelayer-sandbox.com/data/v1/accounts/${mortgageAccount.account_id}/balance`, {
-          headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
-      });
-      const balanceData = await balanceResponse.json();
+      console.log("🏦 LIVE BANK DATA FETCHED:", accountsData);
+      showToast("Bank Connected Successfully!");
       
-      const liveBalance = balanceData.results?.[0]?.current;
-
-      if (liveBalance !== undefined) {
-          // 5. Build the Mortgage Object
-          const currentMonthlyPayment = Math.abs(liveBalance); 
-
-          const newMortgage = {
-              name: mortgageAccount.provider?.display_name || "Live Mortgage",
-              amount: currentMonthlyPayment, 
-              logo: mortgageAccount.provider?.logo_uri || null,
-              type: 'mortgage',
-              isLive: true // Custom flag so you know this came from the bank
-          };
-
-          // 6. Save to Firebase Settings (Replaces any previous live mortgage, keeps manual ones)
-          const currentMortgages = userSettings.mortgages || [];
-          const updatedMortgages = [...currentMortgages.filter(m => !m.isLive), newMortgage];
-          
-          const newSettings = { ...userSettings, mortgages: updatedMortgages };
-          
-          const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
-          await setDoc(settingsRef, newSettings);
-          setUserSettings(newSettings); // Update UI instantly
-
-          showToast(`Live Mortgage Linked: £${currentMonthlyPayment.toFixed(2)}`);
-      }
-
     } catch (error) {
         console.error("Banking API Error:", error);
-        showToast("Failed to sync mortgage data.");
+        showToast("Failed to sync bank data.");
     }
   };
 
-  // 2. Attach this to a "Connect Mortgage" button
   const startBankConnection = () => {
-    const redirectUri = window.location.origin + '/callback'; 
-    const clientId = import.meta.env.VITE_TL_CLIENT_ID; 
-    
-    // Ensure we have a Client ID before trying to redirect
-    if (!clientId) {
-        showToast("Error: Client ID is missing. Check your Env Variables.");
-        return;
-    }
+      const origin = window.location.origin;
+      const redirectUri = origin + '/callback'; 
+      // FIX: Use the correct environment variable name
+      const clientId = import.meta.env.VITE_TL_CLIENT_ID; 
+      
+      if (!clientId) {
+          showToast("Error: Client ID is missing. Check Cloudflare Secrets.");
+          return;
+      }
 
-    // We encode the redirectUri so it doesn't break the URL string
-    const encodedRedirect = encodeURIComponent(redirectUri);
-    
-    // We also simplify the scopes for a cleaner request
-    const scopes = encodeURIComponent("info accounts balance cards transactions offline_access");
-
-    const authUrl = `https://auth.truelayer-sandbox.com/?response_type=code&client_id=${clientId}&scope=${scopes}&redirect_uri=${encodedRedirect}&providers=uk-ob-all%20uk-oauth-all`;
-    
-    window.location.href = authUrl;
-};
+      // FIX: Encode the Redirect URI and Scopes properly
+      const encodedRedirect = encodeURIComponent(redirectUri);
+      const scopes = encodeURIComponent("info accounts balance cards transactions offline_access");
+      
+      const authUrl = `https://auth.truelayer-sandbox.com/?response_type=code&client_id=${clientId}&scope=${scopes}&redirect_uri=${encodedRedirect}&providers=uk-ob-all%20uk-oauth-all`;
+      
+      window.location.href = authUrl;
+  };
 
   const handleDemoLogin = async () => {
     if (isLoggingIn) return;

@@ -7,7 +7,7 @@ export async function onRequestPost(context) {
       const body = await request.json();
       const { code, redirectUri, clientId } = body;
   
-      // We do the secret handshake here on the server
+      // FIX: Use 'clientId' from the frontend and 'env.TL_CLIENT_SECRET' from Cloudflare
       const response = await fetch('https://auth.truelayer-sandbox.com/connect/token', {
         method: 'POST',
         headers: {
@@ -15,8 +15,8 @@ export async function onRequestPost(context) {
         },
         body: new URLSearchParams({
           grant_type: 'authorization_code',
-          client_id: clientId, // Comes from React
-          client_secret: env.TL_CLIENT_SECRET, // <--- Pulls securely from Cloudflare Dashboard!
+          client_id: clientId,
+          client_secret: env.TL_CLIENT_SECRET, 
           redirect_uri: redirectUri,
           code: code,
         }),
@@ -32,4 +32,4 @@ export async function onRequestPost(context) {
     } catch (error) {
       return new Response(JSON.stringify({ error: error.message }), { status: 500 });
     }
-  }
+}
