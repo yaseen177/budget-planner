@@ -5133,15 +5133,22 @@ export default function App() {
 
   // --- OPEN BANKING API LOGIC ---
 
+  // --- OPEN BANKING API LOGIC ---
+
   useEffect(() => {
+    // We check the URL for the code
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
 
-    if (code) {
+    // ONLY proceed if we have BOTH the code AND Firebase has loaded the user
+    if (code && user) {
+      // Clear the code from the address bar so it looks clean
       window.history.replaceState({}, document.title, '/');
+      
+      // Safe to fetch and save, because 'user.uid' now exists!
       fetchBankingData(code);
     }
-  }, []);
+  }, [user]); // <-- CRUCIAL: This tells React to re-run this check once the user loads
 
   const fetchBankingData = async (code) => {
     try {
