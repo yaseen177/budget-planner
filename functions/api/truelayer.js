@@ -3,68 +3,64 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json();
-    // NOW ACCEPTING AN ARRAY OF ACCOUNTS
-    const { refreshToken, clientId, accounts } = body; 
+    const { code, redirectUri, clientId } = body;
 
-    if (!refreshToken || !accounts || !clientId) {
-        return new Response(JSON.stringify({ error: "Missing required parameters." }), { status: 400 });
-    }
-
-    // 1. Silent Login (Happens just ONCE per bank)
     const tokenResponse = await fetch('https://auth.truelayer.com/connect/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        grant_type: 'refresh_token',
+        grant_type: 'authorization_code',
         client_id: clientId,
-        client_secret: env.TL_CLIENT_SECRET,
-        refresh_token: refreshToken,
+        client_secret: env.TL_CLIENT_SECRET, 
+        redirect_uri: redirectUri,
+        code: code,
       }),
     });
 
     const tokenData = await tokenResponse.json();
-    if (!tokenData.access_token) throw new Error("reconnect_required");
+    if (!tokenData.access_token) throw new Error("Failed to authenticate with bank.");
 
     const accessToken = tokenData.access_token;
-    const newRefreshToken = tokenData.refresh_token || refreshToken; 
+    const refreshToken = tokenData.refresh_token; 
 
-    const toDate = new Date();
-    const fromDate = new Date();
-    fromDate.setDate(toDate.getDate() - 30); 
-
-    const fromStr = fromDate.toISOString();
-    const toStr = toDate.toISOString();
-
-    // 2. Fetch EVERY account simultaneously (Lightning Fast!)
-    const fetchPromises = accounts.map(async (acc) => {
-        const endpointType = acc.endpoint_type || 'accounts';
-        const txResponse = await fetch(`https://api.truelayer.com/data/v1/${endpointType}/${acc.account_id}/transactions?from=${fromStr}&to=${toStr}`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        const txData = await txResponse.json();
-        
-        if (txData.error) return [];
-
-        // Clean the data and tag it with the specific account ID
-        return (txData.results || []).map(tx => ({
-            id: tx.transaction_id,
-            date: tx.timestamp.split('T')[0],
-            description: tx.description,
-            amount: tx.amount,
-            category: tx.transaction_category || 'General',
-            merchant: tx.merchant_name || 'Unknown',
-            account_id: acc.account_id 
-        }));
+    // 1. Fetch Standard Accounts
+    const accountsResponse = await fetch('https://api.truelayer.com/data/v1/accounts', {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
     });
+    const accountsData = await accountsResponse.json();
 
-    // Wait for all simultaneous fetches to finish
-    const results = await Promise.all(fetchPromises);
-    const allTransactions = results.flat(); // Flatten the arrays into one big list
+    // 2. Fetch Cards (This is where AMEX lives!)
+    const cardsResponse = await fetch('https://api.truelayer.com/data/v1/cards', {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    const cardsData = await cardsResponse.json();
+
+    // 3. Merge them and tag where they came from
+    const allAccounts = [
+        ...(accountsData.results || []).map(a => ({ ...a, endpoint_type: 'accounts' })),
+        ...(cardsData.results || []).map(c => ({ ...c, endpoint_type: 'cards' }))
+    ];
+
+    const spendingAccounts = allAccounts.filter(
+        acc => !['MORTGAGE', 'LOAN'].includes((acc.account_type || '').toUpperCase())
+    );
+
+    if (spendingAccounts.length === 0) {
+        return new Response(JSON.stringify({ error: "No spending accounts found" }), { status: 404 });
+    }
 
     return new Response(JSON.stringify({
         success: true,
-        transactions: allTransactions,
-        new_refresh_token: newRefreshToken 
+        refresh_token: refreshToken,
+        accounts: spendingAccounts.map(acc => ({
+            account_id: acc.account_id,
+            name: acc.display_name || acc.provider?.display_name || "Bank Account",
+            type: acc.account_type || 'CARD',
+            currency: acc.currency,
+            provider_logo: acc.provider?.logo_uri || null,
+            provider_id: acc.provider?.provider_id || "unknown",
+            endpoint_type: acc.endpoint_type // NEW: Tells the frontend if this is an account or a card
+        }))
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
