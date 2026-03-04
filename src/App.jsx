@@ -1,5 +1,5 @@
 //REVERT BACK TO THIS IF ANY ERROR
-
+import Transactions from './Transactions';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -5820,6 +5820,16 @@ const authUrl = `https://auth.truelayer.com/?response_type=code` +
           onClose={() => setShowAnalytics(false)}
           currency={effectiveSettings.currency} // <--- CHANGED
           allocationRules={effectiveSettings.allocationRules} // <--- CHANGED
+        />
+      )}
+
+      {showTransactions && (
+        <Transactions 
+          user={user} 
+          appId={appId} 
+          onClose={() => setShowTransactions(false)}
+          onConnectBank={startBankConnection} // We pass the function you already wrote!
+          currency={effectiveSettings.currency} 
         />
       )}
 
