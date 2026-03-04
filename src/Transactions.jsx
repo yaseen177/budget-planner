@@ -298,7 +298,9 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                 )}
                             </div>
                             <div>
-                                <p className="font-bold text-slate-800 text-sm sm:text-base">{tx.merchant || tx.description}</p>
+                            <p className="font-bold text-slate-800 text-sm sm:text-base">
+   {tx.merchant && tx.merchant !== 'Unknown' ? tx.merchant : tx.description}
+</p>
                                 <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
                                   <span className="capitalize">{tx.category?.replace(/_/g, ' ') || 'General'}</span>
                                   <span className="w-1 h-1 bg-slate-300 rounded-full"></span>

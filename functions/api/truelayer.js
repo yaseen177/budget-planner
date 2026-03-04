@@ -28,9 +28,9 @@ export async function onRequestPost(context) {
     });
     const accountsData = await accountsResponse.json();
 
-    // 3. Filter for spending accounts (Now including AMEX's 'CREDIT_CARD' and 'CARD' tags)
+    // 3. Filter out Mortgages and Loans, but accept EVERYTHING else (including AMEX Charge Cards)
     const spendingAccounts = accountsData.results?.filter(
-      acc => ['TRANSACTION', 'CREDIT', 'CREDIT_CARD', 'CARD', 'SAVINGS'].includes(acc.account_type.toUpperCase())
+      acc => !['MORTGAGE', 'LOAN'].includes(acc.account_type.toUpperCase())
   ) || [];
 
   if (spendingAccounts.length === 0) {
