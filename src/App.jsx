@@ -5145,39 +5145,42 @@ export default function App() {
 
   const fetchBankingData = async (code) => {
     try {
-      showToast("Connecting to bank...");
+      showToast("Analysing bank data...");
       
       const redirectUri = window.location.origin + '/callback'; 
-      // FIX: Use the correct environment variable name
       const clientId = import.meta.env.VITE_TL_CLIENT_ID; 
 
-      const tokenResponse = await fetch('/api/truelayer', {
+      // 1. Send the code to our Cloudflare backend
+      const response = await fetch('/api/truelayer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-              code: code,
-              redirectUri: redirectUri,
-              clientId: clientId 
-          })
+          body: JSON.stringify({ code, redirectUri, clientId })
       });
 
-      const tokenData = await tokenResponse.json();
-      
-      if (!tokenData.access_token) {
-        throw new Error("Failed to get token from our secure backend");
+      const data = await response.json();
+
+      if (data.error) {
+          showToast(data.error === "No accounts found" ? "No eligible accounts found." : "Failed to sync bank data.");
+          return;
       }
 
-      const accountsResponse = await fetch(`https://api.truelayer-sandbox.com/data/v1/accounts`, {
-          headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
-      });
-      const accountsData = await accountsResponse.json();
+      if (data.success && data.mortgage) {
+          // 2. Save the formatted mortgage straight to Firebase
+          const currentMortgages = userSettings.mortgages || [];
+          const updatedMortgages = [...currentMortgages.filter(m => !m.isLive), data.mortgage];
+          
+          const newSettings = { ...userSettings, mortgages: updatedMortgages };
+          
+          const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
+          await setDoc(settingsRef, newSettings);
+          setUserSettings(newSettings); 
 
-      console.log("🏦 LIVE BANK DATA FETCHED:", accountsData);
-      showToast("Bank Connected Successfully!");
-      
+          showToast(`Live Bank Linked: £${data.mortgage.amount.toFixed(2)}`);
+      }
+
     } catch (error) {
         console.error("Banking API Error:", error);
-        showToast("Failed to sync bank data.");
+        showToast("Failed to communicate with secure server.");
     }
   };
 
