@@ -5245,9 +5245,10 @@ export default function App() {
           showToast(`Successfully linked ${data.accounts[0].name}!`);
       }
 
-    } catch (error) {
-        console.error("Banking API Error:", error);
-        showToast("Failed to communicate with secure server.");
+    } catch (err) {
+      console.error("CRITICAL FETCH ERROR:", err);
+      // This will now print the actual raw JavaScript or Network error to your screen!
+      showToast(`Server Crash: ${err.message}`);
     }
   };
 
