@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2 } from 'lucide-react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 const TRUELAYER_PROVIDERS = {
@@ -31,18 +31,18 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   const [transactions, setTransactions] = useState([]);
   const [error, setError] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeMenu, setActiveMenu] = useState(null); // Tracks which options menu is open
 
-  // Identify all the banks the user has told us about
   const userBanks = useMemo(() => {
     const banks = [];
     
     if (bankDetails?.name) {
-      banks.push({ id: 'current', name: bankDetails.name, type: 'Current Account' });
+      banks.push({ id: 'current', name: bankDetails.name, type: 'Current Account', fallbackLogo: bankDetails.logo });
     }
 
     const creditCards = expenses.filter(e => e.type === 'credit_card');
     creditCards.forEach(cc => {
-       banks.push({ id: cc.id, name: cc.name, type: 'Credit Card' });
+       banks.push({ id: cc.id, name: cc.name, type: 'Credit Card', fallbackLogo: cc.logo });
     });
 
     return banks.map(bank => {
@@ -52,14 +52,13 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
       const connection = providerId ? bankingData?.connections?.[providerId] : null;
       const isConnected = !!connection;
-      
-      // Grab the official logo from TrueLayer if they are connected
-      const logoUrl = isConnected && connection.accounts?.[0]?.provider_logo ? connection.accounts[0].provider_logo : null;
+
+      const liveLogo = isConnected && connection.accounts?.[0]?.provider_logo ? connection.accounts[0].provider_logo : null;
 
       return {
         ...bank,
         providerId,
-        logoUrl, // <-- We add the logo to the bank object here
+        logoUrl: liveLogo || bank.fallbackLogo, 
         status: !providerId ? 'Unavailable' : isConnected ? 'Connected' : 'Inactive'
       };
     });
@@ -74,6 +73,32 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
     return <CreditCard className="w-5 h-5 text-slate-400" />;
   };
 
+  // --- NEW: Disconnect Logic ---
+  const handleDisconnect = async (providerId) => {
+    if (!user) return;
+    try {
+      const bankingRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'openBanking');
+      const docSnap = await getDoc(bankingRef);
+
+      if (docSnap.exists() && docSnap.data().connections) {
+         const connections = { ...docSnap.data().connections };
+         
+         // Remove this specific bank from the Firebase dictionary
+         delete connections[providerId];
+         
+         await updateDoc(bankingRef, { connections });
+         setBankingData({ connections });
+         setActiveMenu(null); // Close the dropdown menu
+         
+         // Refetch to clear out the disconnected bank's transactions from the feed
+         fetchTransactions(true); 
+      }
+    } catch (err) {
+      console.error("Failed to disconnect bank:", err);
+      setError("Failed to disconnect bank securely.");
+    }
+  };
+
   const fetchTransactions = async (forceRefresh = false) => {
     if (!user) return;
     if (forceRefresh) setIsRefreshing(true);
@@ -83,8 +108,9 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
       const bankingRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'openBanking');
       const docSnap = await getDoc(bankingRef);
 
-      if (!docSnap.exists() || !docSnap.data().connections) {
+      if (!docSnap.exists() || !docSnap.data().connections || Object.keys(docSnap.data().connections).length === 0) {
         setBankingData(null);
+        setTransactions([]); // Clear transactions if no banks are connected
         setLoading(false);
         return;
       }
@@ -97,61 +123,56 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
       let tokensChanged = false;
       let authErrorOccurred = false;
 
-      // Loop through EVERY connected bank concurrently
-      const fetchPromises = Object.entries(connections).map(async ([providerId, bankData]) => {
-          if (!bankData.accounts || bankData.accounts.length === 0) return;
-          
-          const primaryAccount = bankData.accounts[0]; // Fetch from their main account for this bank
+      for (const [providerId, bankData] of Object.entries(connections)) {
+          if (!bankData.accounts || bankData.accounts.length === 0) continue;
 
-          try {
-            const response = await fetch('/api/transactions', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                refreshToken: bankData.refreshToken,
-                accountId: primaryAccount.account_id,
-                clientId: import.meta.env.VITE_TL_CLIENT_ID,
-                // Pass the tag to the backend!
-                endpointType: primaryAccount.endpoint_type || 'accounts' 
-              })
-            });
+          let currentToken = bankData.refreshToken;
 
-            const responseData = await response.json();
+          for (const account of bankData.accounts) {
+              try {
+                  const response = await fetch('/api/transactions', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                          refreshToken: currentToken, 
+                          accountId: account.account_id,
+                          clientId: import.meta.env.VITE_TL_CLIENT_ID,
+                          endpointType: account.endpoint_type || 'accounts'
+                      })
+                  });
 
-            if (responseData.error) {
-                if (responseData.error === "reconnect_required") authErrorOccurred = true;
-                return;
-            }
+                  const responseData = await response.json();
 
-            if (responseData.success) {
-                // Tag each transaction with its bank logo so the user knows where it came from
-                const txsWithBank = responseData.transactions.map(tx => ({
-                    ...tx,
-                    bankName: primaryAccount.name,
-                    providerLogo: primaryAccount.provider_logo
-                }));
+                  if (responseData.error) {
+                      if (responseData.error === "reconnect_required") authErrorOccurred = true;
+                      continue; 
+                  }
 
-                allTransactions = [...allTransactions, ...txsWithBank];
-                
-                // Keep tokens fresh
-                if (responseData.new_refresh_token && responseData.new_refresh_token !== bankData.refreshToken) {
-                    updatedConnections[providerId].refreshToken = responseData.new_refresh_token;
-                    tokensChanged = true;
-                }
-            }
-          } catch (e) {
-             console.error(`Failed to fetch ${providerId}:`, e);
+                  if (responseData.success) {
+                      const txsWithBank = responseData.transactions.map(tx => ({
+                          ...tx,
+                          bankName: account.name, 
+                          providerLogo: account.provider_logo 
+                      }));
+
+                      allTransactions = [...allTransactions, ...txsWithBank];
+
+                      if (responseData.new_refresh_token && responseData.new_refresh_token !== currentToken) {
+                          currentToken = responseData.new_refresh_token;
+                          updatedConnections[providerId].refreshToken = currentToken;
+                          tokensChanged = true;
+                      }
+                  }
+              } catch (e) {
+                 console.error(`Failed to fetch account ${account.name}:`, e);
+              }
           }
-      });
-
-      // Wait for all banks to finish fetching
-      await Promise.all(fetchPromises);
-
-      if (authErrorOccurred) {
-          setError("One or more of your connections has expired. Please hit 'Connect' to refresh them.");
       }
 
-      // Sort the massive combined list by date (newest first)
+      if (authErrorOccurred) {
+          setError("One or more of your connections has expired. Please hit 'Options > Reconnect' to refresh them.");
+      }
+
       allTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
       setTransactions(allTransactions);
 
@@ -198,8 +219,8 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
           ) : (
             <>
               {error && (
-                <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-2xl font-medium text-sm">
-                  {error}
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-2xl font-medium text-sm flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 shrink-0" /> {error}
                 </div>
               )}
 
@@ -209,7 +230,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                      <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <Shield className="w-5 h-5 text-emerald-500" /> Your Accounts
                      </h3>
-                     {/* Unified Sync Button */}
                      {bankingData && Object.keys(bankingData.connections).length > 0 && (
                         <button 
                             onClick={() => fetchTransactions(true)}
@@ -229,13 +249,13 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                          <div key={index} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/50">
                             
                             <div className="flex items-center gap-4">
-                               <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center w-12 h-12">
+                               <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center w-12 h-12">
                                   {bank.logoUrl ? (
-                                      <img src={bank.logoUrl} alt={bank.name} className="w-6 h-6 object-contain" />
+                                      <img src={bank.logoUrl} alt={bank.name} className="w-7 h-7 object-contain" />
                                   ) : bank.type === 'Credit Card' ? (
-                                      <CreditCard className="w-6 h-6 text-slate-700" />
+                                      <CreditCard className="w-6 h-6 text-slate-400" />
                                   ) : (
-                                      <Landmark className="w-6 h-6 text-slate-700" />
+                                      <Landmark className="w-6 h-6 text-slate-400" />
                                   )}
                                </div>
                                <div>
@@ -256,6 +276,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                   {bank.status}
                                </div>
 
+                               {/* --- ACTION BUTTONS --- */}
                                {bank.status === 'Inactive' && (
                                   <button 
                                      onClick={() => onConnectBank(bank.providerId)}
@@ -264,9 +285,43 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                      Connect
                                   </button>
                                )}
+
                                {bank.status === 'Connected' && (
-                                  <div className="text-xs font-medium text-slate-400 flex items-center gap-1">
-                                     <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Active
+                                  <div className="flex items-center gap-2">
+                                     <div className="text-xs font-medium text-slate-400 flex items-center gap-1 mr-2 hidden sm:flex">
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Active
+                                     </div>
+                                     
+                                     {/* Options Dropdown */}
+                                     <div className="relative">
+                                        <button 
+                                          onClick={() => setActiveMenu(activeMenu === bank.providerId ? null : bank.providerId)}
+                                          className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-full transition"
+                                        >
+                                           <MoreVertical className="w-5 h-5" />
+                                        </button>
+
+                                        {activeMenu === bank.providerId && (
+                                           <>
+                                             <div className="fixed inset-0 z-30" onClick={() => setActiveMenu(null)}></div>
+                                             <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-40 animate-in fade-in zoom-in-95 origin-top-right">
+                                                <button 
+                                                  onClick={() => { setActiveMenu(null); onConnectBank(bank.providerId); }}
+                                                  className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition"
+                                                >
+                                                  <RefreshCw className="w-4 h-4 text-slate-400" /> Reconnect Bank
+                                                </button>
+                                                <div className="h-px bg-slate-100 my-1"></div>
+                                                <button 
+                                                  onClick={() => handleDisconnect(bank.providerId)}
+                                                  className="w-full text-left px-4 py-2.5 text-sm font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-3 transition"
+                                                >
+                                                  <Trash2 className="w-4 h-4" /> Disconnect
+                                                </button>
+                                             </div>
+                                           </>
+                                        )}
+                                     </div>
                                   </div>
                                )}
                             </div>
@@ -278,31 +333,34 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
               {/* SECTION 2: UNIFIED TRANSACTIONS FEED */}
               {bankingData && Object.keys(bankingData.connections).length > 0 && transactions.length > 0 && (
-                <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden mt-6">
                   <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                      <h3 className="font-bold text-slate-800">Unified Spending Feed</h3>
                      <span className="text-xs font-medium text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200">Last 30 Days</span>
                   </div>
 
                   <div className="divide-y divide-slate-50">
-                    {transactions.map((tx, idx) => (
+                    {transactions.map((tx, idx) => {
+                      const relatedBank = userBanks.find(b => b.name === tx.bankName || (b.providerId && b.status === 'Connected'));
+                      const displayLogo = tx.providerLogo || relatedBank?.logoUrl;
+
+                      return (
                       <div key={`${tx.id}-${idx}`} className="p-4 sm:p-5 flex justify-between items-center hover:bg-slate-50 transition group">
                           <div className="flex items-center gap-4">
                             <div className="relative">
                                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 group-hover:bg-white group-hover:shadow-sm transition">
                                     {getCategoryIcon(tx.category)}
                                 </div>
-                                {/* Bank Logo Bubble */}
-                                {tx.providerLogo && (
+                                {displayLogo && (
                                     <div className="absolute -bottom-1 -right-1 bg-white p-0.5 rounded-full shadow-sm border border-slate-100">
-                                        <img src={tx.providerLogo} className="w-3.5 h-3.5 object-contain rounded-full" />
+                                        <img src={displayLogo} className="w-4 h-4 object-contain rounded-full" />
                                     </div>
                                 )}
                             </div>
                             <div>
-                            <p className="font-bold text-slate-800 text-sm sm:text-base">
-   {tx.merchant && tx.merchant !== 'Unknown' ? tx.merchant : tx.description}
-</p>
+                                <p className="font-bold text-slate-800 text-sm sm:text-base">
+                                  {tx.merchant && tx.merchant !== 'Unknown' ? tx.merchant : tx.description}
+                                </p>
                                 <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
                                   <span className="capitalize">{tx.category?.replace(/_/g, ' ') || 'General'}</span>
                                   <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
@@ -320,7 +378,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">{tx.bankName}</span>
                           </div>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 </div>
               )}
