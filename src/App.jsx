@@ -5190,21 +5190,14 @@ export default function App() {
         return;
     }
 
-    // Use URLSearchParams to ensure the browser encodes the spaces and colons for us
-    const params = new URLSearchParams({
-        response_type: 'code',
-        client_id: clientId,
-        // Minimal scopes required to see mortgage balances
-        scope: 'info accounts balance offline_access', 
-        redirect_uri: redirectUri,
-        // This specific string tells TrueLayer to show ALL UK Open Banking banks
-        providers: 'uk-ob-all' 
-    });
-
-    // Construct the final URL
-    const authUrl = `https://auth.truelayer-sandbox.com/?${params.toString()}`;
+    // By hardcoding the string, we guarantee TrueLayer gets '%20' instead of '+'
+    const authUrl = `https://auth.truelayer-sandbox.com/?response_type=code` +
+                    `&client_id=${clientId}` +
+                    `&scope=info%20accounts%20balance%20offline_access` +
+                    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+                    `&providers=uk-ob-all%20uk-oauth-all`;
     
-    console.log("Redirecting to TrueLayer:", authUrl);
+    console.log("Redirecting to TrueLayer (Fixed Encoding):", authUrl);
     window.location.href = authUrl;
   };
 
