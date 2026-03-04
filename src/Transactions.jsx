@@ -152,7 +152,8 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                       const txsWithBank = responseData.transactions.map(tx => ({
                           ...tx,
                           bankName: account.name, 
-                          providerLogo: account.provider_logo 
+                          providerLogo: account.provider_logo,
+                          providerId: providerId
                       }));
 
                       allTransactions = [...allTransactions, ...txsWithBank];
@@ -341,7 +342,10 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
                   <div className="divide-y divide-slate-50">
                     {transactions.map((tx, idx) => {
-                      const relatedBank = userBanks.find(b => b.name === tx.bankName || (b.providerId && b.status === 'Connected'));
+                      
+                      // REPLACE the old relatedBank line with this one:
+                      const relatedBank = userBanks.find(b => b.providerId === tx.providerId);
+                      
                       const displayLogo = tx.providerLogo || relatedBank?.logoUrl;
 
                       return (
