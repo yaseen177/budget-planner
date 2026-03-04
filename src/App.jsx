@@ -5183,19 +5183,21 @@ export default function App() {
   // --- OPEN BANKING API LOGIC ---
 
   useEffect(() => {
-    // We check the URL for the code
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
-
-    // ONLY proceed if we have BOTH the code AND Firebase has loaded the user
-    if (code && user) {
-      // Clear the code from the address bar so it looks clean
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      // Safe to fetch and save, because 'user.uid' now exists!
-      fetchBankingData(code);
+    
+    // Check if the code exists AND hasn't been saved to browser memory yet
+    if (code && !sessionStorage.getItem(`used_code_${code}`)) {
+       
+       // Lock it in browser memory immediately!
+       sessionStorage.setItem(`used_code_${code}`, 'true');
+       
+       // Wipe the URL clean
+       window.history.replaceState({}, document.title, window.location.pathname);
+       
+       fetchBankingData(code);
     }
-  }, [user]); // <-- CRUCIAL: This tells React to re-run this check once the user loads
+  }, []);
 
   const fetchBankingData = async (code) => {
     try {
@@ -5213,9 +5215,13 @@ export default function App() {
       const data = await response.json();
 
       if (data.error) {
-          showToast(data.error === "No spending accounts found" ? "No eligible spending accounts found." : "Failed to sync bank data.");
-          return;
-      }
+        // Log it for good measure
+        console.error("TRUELAYER RAW ERROR:", data.error);
+        
+        // Force the toast to show us the exact problem!
+        showToast(`Bank Error: ${data.error}`);
+        return;
+    }
 
       if (data.success && data.refresh_token && data.accounts.length > 0) {
           // Identify which bank was just connected
