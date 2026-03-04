@@ -5833,8 +5833,6 @@ const authUrl = `https://auth.truelayer.com/?response_type=code` +
         />
       )}
 
-      
-
       {showSandboxInfo && (
         <SandboxInfoModal 
             onClose={() => setShowSandboxInfo(false)}
