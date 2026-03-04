@@ -5212,7 +5212,8 @@ export default function App() {
 
     let authUrl = `https://auth.truelayer.com/?response_type=code` +
                   `&client_id=${clientId}` +
-                  `&scope=info%20accounts%20balance%20transactions%20offline_access` +
+                  // Add 'cards' to this string!
+                  `&scope=info%20accounts%20balance%20transactions%20cards%20offline_access` +
                   `&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
     // If we have a specific bank ID, skip the selection screen!

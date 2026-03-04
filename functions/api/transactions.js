@@ -1,16 +1,16 @@
+// Replace the top section down to the txResponse fetch:
 export async function onRequestPost(context) {
     const { request, env } = context;
   
     try {
       const body = await request.json();
-      const { refreshToken, accountId, clientId } = body;
+      // 1. Catch the new endpointType (defaulting to 'accounts')
+      const { refreshToken, accountId, clientId, endpointType = 'accounts' } = body; 
   
       if (!refreshToken || !accountId || !clientId) {
           return new Response(JSON.stringify({ error: "Missing required parameters." }), { status: 400 });
       }
   
-      // 1. SILENT LOGIN: Exchange the Refresh Token for a fresh Access Token
-      // Note: We are using the Live URL 'auth.truelayer.com'
       const tokenResponse = await fetch('https://auth.truelayer.com/connect/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -23,18 +23,11 @@ export async function onRequestPost(context) {
       });
   
       const tokenData = await tokenResponse.json();
-      
-      // If the token is rejected (e.g., 90-day expiry), tell the frontend so it can ask the user to reconnect
-      if (!tokenData.access_token) {
-          throw new Error("reconnect_required");
-      }
+      if (!tokenData.access_token) throw new Error("reconnect_required");
   
       const accessToken = tokenData.access_token;
-      
-      // TrueLayer sometimes rotates the refresh token for security. We must catch the new one!
       const newRefreshToken = tokenData.refresh_token || refreshToken; 
   
-      // 2. SET THE DATE RANGE: Let's fetch the last 30 days of transactions
       const toDate = new Date();
       const fromDate = new Date();
       fromDate.setDate(toDate.getDate() - 30); 
@@ -42,8 +35,8 @@ export async function onRequestPost(context) {
       const fromStr = fromDate.toISOString();
       const toStr = toDate.toISOString();
   
-      // 3. FETCH TRANSACTIONS: Grab the data for the specific account
-      const txResponse = await fetch(`https://api.truelayer.com/data/v1/accounts/${accountId}/transactions?from=${fromStr}&to=${toStr}`, {
+      // 2. Use the dynamic endpointType in the URL!
+      const txResponse = await fetch(`https://api.truelayer.com/data/v1/${endpointType}/${accountId}/transactions?from=${fromStr}&to=${toStr}`, {
           headers: { 'Authorization': `Bearer ${accessToken}` }
       });
       

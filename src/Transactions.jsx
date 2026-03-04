@@ -110,7 +110,9 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
               body: JSON.stringify({
                 refreshToken: bankData.refreshToken,
                 accountId: primaryAccount.account_id,
-                clientId: import.meta.env.VITE_TL_CLIENT_ID
+                clientId: import.meta.env.VITE_TL_CLIENT_ID,
+                // Pass the tag to the backend!
+                endpointType: primaryAccount.endpoint_type || 'accounts' 
               })
             });
 
