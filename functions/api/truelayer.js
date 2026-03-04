@@ -5,7 +5,7 @@ export async function onRequestPost(context) {
     const body = await request.json();
     const { code, redirectUri, clientId } = body;
 
-    // 1. LIVE Token Endpoint
+    // 1. Exchange the code for the Access Token AND the Refresh Token
     const tokenResponse = await fetch('https://auth.truelayer.com/connect/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -24,39 +24,34 @@ export async function onRequestPost(context) {
     }
 
     const accessToken = tokenData.access_token;
+    const refreshToken = tokenData.refresh_token; // <-- THE GOLDEN KEY
 
-    // 2. LIVE Accounts Endpoint
+    // 2. Fetch all accounts the user just authorised
     const accountsResponse = await fetch('https://api.truelayer.com/data/v1/accounts', {
         headers: { 'Authorization': `Bearer ${accessToken}` }
     });
     const accountsData = await accountsResponse.json();
 
-    // 3. Find the Mortgage Account
-    const targetAccount = accountsData.results?.find(
-        acc => acc.account_type === 'mortgage' || acc.account_type === 'loan'
-    );
+    // 3. Filter for spending accounts (Current Accounts, Credit Cards, Savings)
+    const spendingAccounts = accountsData.results?.filter(
+        acc => ['TRANSACTION', 'CREDIT', 'SAVINGS'].includes(acc.account_type.toUpperCase())
+    ) || [];
 
-    if (!targetAccount) {
-        return new Response(JSON.stringify({ error: "No mortgage accounts found" }), { status: 404 });
+    if (spendingAccounts.length === 0) {
+        return new Response(JSON.stringify({ error: "No spending accounts found" }), { status: 404 });
     }
 
-    // 4. LIVE Balance Endpoint
-    const balanceResponse = await fetch(`https://api.truelayer.com/data/v1/accounts/${targetAccount.account_id}/balance`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-    });
-    const balanceData = await balanceResponse.json();
-    const liveBalance = balanceData.results?.[0]?.current || 0;
-
-    // 5. Send data back to the frontend
+    // 4. Send the Refresh Token and the list of accounts back to React
     return new Response(JSON.stringify({
         success: true,
-        mortgage: {
-            name: targetAccount.provider?.display_name || "Live Mortgage",
-            amount: Math.abs(liveBalance), 
-            logo: targetAccount.provider?.logo_uri || null,
-            type: 'mortgage',
-            isLive: true
-        }
+        refresh_token: refreshToken,
+        accounts: spendingAccounts.map(acc => ({
+            account_id: acc.account_id,
+            name: acc.display_name || acc.provider?.display_name || "Bank Account",
+            type: acc.account_type,
+            currency: acc.currency,
+            provider_logo: acc.provider?.logo_uri || null
+        }))
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }

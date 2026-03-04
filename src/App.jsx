@@ -4596,6 +4596,8 @@ export default function App() {
 
   const [isLegacyUser, setIsLegacyUser] = useState(false);
 
+  const [showTransactions, setShowTransactions] = useState(false);
+
   // --- ADMIN DEMO STATE ---
   const [activeDemoId, setActiveDemoId] = useState(null);
 
@@ -5152,7 +5154,7 @@ export default function App() {
 
   const fetchBankingData = async (code) => {
     try {
-      showToast("Analysing bank data...");
+      showToast("Securing your bank connection...");
       
       const redirectUri = window.location.origin + '/callback'; 
       const clientId = import.meta.env.VITE_TL_CLIENT_ID; 
@@ -5167,22 +5169,24 @@ export default function App() {
       const data = await response.json();
 
       if (data.error) {
-          showToast(data.error === "No accounts found" ? "No eligible accounts found." : "Failed to sync bank data.");
+          showToast(data.error === "No spending accounts found" ? "No eligible spending accounts found." : "Failed to sync bank data.");
           return;
       }
 
-      if (data.success && data.mortgage) {
-          // 2. Save the formatted mortgage straight to Firebase
-          const currentMortgages = userSettings.mortgages || [];
-          const updatedMortgages = [...currentMortgages.filter(m => !m.isLive), data.mortgage];
+      if (data.success && data.refresh_token) {
+          // 2. Save the golden token and accounts list to a dedicated Firebase document
+          const bankingRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'openBanking');
           
-          const newSettings = { ...userSettings, mortgages: updatedMortgages };
-          
-          const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
-          await setDoc(settingsRef, newSettings);
-          setUserSettings(newSettings); 
+          await setDoc(bankingRef, {
+              refreshToken: data.refresh_token,
+              accounts: data.accounts,
+              lastConnected: new Date().toISOString()
+          });
 
-          showToast(`Live Bank Linked: £${data.mortgage.amount.toFixed(2)}`);
+          showToast(`Successfully linked ${data.accounts.length} account(s)!`);
+          
+          // If using a router, you could redirect them to the new analytics page here:
+          // navigate('/transactions');
       }
 
     } catch (error) {
@@ -5202,11 +5206,12 @@ export default function App() {
 
     // 1. Point to the LIVE auth server (removed '-sandbox')
     // 2. Added 'providers=uk-ob-all' to show all real UK banks
-    const authUrl = `https://auth.truelayer.com/?response_type=code` +
-                    `&client_id=${clientId}` +
-                    `&scope=info%20accounts%20balance%20offline_access` +
-                    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-                    `&providers=uk-ob-all`; 
+    // Add 'transactions' to the list of scopes requested
+const authUrl = `https://auth.truelayer.com/?response_type=code` +
+`&client_id=${clientId}` +
+`&scope=info%20accounts%20balance%20transactions%20offline_access` +
+`&redirect_uri=${encodeURIComponent(redirectUri)}` +
+`&providers=uk-ob-all`;
     
     console.log("Directing to Live Bank Selection:", authUrl);
     window.location.href = authUrl;
@@ -5884,13 +5889,6 @@ export default function App() {
             <div className={`p-3.5 rounded-2xl shadow-lg border border-white/10 backdrop-blur-md ${isSandbox ? 'bg-indigo-500/20 text-indigo-200' : 'bg-white/10 text-emerald-100'}`}>
               {isSandbox ? <FlaskConical className="w-6 h-6" /> : <Landmark className="w-6 h-6" />}
             </div>
-
-            <button 
-              onClick={startBankConnection}
-              className="bg-blue-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-700 transition shadow-lg w-full flex justify-center items-center gap-2"
-            >
-              <Shield className="w-5 h-5" /> Connect Live Mortgage
-            </button>
             
             <div>
               <h1 className="text-2xl font-black tracking-tight text-white leading-none mb-1">
@@ -5921,6 +5919,9 @@ export default function App() {
             
              <button id="btn-sandbox" onClick={toggleSandbox} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition border border-white/5 text-white/70 hover:text-white backdrop-blur-md" title="Sandbox Mode">
               <FlaskConical className={`w-5 h-5`} />
+            </button>
+            <button id="btn-transactions" onClick={() => setShowTransactions(true)} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition border border-white/5 text-white/70 hover:text-white backdrop-blur-md" title="Transactions">
+              <CreditCard className={`w-5 h-5`} />
             </button>
             <button id="btn-analytics" onClick={() => setShowAnalytics(true)} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition border border-white/5 text-white/70 hover:text-white backdrop-blur-md" title="Trends">
               <BarChart3 className={`w-5 h-5`} />
@@ -6587,6 +6588,7 @@ export default function App() {
                 )}
                 {[
                   { id: 'btn-sandbox-mobile', label: 'Sandbox', icon: FlaskConical, action: toggleSandbox, color: 'text-purple-600', bg: 'bg-purple-50' },
+                  { id: 'btn-transactions-mobile', label: 'Transactions', icon: CreditCard, action: () => setShowTransactions(true), color: 'text-indigo-600', bg: 'bg-indigo-50' },
                   { id: 'btn-analytics-mobile', label: 'Analytics', icon: BarChart3, action: () => setShowAnalytics(true), color: 'text-emerald-600', bg: 'bg-emerald-50' },
                   { label: 'Reports', icon: FileText, action: () => setShowReportSelector(true), color: 'text-blue-600', bg: 'bg-blue-50' },
                   { id: 'btn-settings-mobile', label: 'Settings', icon: Settings, action: () => setShowSettings(true), color: 'text-slate-600', bg: 'bg-slate-100' },
