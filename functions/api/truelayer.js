@@ -5,8 +5,8 @@ export async function onRequestPost(context) {
     const body = await request.json();
     const { code, redirectUri, clientId } = body;
 
-    // 1. Secret Handshake: Exchange code for the Access Token
-    const tokenResponse = await fetch('https://auth.truelayer-sandbox.com/connect/token', {
+    // 1. LIVE Token Endpoint
+    const tokenResponse = await fetch('https://auth.truelayer.com/connect/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -25,34 +25,29 @@ export async function onRequestPost(context) {
 
     const accessToken = tokenData.access_token;
 
-    // 2. Fetch Accounts (Now safely happening on the server!)
-    const accountsResponse = await fetch('https://api.truelayer-sandbox.com/data/v1/accounts', {
+    // 2. LIVE Accounts Endpoint
+    const accountsResponse = await fetch('https://api.truelayer.com/data/v1/accounts', {
         headers: { 'Authorization': `Bearer ${accessToken}` }
     });
     const accountsData = await accountsResponse.json();
 
-    // 3. Find the Mortgage (or use the first Mock Account available)
-    let targetAccount = accountsData.results?.find(
+    // 3. Find the Mortgage Account
+    const targetAccount = accountsData.results?.find(
         acc => acc.account_type === 'mortgage' || acc.account_type === 'loan'
     );
 
-    // Fallback: The Mock Bank often just gives generic accounts, so we grab the first one to ensure it works
-    if (!targetAccount && accountsData.results?.length > 0) {
-        targetAccount = accountsData.results[0];
-    }
-
     if (!targetAccount) {
-        return new Response(JSON.stringify({ error: "No accounts found" }), { status: 404 });
+        return new Response(JSON.stringify({ error: "No mortgage accounts found" }), { status: 404 });
     }
 
-    // 4. Fetch the Balance for that specific account
-    const balanceResponse = await fetch(`https://api.truelayer-sandbox.com/data/v1/accounts/${targetAccount.account_id}/balance`, {
+    // 4. LIVE Balance Endpoint
+    const balanceResponse = await fetch(`https://api.truelayer.com/data/v1/accounts/${targetAccount.account_id}/balance`, {
         headers: { 'Authorization': `Bearer ${accessToken}` }
     });
     const balanceData = await balanceResponse.json();
     const liveBalance = balanceData.results?.[0]?.current || 0;
 
-    // 5. Send a perfectly formatted object back to React
+    // 5. Send data back to the frontend
     return new Response(JSON.stringify({
         success: true,
         mortgage: {

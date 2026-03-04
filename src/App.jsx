@@ -5200,15 +5200,15 @@ export default function App() {
         return;
     }
 
-    // We use the exact 'provider_id' you found: "mock"
-    // We encode the redirectUri but use %20 for spaces in the scope to be safe.
-    const authUrl = `https://auth.truelayer-sandbox.com/?response_type=code` +
+    // 1. Point to the LIVE auth server (removed '-sandbox')
+    // 2. Added 'providers=uk-ob-all' to show all real UK banks
+    const authUrl = `https://auth.truelayer.com/?response_type=code` +
                     `&client_id=${clientId}` +
                     `&scope=info%20accounts%20balance%20offline_access` +
                     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-                    `&provider_id=mock`; 
+                    `&providers=uk-ob-all`; 
     
-    console.log("Directing to Mock Bank:", authUrl);
+    console.log("Directing to Live Bank Selection:", authUrl);
     window.location.href = authUrl;
   };
 
@@ -5884,6 +5884,13 @@ export default function App() {
             <div className={`p-3.5 rounded-2xl shadow-lg border border-white/10 backdrop-blur-md ${isSandbox ? 'bg-indigo-500/20 text-indigo-200' : 'bg-white/10 text-emerald-100'}`}>
               {isSandbox ? <FlaskConical className="w-6 h-6" /> : <Landmark className="w-6 h-6" />}
             </div>
+
+            <button 
+              onClick={startBankConnection}
+              className="bg-blue-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-700 transition shadow-lg w-full flex justify-center items-center gap-2"
+            >
+              <Shield className="w-5 h-5" /> Connect Live Mortgage
+            </button>
             
             <div>
               <h1 className="text-2xl font-black tracking-tight text-white leading-none mb-1">
@@ -5911,12 +5918,7 @@ export default function App() {
                </button>
             )}
 
-            <button 
-              onClick={startBankConnection}
-              className="bg-blue-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-700 transition shadow-lg w-full flex justify-center items-center gap-2"
-            >
-              <Shield className="w-5 h-5" /> Connect Live Mortgage
-            </button>
+            
              <button id="btn-sandbox" onClick={toggleSandbox} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition border border-white/5 text-white/70 hover:text-white backdrop-blur-md" title="Sandbox Mode">
               <FlaskConical className={`w-5 h-5`} />
             </button>
