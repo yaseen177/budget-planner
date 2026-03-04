@@ -5186,18 +5186,19 @@ export default function App() {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     
-    // Check if the code exists AND hasn't been saved to browser memory yet
+    // THE GATEKEEPER: If there's no user yet, don't try to sync!
+    // Firebase takes a second to load the user after a redirect.
+    if (!user) return; 
+
     if (code && !sessionStorage.getItem(`used_code_${code}`)) {
-       
-       // Lock it in browser memory immediately!
        sessionStorage.setItem(`used_code_${code}`, 'true');
        
-       // Wipe the URL clean
        window.history.replaceState({}, document.title, window.location.pathname);
        
+       // Now it is safe to call because 'user.uid' definitely exists
        fetchBankingData(code);
     }
-  }, []);
+  }, [user]); // Add 'user' as a dependency so it fires as soon as the user is found
 
   const fetchBankingData = async (code) => {
     try {
