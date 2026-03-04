@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, RefreshCw, Landmark, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2, Utensils, Tv, ShoppingCart, TrendingUp, Activity } from 'lucide-react';
+import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2, Utensils, Tv, ShoppingCart, TrendingUp, Activity } from 'lucide-react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 const TRUELAYER_PROVIDERS = {
@@ -29,9 +29,10 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   const [loading, setLoading] = useState(true);
   const [bankingData, setBankingData] = useState(null);
   const [transactions, setTransactions] = useState([]);
+  const [balances, setBalances] = useState({}); // <--- NEW STATE FOR BALANCES
   const [error, setError] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [activeMenu, setActiveMenu] = useState(null); // Tracks which options menu is open
+  const [activeMenu, setActiveMenu] = useState(null); 
 
   const userBanks = useMemo(() => {
     const banks = [];
@@ -58,7 +59,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
       return {
         ...bank,
         providerId,
-        logoUrl: bank.fallbackLogo || liveLogo,
+        logoUrl: bank.fallbackLogo || liveLogo, 
         status: !providerId ? 'Unavailable' : isConnected ? 'Connected' : 'Inactive'
       };
     });
@@ -78,7 +79,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
     }
   };
 
-  // --- NEW: Disconnect Logic ---
   const handleDisconnect = async (providerId) => {
     if (!user) return;
     try {
@@ -87,15 +87,11 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
       if (docSnap.exists() && docSnap.data().connections) {
          const connections = { ...docSnap.data().connections };
-         
-         // Remove this specific bank from the Firebase dictionary
          delete connections[providerId];
          
          await updateDoc(bankingRef, { connections });
          setBankingData({ connections });
-         setActiveMenu(null); // Close the dropdown menu
-         
-         // Refetch to clear out the disconnected bank's transactions from the feed
+         setActiveMenu(null); 
          fetchTransactions(true); 
       }
     } catch (err) {
@@ -116,6 +112,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
       if (!docSnap.exists() || !docSnap.data().connections || Object.keys(docSnap.data().connections).length === 0) {
         setBankingData(null);
         setTransactions([]);
+        setBalances({});
         setLoading(false);
         return;
       }
@@ -128,12 +125,10 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
       let tokensChanged = false;
       let authErrorOccurred = false;
 
-      // Loop through each BANK (e.g. once for Monzo, once for AMEX)
       for (const [providerId, bankData] of Object.entries(connections)) {
           if (!bankData.accounts || bankData.accounts.length === 0) continue;
 
           try {
-              // Send ALL accounts for this bank to our Cloudflare backend in one go!
               const response = await fetch('/api/transactions', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -155,7 +150,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
               }
 
               if (responseData.success) {
-                  // Re-attach the correct bank details to each transaction based on account_id
                   const txsWithBank = responseData.transactions.map(tx => {
                       const accountDetails = bankData.accounts.find(a => a.account_id === tx.account_id);
                       return {
@@ -167,6 +161,11 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                   });
 
                   allTransactions = [...allTransactions, ...txsWithBank];
+
+                  // Capture the live balances sent from the backend!
+                  if (responseData.balances) {
+                      setBalances(prev => ({ ...prev, ...responseData.balances }));
+                  }
 
                   if (responseData.new_refresh_token && responseData.new_refresh_token !== bankData.refreshToken) {
                       updatedConnections[providerId].refreshToken = responseData.new_refresh_token;
@@ -250,90 +249,115 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                      )}
                  </div>
                  
-                 <div className="space-y-3">
+                 <div className="space-y-4">
                     {userBanks.length === 0 ? (
                        <p className="text-slate-500 text-sm text-center py-4">No banks or credit cards added to your budget yet.</p>
                     ) : (
                        userBanks.map((bank, index) => (
-                         <div key={index} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/50">
+                         // Notice the structural change here to accommodate the new balances sub-section
+                         <div key={index} className="flex flex-col p-4 rounded-2xl border border-slate-100 bg-slate-50/50">
                             
-                            <div className="flex items-center gap-4">
-                               <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center w-12 h-12">
-                                  {bank.logoUrl ? (
-                                      <img src={bank.logoUrl} alt={bank.name} className="w-7 h-7 object-contain" />
-                                  ) : bank.type === 'Credit Card' ? (
-                                      <CreditCard className="w-6 h-6 text-slate-400" />
-                                  ) : (
-                                      <Landmark className="w-6 h-6 text-slate-400" />
-                                  )}
-                               </div>
-                               <div>
-                                  <h4 className="font-bold text-slate-800">{bank.name}</h4>
-                                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{bank.type}</p>
-                               </div>
+                            {/* Main Row: Bank Info & Actions */}
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div className="flex items-center gap-4">
+                                   <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center w-12 h-12">
+                                      {bank.logoUrl ? (
+                                          <img src={bank.logoUrl} alt={bank.name} className="w-7 h-7 object-contain" />
+                                      ) : bank.type === 'Credit Card' ? (
+                                          <CreditCard className="w-6 h-6 text-slate-400" />
+                                      ) : (
+                                          <Landmark className="w-6 h-6 text-slate-400" />
+                                      )}
+                                   </div>
+                                   <div>
+                                      <h4 className="font-bold text-slate-800">{bank.name}</h4>
+                                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{bank.type}</p>
+                                   </div>
+                                </div>
+
+                                <div className="flex items-center justify-between w-full sm:w-auto gap-4 pl-14 sm:pl-0">
+                                   <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                                      bank.status === 'Connected' ? 'bg-emerald-100 text-emerald-700' :
+                                      bank.status === 'Inactive' ? 'bg-slate-200 text-slate-600' :
+                                      'bg-rose-100 text-rose-700'
+                                   }`}>
+                                      {bank.status === 'Connected' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                                      {bank.status === 'Inactive' && <AlertCircle className="w-3.5 h-3.5" />}
+                                      {bank.status === 'Unavailable' && <AlertTriangle className="w-3.5 h-3.5" />}
+                                      {bank.status}
+                                   </div>
+
+                                   {bank.status === 'Inactive' && (
+                                      <button 
+                                         onClick={() => onConnectBank(bank.providerId)}
+                                         className="bg-indigo-600 text-white text-sm font-bold py-2 px-4 rounded-xl hover:bg-indigo-700 transition shadow-md whitespace-nowrap"
+                                      >
+                                         Connect
+                                      </button>
+                                   )}
+
+                                   {bank.status === 'Connected' && (
+                                      <div className="flex items-center gap-2">
+                                         <div className="relative">
+                                            <button 
+                                              onClick={() => setActiveMenu(activeMenu === bank.providerId ? null : bank.providerId)}
+                                              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-full transition"
+                                            >
+                                               <MoreVertical className="w-5 h-5" />
+                                            </button>
+
+                                            {activeMenu === bank.providerId && (
+                                               <>
+                                                 <div className="fixed inset-0 z-30" onClick={() => setActiveMenu(null)}></div>
+                                                 <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-40 animate-in fade-in zoom-in-95 origin-top-right">
+                                                    <button 
+                                                      onClick={() => { setActiveMenu(null); onConnectBank(bank.providerId); }}
+                                                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition"
+                                                    >
+                                                      <RefreshCw className="w-4 h-4 text-slate-400" /> Reconnect Bank
+                                                    </button>
+                                                    <div className="h-px bg-slate-100 my-1"></div>
+                                                    <button 
+                                                      onClick={() => handleDisconnect(bank.providerId)}
+                                                      className="w-full text-left px-4 py-2.5 text-sm font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-3 transition"
+                                                    >
+                                                      <Trash2 className="w-4 h-4" /> Disconnect
+                                                    </button>
+                                                 </div>
+                                               </>
+                                            )}
+                                         </div>
+                                      </div>
+                                   )}
+                                </div>
                             </div>
 
-                            <div className="flex items-center justify-between w-full sm:w-auto gap-4 pl-14 sm:pl-0">
-                               <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                                  bank.status === 'Connected' ? 'bg-emerald-100 text-emerald-700' :
-                                  bank.status === 'Inactive' ? 'bg-slate-200 text-slate-600' :
-                                  'bg-rose-100 text-rose-700'
-                               }`}>
-                                  {bank.status === 'Connected' && <CheckCircle2 className="w-3.5 h-3.5" />}
-                                  {bank.status === 'Inactive' && <AlertCircle className="w-3.5 h-3.5" />}
-                                  {bank.status === 'Unavailable' && <AlertTriangle className="w-3.5 h-3.5" />}
-                                  {bank.status}
-                               </div>
-
-                               {/* --- ACTION BUTTONS --- */}
-                               {bank.status === 'Inactive' && (
-                                  <button 
-                                     onClick={() => onConnectBank(bank.providerId)}
-                                     className="bg-indigo-600 text-white text-sm font-bold py-2 px-4 rounded-xl hover:bg-indigo-700 transition shadow-md whitespace-nowrap"
-                                  >
-                                     Connect
-                                  </button>
-                               )}
-
-                               {bank.status === 'Connected' && (
-                                  <div className="flex items-center gap-2">
-                                     <div className="text-xs font-medium text-slate-400 flex items-center gap-1 mr-2 hidden sm:flex">
-                                        <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Active
-                                     </div>
-                                     
-                                     {/* Options Dropdown */}
-                                     <div className="relative">
-                                        <button 
-                                          onClick={() => setActiveMenu(activeMenu === bank.providerId ? null : bank.providerId)}
-                                          className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-full transition"
-                                        >
-                                           <MoreVertical className="w-5 h-5" />
-                                        </button>
-
-                                        {activeMenu === bank.providerId && (
-                                           <>
-                                             <div className="fixed inset-0 z-30" onClick={() => setActiveMenu(null)}></div>
-                                             <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-40 animate-in fade-in zoom-in-95 origin-top-right">
-                                                <button 
-                                                  onClick={() => { setActiveMenu(null); onConnectBank(bank.providerId); }}
-                                                  className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition"
-                                                >
-                                                  <RefreshCw className="w-4 h-4 text-slate-400" /> Reconnect Bank
-                                                </button>
-                                                <div className="h-px bg-slate-100 my-1"></div>
-                                                <button 
-                                                  onClick={() => handleDisconnect(bank.providerId)}
-                                                  className="w-full text-left px-4 py-2.5 text-sm font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-3 transition"
-                                                >
-                                                  <Trash2 className="w-4 h-4" /> Disconnect
-                                                </button>
-                                             </div>
-                                           </>
-                                        )}
-                                     </div>
-                                  </div>
-                               )}
-                            </div>
+                            {/* --- THE NEW BALANCES BREAKDOWN SECTION --- */}
+                            {bank.status === 'Connected' && bankingData?.connections?.[bank.providerId]?.accounts && (
+                                <div className="mt-4 pt-4 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {bankingData.connections[bank.providerId].accounts.map(acc => (
+                                        <div key={acc.account_id} className="flex justify-between items-center p-2.5 bg-white rounded-xl shadow-sm border border-slate-100">
+                                            <span className="text-xs font-bold text-slate-600 truncate mr-3">{acc.name}</span>
+                                            
+                                            <span className={`text-sm font-black whitespace-nowrap ${
+                                                balances[acc.account_id] !== undefined && balances[acc.account_id] < 0 
+                                                ? 'text-rose-600' 
+                                                : 'text-slate-800'
+                                            }`}>
+                                                {balances[acc.account_id] !== undefined ? (
+                                                    <>
+                                                       {balances[acc.account_id] < 0 ? '-' : ''}
+                                                       {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}
+                                                       {Math.abs(balances[acc.account_id]).toFixed(2)}
+                                                    </>
+                                                ) : (
+                                                    <span className="w-12 h-4 bg-slate-200 rounded animate-pulse inline-block"></span>
+                                                )}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                          </div>
                        ))
                     )}
@@ -351,10 +375,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                   <div className="divide-y divide-slate-50">
                     {transactions.map((tx, idx) => {
                       const relatedBank = userBanks.find(b => b.providerId === tx.providerId);
-                      
-                      // 1. Prioritize your manual fallback logo!
-                      // 2. If no fallback, use TrueLayer's live logo
-                      // 3. If that fails, use the mapped bank logoUrl
                       const displayLogo = relatedBank?.fallbackLogo || tx.providerLogo || relatedBank?.logoUrl;
 
                       return (
@@ -375,7 +395,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                   {tx.merchant && tx.merchant !== 'Unknown' ? tx.merchant : tx.description}
                                 </p>
                                 <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                                <span className="capitalize">{tx.category || 'Miscellaneous'}</span>
+                                  <span className="capitalize">{tx.category || 'Miscellaneous'}</span>
                                   <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                                   <span>{new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
                                 </p>

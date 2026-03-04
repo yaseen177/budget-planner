@@ -1,16 +1,10 @@
 // --- SMART CATEGORISATION ENGINE ---
 const categoriseTransaction = (merchant, description, tlCategory, amount) => {
-    // 1. Combine merchant and description, convert to lowercase
     let rawText = `${merchant} ${description}`.toLowerCase();
-    
-    // 2. Strip out web domains and non-alphanumeric characters to make matching robust
-    // e.g. "www.ubereats.co.uk" becomes "ubereats"
     let text = rawText.replace(/www\.|co\.uk|\.com|\.org/g, '').replace(/[^a-z0-9\s]/g, '');
 
-    // 3. Check for Income
     if (amount > 0) return 'Income';
 
-    // 4. Enhanced Keyword Matching for UK merchants
     if (text.match(/tesco|sainsbury|asda|morrison|aldi|lidl|waitrose|coop|iceland|costco|ocado|farmfoods/)) return 'Groceries';
     if (text.match(/mcdonald|kfc|burger king|burgerking|nando|costa|starbucks|greggs|deliveroo|ubereats|uber eats|justeat|just eat|domino|pret|pizza hut|subway|wetherspoon|kebab/)) return 'Eating Out';
     if (text.match(/uber|trainline|tfl|rail|petrol|shell|bp|esso|texaco|parking|bus|coach|ryanair|easyjet|ba |britishairways|national express|applegreen/)) return 'Transport';
@@ -19,7 +13,6 @@ const categoriseTransaction = (merchant, description, tlCategory, amount) => {
     if (text.match(/amazon|amzn|ebay|argos|boots|superdrug|primark|zara|hm|asos|next|ikea|shein|temu|tiktok/)) return 'Shopping';
     if (text.match(/gym|puregym|david lloyd|fitness|pharmacy|nhs|bupa|specsavers/)) return 'Health';
 
-    // 5. Fallback to TrueLayer's suggested category if we didn't match a keyword
     if (tlCategory) {
         const cat = tlCategory.toUpperCase();
         if (cat.includes('GROCER')) return 'Groceries';
@@ -31,7 +24,6 @@ const categoriseTransaction = (merchant, description, tlCategory, amount) => {
         if (cat.includes('HEALTH')) return 'Health';
     }
 
-    // 6. Default if all else fails
     return 'Miscellaneous';
 };
 
@@ -72,14 +64,27 @@ export async function onRequestPost(context) {
 
     const fetchPromises = accounts.map(async (acc) => {
         const endpointType = acc.endpoint_type || 'accounts';
-        const txResponse = await fetch(`https://api.truelayer.com/data/v1/${endpointType}/${acc.account_id}/transactions?from=${fromStr}&to=${toStr}`, {
+        
+        // Fetch Transactions AND Balances simultaneously!
+        const txPromise = fetch(`https://api.truelayer.com/data/v1/${endpointType}/${acc.account_id}/transactions?from=${fromStr}&to=${toStr}`, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
-        const txData = await txResponse.json();
-        
-        if (txData.error) return [];
+        const balancePromise = fetch(`https://api.truelayer.com/data/v1/${endpointType}/${acc.account_id}/balance`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
 
-        return (txData.results || []).map(tx => ({
+        const [txResponse, balanceResponse] = await Promise.all([txPromise, balancePromise]);
+        
+        const txData = await txResponse.json();
+        const balanceData = await balanceResponse.json();
+
+        // Extract the balance
+        let currentBalance = 0;
+        if (!balanceData.error && balanceData.results && balanceData.results.length > 0) {
+            currentBalance = balanceData.results[0].current || 0;
+        }
+
+        const cleanedTx = txData.error ? [] : (txData.results || []).map(tx => ({
             id: tx.transaction_id,
             date: tx.timestamp.split('T')[0],
             description: tx.description,
@@ -88,14 +93,27 @@ export async function onRequestPost(context) {
             merchant: tx.merchant_name || 'Unknown',
             account_id: acc.account_id 
         }));
+
+        return {
+            account_id: acc.account_id,
+            balance: currentBalance,
+            transactions: cleanedTx
+        };
     });
 
     const results = await Promise.all(fetchPromises);
-    const allTransactions = results.flat(); 
+    
+    // Combine transactions and map out the balances
+    const allTransactions = results.flatMap(r => r.transactions || []);
+    const balances = {};
+    results.forEach(r => {
+        if (r.account_id) balances[r.account_id] = r.balance;
+    });
 
     return new Response(JSON.stringify({
         success: true,
         transactions: allTransactions,
+        balances: balances, // <--- We now send a dictionary of balances back to React!
         new_refresh_token: newRefreshToken 
     }), {
       status: 200,
