@@ -110,7 +110,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
       if (!docSnap.exists() || !docSnap.data().connections || Object.keys(docSnap.data().connections).length === 0) {
         setBankingData(null);
-        setTransactions([]); // Clear transactions if no banks are connected
+        setTransactions([]);
         setLoading(false);
         return;
       }
@@ -123,50 +123,53 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
       let tokensChanged = false;
       let authErrorOccurred = false;
 
+      // Loop through each BANK (e.g. once for Monzo, once for AMEX)
       for (const [providerId, bankData] of Object.entries(connections)) {
           if (!bankData.accounts || bankData.accounts.length === 0) continue;
 
-          let currentToken = bankData.refreshToken;
+          try {
+              // Send ALL accounts for this bank to our Cloudflare backend in one go!
+              const response = await fetch('/api/transactions', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      refreshToken: bankData.refreshToken, 
+                      clientId: import.meta.env.VITE_TL_CLIENT_ID,
+                      accounts: bankData.accounts.map(acc => ({
+                          account_id: acc.account_id,
+                          endpoint_type: acc.endpoint_type || 'accounts'
+                      }))
+                  })
+              });
 
-          for (const account of bankData.accounts) {
-              try {
-                  const response = await fetch('/api/transactions', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                          refreshToken: currentToken, 
-                          accountId: account.account_id,
-                          clientId: import.meta.env.VITE_TL_CLIENT_ID,
-                          endpointType: account.endpoint_type || 'accounts'
-                      })
+              const responseData = await response.json();
+
+              if (responseData.error) {
+                  if (responseData.error === "reconnect_required") authErrorOccurred = true;
+                  continue; 
+              }
+
+              if (responseData.success) {
+                  // Re-attach the correct bank details to each transaction based on account_id
+                  const txsWithBank = responseData.transactions.map(tx => {
+                      const accountDetails = bankData.accounts.find(a => a.account_id === tx.account_id);
+                      return {
+                          ...tx,
+                          bankName: accountDetails?.name || 'Bank', 
+                          providerLogo: accountDetails?.provider_logo,
+                          providerId: providerId
+                      };
                   });
 
-                  const responseData = await response.json();
+                  allTransactions = [...allTransactions, ...txsWithBank];
 
-                  if (responseData.error) {
-                      if (responseData.error === "reconnect_required") authErrorOccurred = true;
-                      continue; 
+                  if (responseData.new_refresh_token && responseData.new_refresh_token !== bankData.refreshToken) {
+                      updatedConnections[providerId].refreshToken = responseData.new_refresh_token;
+                      tokensChanged = true;
                   }
-
-                  if (responseData.success) {
-                      const txsWithBank = responseData.transactions.map(tx => ({
-                          ...tx,
-                          bankName: account.name, 
-                          providerLogo: account.provider_logo,
-                          providerId: providerId
-                      }));
-
-                      allTransactions = [...allTransactions, ...txsWithBank];
-
-                      if (responseData.new_refresh_token && responseData.new_refresh_token !== currentToken) {
-                          currentToken = responseData.new_refresh_token;
-                          updatedConnections[providerId].refreshToken = currentToken;
-                          tokensChanged = true;
-                      }
-                  }
-              } catch (e) {
-                 console.error(`Failed to fetch account ${account.name}:`, e);
               }
+          } catch (e) {
+             console.error(`Failed to fetch bank ${providerId}:`, e);
           }
       }
 
@@ -342,11 +345,12 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
                   <div className="divide-y divide-slate-50">
                     {transactions.map((tx, idx) => {
-                      
-                      // REPLACE the old relatedBank line with this one:
                       const relatedBank = userBanks.find(b => b.providerId === tx.providerId);
                       
-                      const displayLogo = tx.providerLogo || relatedBank?.logoUrl;
+                      // 1. Prioritize your manual fallback logo!
+                      // 2. If no fallback, use TrueLayer's live logo
+                      // 3. If that fails, use the mapped bank logoUrl
+                      const displayLogo = relatedBank?.fallbackLogo || tx.providerLogo || relatedBank?.logoUrl;
 
                       return (
                       <div key={`${tx.id}-${idx}`} className="p-4 sm:p-5 flex justify-between items-center hover:bg-slate-50 transition group">
