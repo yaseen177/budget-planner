@@ -375,7 +375,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                   {tx.merchant && tx.merchant !== 'Unknown' ? tx.merchant : tx.description}
                                 </p>
                                 <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                                  <span className="capitalize">{tx.category?.replace(/_/g, ' ') || 'General'}</span>
+                                <span className="capitalize">{tx.category || 'Miscellaneous'}</span>
                                   <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                                   <span>{new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
                                 </p>
