@@ -5159,7 +5159,6 @@ export default function App() {
       const redirectUri = window.location.origin + '/callback'; 
       const clientId = import.meta.env.VITE_TL_CLIENT_ID; 
 
-      // 1. Send the code to our Cloudflare backend
       const response = await fetch('/api/truelayer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -5173,20 +5172,26 @@ export default function App() {
           return;
       }
 
-      if (data.success && data.refresh_token) {
-          // 2. Save the golden token and accounts list to a dedicated Firebase document
-          const bankingRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'openBanking');
+      if (data.success && data.refresh_token && data.accounts.length > 0) {
+          // Identify which bank was just connected
+          const providerId = data.accounts[0].provider_id;
           
-          await setDoc(bankingRef, {
+          const bankingRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'openBanking');
+          const docSnap = await getDoc(bankingRef);
+          
+          // Get existing connections, or start a new dictionary
+          let connections = docSnap.exists() ? (docSnap.data().connections || {}) : {};
+
+          // Add or overwrite just this specific bank
+          connections[providerId] = {
               refreshToken: data.refresh_token,
               accounts: data.accounts,
               lastConnected: new Date().toISOString()
-          });
-
-          showToast(`Successfully linked ${data.accounts.length} account(s)!`);
+          };
           
-          // If using a router, you could redirect them to the new analytics page here:
-          // navigate('/transactions');
+          await setDoc(bankingRef, { connections }, { merge: true });
+
+          showToast(`Successfully linked ${data.accounts[0].name}!`);
       }
 
     } catch (error) {
@@ -5195,25 +5200,29 @@ export default function App() {
     }
   };
 
-  const startBankConnection = () => {
+  // Now accepts an optional providerId!
+  const startBankConnection = (providerId = null) => {
     const clientId = import.meta.env.VITE_TL_CLIENT_ID;
     const redirectUri = window.location.origin + '/callback'; 
     
     if (!clientId) {
-        showToast("Error: Client ID is missing. Check Cloudflare variables.");
+        showToast("Error: Client ID is missing.");
         return;
     }
 
-    // 1. Point to the LIVE auth server (removed '-sandbox')
-    // 2. Added 'providers=uk-ob-all' to show all real UK banks
-    // Add 'transactions' to the list of scopes requested
-const authUrl = `https://auth.truelayer.com/?response_type=code` +
-`&client_id=${clientId}` +
-`&scope=info%20accounts%20balance%20transactions%20offline_access` +
-`&redirect_uri=${encodeURIComponent(redirectUri)}` +
-`&providers=uk-ob-all`;
+    let authUrl = `https://auth.truelayer.com/?response_type=code` +
+                  `&client_id=${clientId}` +
+                  `&scope=info%20accounts%20balance%20transactions%20offline_access` +
+                  `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+    // If we have a specific bank ID, skip the selection screen!
+    if (providerId) {
+        authUrl += `&provider_id=${providerId}`;
+    } else {
+        authUrl += `&providers=uk-ob-all`;
+    }
     
-    console.log("Directing to Live Bank Selection:", authUrl);
+    console.log("Directing to Bank:", authUrl);
     window.location.href = authUrl;
   };
 
@@ -5823,14 +5832,16 @@ const authUrl = `https://auth.truelayer.com/?response_type=code` +
         />
       )}
 
-      {showTransactions && (
+{showTransactions && (
         <Transactions 
           user={user} 
           appId={appId} 
-          db={db} // <--- ADD THIS LINE TO PASS THE DATABASE CONNECTION
+          db={db}
           onClose={() => setShowTransactions(false)}
           onConnectBank={startBankConnection}
           currency={effectiveSettings.currency} 
+          bankDetails={effectiveSettings.bankDetails} // <--- Added
+          expenses={finalExpenses} // <--- Added
         />
       )}
 

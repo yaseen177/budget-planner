@@ -5,7 +5,6 @@ export async function onRequestPost(context) {
     const body = await request.json();
     const { code, redirectUri, clientId } = body;
 
-    // 1. Exchange the code for the Access Token AND the Refresh Token
     const tokenResponse = await fetch('https://auth.truelayer.com/connect/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -19,20 +18,16 @@ export async function onRequestPost(context) {
     });
 
     const tokenData = await tokenResponse.json();
-    if (!tokenData.access_token) {
-        throw new Error("Failed to authenticate with bank.");
-    }
+    if (!tokenData.access_token) throw new Error("Failed to authenticate with bank.");
 
     const accessToken = tokenData.access_token;
-    const refreshToken = tokenData.refresh_token; // <-- THE GOLDEN KEY
+    const refreshToken = tokenData.refresh_token; 
 
-    // 2. Fetch all accounts the user just authorised
     const accountsResponse = await fetch('https://api.truelayer.com/data/v1/accounts', {
         headers: { 'Authorization': `Bearer ${accessToken}` }
     });
     const accountsData = await accountsResponse.json();
 
-    // 3. Filter for spending accounts (Current Accounts, Credit Cards, Savings)
     const spendingAccounts = accountsData.results?.filter(
         acc => ['TRANSACTION', 'CREDIT', 'SAVINGS'].includes(acc.account_type.toUpperCase())
     ) || [];
@@ -41,7 +36,6 @@ export async function onRequestPost(context) {
         return new Response(JSON.stringify({ error: "No spending accounts found" }), { status: 404 });
     }
 
-    // 4. Send the Refresh Token and the list of accounts back to React
     return new Response(JSON.stringify({
         success: true,
         refresh_token: refreshToken,
@@ -50,7 +44,8 @@ export async function onRequestPost(context) {
             name: acc.display_name || acc.provider?.display_name || "Bank Account",
             type: acc.account_type,
             currency: acc.currency,
-            provider_logo: acc.provider?.logo_uri || null
+            provider_logo: acc.provider?.logo_uri || null,
+            provider_id: acc.provider?.provider_id || "unknown" // <-- NEW: Identifies the bank
         }))
     }), {
       status: 200,
