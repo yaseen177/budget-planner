@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap } from 'lucide-react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from './firebase'; // Adjust this import based on your actual firebase config file
 
-const Transactions = ({ user, appId, onClose, onConnectBank, currency = 'GBP' }) => {
+// Notice 'db' is now in the list of props!
+const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP' }) => {
   const [loading, setLoading] = useState(true);
   const [bankingData, setBankingData] = useState(null);
   const [transactions, setTransactions] = useState([]);

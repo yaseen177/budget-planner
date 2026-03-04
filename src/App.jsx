@@ -5827,8 +5827,9 @@ const authUrl = `https://auth.truelayer.com/?response_type=code` +
         <Transactions 
           user={user} 
           appId={appId} 
+          db={db} // <--- ADD THIS LINE TO PASS THE DATABASE CONNECTION
           onClose={() => setShowTransactions(false)}
-          onConnectBank={startBankConnection} // We pass the function you already wrote!
+          onConnectBank={startBankConnection}
           currency={effectiveSettings.currency} 
         />
       )}
