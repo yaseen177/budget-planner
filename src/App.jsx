@@ -2594,6 +2594,8 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   const [displayName, setDisplayName] = useState(currentSettings.displayName || user.displayName || '');
   const [currency, setCurrency] = useState(currentSettings.currency || 'GBP');
   const [bank, setBank] = useState(currentSettings.bankDetails || null);
+  // NEW STATE: Manage the list of extra current accounts
+  const [additionalBanks, setAdditionalBanks] = useState(currentSettings.additionalBanks || []);
   const [payDay, setPayDay] = useState(currentSettings.payDay || '1');
   
   // Lists
@@ -2670,6 +2672,15 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   };
   const removeDefaultExpense = (id) => setDefaultExpenses(defaultExpenses.filter(e => e.id !== id));
 
+  // --- NEW HANDLERS FOR ADDITIONAL BANKS ---
+  const addAdditionalBank = (selectedBank) => {
+    if (!selectedBank) return;
+    setAdditionalBanks([...additionalBanks, { ...selectedBank, id: Date.now().toString() }]);
+  };
+  const removeAdditionalBank = (id) => {
+    setAdditionalBanks(additionalBanks.filter(b => b.id !== id));
+  };
+
   const handleSave = () => {
     if (totalPercentage > 100) {
       alert("Total percentage cannot exceed 100%");
@@ -2683,6 +2694,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
       displayName,
       currency,
       bankDetails: bank,
+      additionalBanks, // <--- SAVING THE NEW ARRAY
       payDay,
       allocationRules: allocations,
       defaultFixedExpenses: defaultExpenses,
@@ -2749,24 +2761,57 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                  </div>
               </div>
 
-              {/* Bank Selector */}
+              {/* MAIN Bank Selector */}
               <div>
-                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Main Current Account</label>
+                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Salary Current Account (Main)</label>
+                 <p className="text-[10px] text-slate-400 mb-2 leading-tight">This bank drives the "Keep in Bank" math on your dashboard.</p>
                  {bank ? (
-                    <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-emerald-200 ring-2 ring-emerald-50">
+                    <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-emerald-200 ring-2 ring-emerald-50 shadow-sm">
                        <div className="flex items-center gap-3">
-                          <img src={bank.logo} className="w-8 h-8 rounded-full object-contain bg-slate-50" />
+                          <img src={bank.logo} className="w-8 h-8 rounded-full object-contain bg-slate-50 border border-slate-100" />
                           <span className="font-bold text-slate-700">{bank.name}</span>
                        </div>
-                       <button onClick={() => setBank(null)} className="text-xs font-bold text-indigo-500 hover:text-indigo-600">Change</button>
+                       <button onClick={() => setBank(null)} className="text-xs font-bold text-indigo-500 hover:text-indigo-600 px-3 py-1 bg-indigo-50 rounded-lg">Change</button>
                     </div>
                  ) : (
                     <BankSelector selectedBank={bank} onSelect={setBank} />
                  )}
               </div>
 
+              {/* ADDITIONAL Bank Selectors */}
+              <div className="pt-4 border-t border-slate-100">
+                 <div className="flex items-center justify-between mb-3">
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Additional Accounts</label>
+                    <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">For Open Banking</span>
+                 </div>
+                 
+                 <div className="space-y-2 mb-3">
+                    {additionalBanks.map(b => (
+                       <div key={b.id} className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200 shadow-sm animate-in zoom-in">
+                          <div className="flex items-center gap-3">
+                             {b.logo ? (
+                                <img src={b.logo} className="w-6 h-6 rounded-full object-contain bg-white border border-slate-100 p-0.5" />
+                             ) : (
+                                <Landmark className="w-6 h-6 text-slate-400" />
+                             )}
+                             <span className="font-bold text-slate-700 text-sm">{b.name}</span>
+                          </div>
+                          <button onClick={() => removeAdditionalBank(b.id)} className="p-1.5 text-slate-400 hover:bg-white hover:text-rose-500 rounded-lg transition">
+                             <X className="w-4 h-4" />
+                          </button>
+                       </div>
+                    ))}
+                 </div>
+                 
+                 <BankSelector 
+                    selectedBank={null} 
+                    onSelect={addAdditionalBank} 
+                    placeholder="+ Add another bank account..."
+                 />
+              </div>
+
               {/* Payday */}
-              <div>
+              <div className="pt-4 border-t border-slate-100">
                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Payday (Day of Month)</label>
                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
                    {[1, 25, 26, 28, 30, 31].map(d => (
@@ -5843,6 +5888,7 @@ export default function App() {
           currency={effectiveSettings.currency} 
           bankDetails={effectiveSettings.bankDetails} // <--- Added
           expenses={finalExpenses} // <--- Added
+          additionalBanks={effectiveSettings.additionalBanks}
         />
       )}
 

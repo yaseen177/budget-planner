@@ -46,15 +46,25 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   const userBanks = useMemo(() => {
     const banks = [];
     
+    // 1. The Main Salary Account
     if (bankDetails?.name) {
-      banks.push({ id: 'current', name: bankDetails.name, type: 'Current Account', fallbackLogo: bankDetails.logo });
+      banks.push({ id: 'current', name: bankDetails.name, type: 'Salary Account', fallbackLogo: bankDetails.logo });
     }
 
+    // 2. Any Additional Current Accounts
+    if (additionalBanks && additionalBanks.length > 0) {
+        additionalBanks.forEach((b, i) => {
+            banks.push({ id: `extra-${i}`, name: b.name, type: 'Current Account', fallbackLogo: b.logo });
+        });
+    }
+
+    // 3. Credit Cards (from expenses)
     const creditCards = expenses.filter(e => e.type === 'credit_card');
     creditCards.forEach(cc => {
        banks.push({ id: cc.id, name: cc.name, type: 'Credit Card', fallbackLogo: cc.logo });
     });
 
+    // Map them to TrueLayer statuses
     return banks.map(bank => {
       const searchName = bank.name.toLowerCase().trim();
       const matchedKey = Object.keys(TRUELAYER_PROVIDERS).find(key => searchName.includes(key));
@@ -72,7 +82,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
         status: !providerId ? 'Unavailable' : isConnected ? 'Connected' : 'Inactive'
       };
     });
-  }, [bankDetails, expenses, bankingData]);
+  }, [bankDetails, additionalBanks, expenses, bankingData]);
 
   const getCategoryIcon = (category) => {
     switch(category) {
