@@ -50,12 +50,16 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
       const matchedKey = Object.keys(TRUELAYER_PROVIDERS).find(key => searchName.includes(key));
       const providerId = matchedKey ? TRUELAYER_PROVIDERS[matchedKey] : null;
 
-      // Check the new 'connections' dictionary
-      const isConnected = providerId && bankingData?.connections?.[providerId];
+      const connection = providerId ? bankingData?.connections?.[providerId] : null;
+      const isConnected = !!connection;
+      
+      // Grab the official logo from TrueLayer if they are connected
+      const logoUrl = isConnected && connection.accounts?.[0]?.provider_logo ? connection.accounts[0].provider_logo : null;
 
       return {
         ...bank,
         providerId,
+        logoUrl, // <-- We add the logo to the bank object here
         status: !providerId ? 'Unavailable' : isConnected ? 'Connected' : 'Inactive'
       };
     });
@@ -223,8 +227,14 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                          <div key={index} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/50">
                             
                             <div className="flex items-center gap-4">
-                               <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100">
-                                  {bank.type === 'Credit Card' ? <CreditCard className="w-6 h-6 text-slate-700" /> : <Landmark className="w-6 h-6 text-slate-700" />}
+                               <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center w-12 h-12">
+                                  {bank.logoUrl ? (
+                                      <img src={bank.logoUrl} alt={bank.name} className="w-6 h-6 object-contain" />
+                                  ) : bank.type === 'Credit Card' ? (
+                                      <CreditCard className="w-6 h-6 text-slate-700" />
+                                  ) : (
+                                      <Landmark className="w-6 h-6 text-slate-700" />
+                                  )}
                                </div>
                                <div>
                                   <h4 className="font-bold text-slate-800">{bank.name}</h4>

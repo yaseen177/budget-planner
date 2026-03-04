@@ -28,13 +28,14 @@ export async function onRequestPost(context) {
     });
     const accountsData = await accountsResponse.json();
 
+    // 3. Filter for spending accounts (Now including AMEX's 'CREDIT_CARD' and 'CARD' tags)
     const spendingAccounts = accountsData.results?.filter(
-        acc => ['TRANSACTION', 'CREDIT', 'SAVINGS'].includes(acc.account_type.toUpperCase())
-    ) || [];
+      acc => ['TRANSACTION', 'CREDIT', 'CREDIT_CARD', 'CARD', 'SAVINGS'].includes(acc.account_type.toUpperCase())
+  ) || [];
 
-    if (spendingAccounts.length === 0) {
-        return new Response(JSON.stringify({ error: "No spending accounts found" }), { status: 404 });
-    }
+  if (spendingAccounts.length === 0) {
+      return new Response(JSON.stringify({ error: "No spending accounts found" }), { status: 404 });
+  }
 
     return new Response(JSON.stringify({
         success: true,
