@@ -5190,7 +5190,7 @@ export default function App() {
     // ONLY proceed if we have BOTH the code AND Firebase has loaded the user
     if (code && user) {
       // Clear the code from the address bar so it looks clean
-      window.history.replaceState({}, document.title, '/');
+      window.history.replaceState({}, document.title, window.location.pathname);
       
       // Safe to fetch and save, because 'user.uid' now exists!
       fetchBankingData(code);
