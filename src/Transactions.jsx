@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2 } from 'lucide-react';
+import { X, RefreshCw, Landmark, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2, Utensils, Tv, ShoppingCart, TrendingUp, Activity } from 'lucide-react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 const TRUELAYER_PROVIDERS = {
@@ -65,12 +65,17 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   }, [bankDetails, expenses, bankingData]);
 
   const getCategoryIcon = (category) => {
-    const cat = category?.toLowerCase() || '';
-    if (cat.includes('food') || cat.includes('dining') || cat.includes('groceries')) return <ShoppingBag className="w-5 h-5 text-orange-500" />;
-    if (cat.includes('transport') || cat.includes('travel')) return <Car className="w-5 h-5 text-blue-500" />;
-    if (cat.includes('bills') || cat.includes('utilities')) return <Zap className="w-5 h-5 text-yellow-500" />;
-    if (cat.includes('entertainment') || cat.includes('coffee')) return <Coffee className="w-5 h-5 text-amber-600" />;
-    return <CreditCard className="w-5 h-5 text-slate-400" />;
+    switch(category) {
+        case 'Groceries': return <ShoppingBag className="w-5 h-5 text-emerald-500" />;
+        case 'Eating Out': return <Utensils className="w-5 h-5 text-orange-500" />;
+        case 'Transport': return <Car className="w-5 h-5 text-blue-500" />;
+        case 'Bills': return <Zap className="w-5 h-5 text-yellow-500" />;
+        case 'Entertainment': return <Tv className="w-5 h-5 text-purple-500" />;
+        case 'Shopping': return <ShoppingCart className="w-5 h-5 text-pink-500" />;
+        case 'Health': return <Activity className="w-5 h-5 text-rose-500" />;
+        case 'Income': return <TrendingUp className="w-5 h-5 text-emerald-600" />;
+        default: return <CreditCard className="w-5 h-5 text-slate-400" />;
+    }
   };
 
   // --- NEW: Disconnect Logic ---
