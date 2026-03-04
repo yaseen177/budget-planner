@@ -58,7 +58,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
       return {
         ...bank,
         providerId,
-        logoUrl: liveLogo || bank.fallbackLogo, 
+        logoUrl: bank.fallbackLogo || liveLogo,
         status: !providerId ? 'Unavailable' : isConnected ? 'Connected' : 'Inactive'
       };
     });
