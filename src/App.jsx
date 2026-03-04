@@ -5887,8 +5887,8 @@ export default function App() {
           onConnectBank={startBankConnection}
           currency={effectiveSettings.currency} 
           bankDetails={effectiveSettings.bankDetails} // <--- Added
-          expenses={finalExpenses} // <--- Added
           additionalBanks={effectiveSettings.additionalBanks}
+          expenses={finalExpenses} // <--- Added
         />
       )}
 

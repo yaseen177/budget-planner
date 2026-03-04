@@ -25,7 +25,7 @@ const TRUELAYER_PROVIDERS = {
   'mock': 'mock'
 };
 
-const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP', bankDetails, expenses = [] }) => {
+const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP', bankDetails, additionalBanks = [], expenses = [] }) => {
   const [loading, setLoading] = useState(true);
   const [bankingData, setBankingData] = useState(null);
   const [transactions, setTransactions] = useState([]);
