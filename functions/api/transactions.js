@@ -1,10 +1,24 @@
 // --- SMART CATEGORISATION ENGINE ---
-const categoriseTransaction = (merchant, description, tlCategory, amount) => {
+const categoriseTransaction = (merchant, description, tlCategory, amount, accountType) => {
     let rawText = `${merchant} ${description}`.toLowerCase();
     let text = rawText.replace(/www\.|co\.uk|\.com|\.org/g, '').replace(/[^a-z0-9\s]/g, '');
 
-    if (amount > 0) return 'Income';
+    // 1. Check if this is a credit/charge card
+    const isCreditCard = ['CREDIT', 'CREDIT_CARD', 'CARD', 'CHARGE_CARD'].includes((accountType || '').toUpperCase());
 
+    // 2. Handle the Polarity Flip
+    let isIncome = false;
+    if (isCreditCard) {
+        // On a credit card, a negative amount usually means you paid it off (Income/Credit)
+        isIncome = amount < 0; 
+    } else {
+        // On a normal bank account, a positive amount is Income
+        isIncome = amount > 0; 
+    }
+
+    if (isIncome) return 'Income';
+
+    // 3. Keyword Matching for Outgoings
     if (text.match(/tesco|sainsbury|asda|morrison|aldi|lidl|waitrose|coop|iceland|costco|ocado|farmfoods/)) return 'Groceries';
     if (text.match(/mcdonald|kfc|burger king|burgerking|nando|costa|starbucks|greggs|deliveroo|ubereats|uber eats|justeat|just eat|domino|pret|pizza hut|subway|wetherspoon|kebab/)) return 'Eating Out';
     if (text.match(/uber|trainline|tfl|rail|petrol|shell|bp|esso|texaco|parking|bus|coach|ryanair|easyjet|ba |britishairways|national express|applegreen/)) return 'Transport';
@@ -65,7 +79,6 @@ export async function onRequestPost(context) {
     const fetchPromises = accounts.map(async (acc) => {
         const endpointType = acc.endpoint_type || 'accounts';
         
-        // Fetch Transactions AND Balances simultaneously!
         const txPromise = fetch(`https://api.truelayer.com/data/v1/${endpointType}/${acc.account_id}/transactions?from=${fromStr}&to=${toStr}`, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
@@ -78,7 +91,6 @@ export async function onRequestPost(context) {
         const txData = await txResponse.json();
         const balanceData = await balanceResponse.json();
 
-        // Extract the balance
         let currentBalance = 0;
         if (!balanceData.error && balanceData.results && balanceData.results.length > 0) {
             currentBalance = balanceData.results[0].current || 0;
@@ -89,7 +101,8 @@ export async function onRequestPost(context) {
             date: tx.timestamp.split('T')[0],
             description: tx.description,
             amount: tx.amount,
-            category: categoriseTransaction(tx.merchant_name || '', tx.description || '', tx.transaction_category, tx.amount),
+            // ---> WE NOW PASS THE ACCOUNT TYPE INTO THE ENGINE <---
+            category: categoriseTransaction(tx.merchant_name || '', tx.description || '', tx.transaction_category, tx.amount, acc.type),
             merchant: tx.merchant_name || 'Unknown',
             account_id: acc.account_id 
         }));

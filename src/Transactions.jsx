@@ -129,18 +129,19 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
           if (!bankData.accounts || bankData.accounts.length === 0) continue;
 
           try {
-              const response = await fetch('/api/transactions', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                      refreshToken: bankData.refreshToken, 
-                      clientId: import.meta.env.VITE_TL_CLIENT_ID,
-                      accounts: bankData.accounts.map(acc => ({
-                          account_id: acc.account_id,
-                          endpoint_type: acc.endpoint_type || 'accounts'
-                      }))
-                  })
-              });
+            const response = await fetch('/api/transactions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  refreshToken: bankData.refreshToken, 
+                  clientId: import.meta.env.VITE_TL_CLIENT_ID,
+                  accounts: bankData.accounts.map(acc => ({
+                      account_id: acc.account_id,
+                      endpoint_type: acc.endpoint_type || 'accounts',
+                      type: acc.type // <--- MUST ADD THIS LINE
+                  }))
+              })
+          });
 
               const responseData = await response.json();
 
