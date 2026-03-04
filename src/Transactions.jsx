@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2, Utensils, Tv, ShoppingCart, TrendingUp, Activity } from 'lucide-react';
+import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2, Utensils, Tv, ShoppingCart, TrendingUp, Activity, PieChart, ChevronDown, ChevronUp, List } from 'lucide-react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 const TRUELAYER_PROVIDERS = {
@@ -29,10 +29,19 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   const [loading, setLoading] = useState(true);
   const [bankingData, setBankingData] = useState(null);
   const [transactions, setTransactions] = useState([]);
-  const [balances, setBalances] = useState({}); // <--- NEW STATE FOR BALANCES
+  const [balances, setBalances] = useState({});
   const [error, setError] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null); 
+  
+  // NEW STATE
+  const [activeTab, setActiveTab] = useState('feed'); // 'feed' or 'analytics'
+  const [dateFilter, setDateFilter] = useState('30'); // '30', '90', 'thisMonth', 'lastMonth'
+  const [expandedBanks, setExpandedBanks] = useState({}); // Tracks which banks are expanded
+
+  const toggleBankExpansion = (providerId) => {
+      setExpandedBanks(prev => ({ ...prev, [providerId]: !prev[providerId] }));
+  };
 
   const userBanks = useMemo(() => {
     const banks = [];
@@ -105,6 +114,22 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
     if (forceRefresh) setIsRefreshing(true);
     setError(null);
 
+    // Calculate dates based on the selected filter
+    let fromDate = new Date();
+    let toDate = new Date();
+    
+    if (dateFilter === '30') {
+       fromDate.setDate(toDate.getDate() - 30);
+    } else if (dateFilter === '90') {
+       fromDate.setDate(toDate.getDate() - 90);
+    } else if (dateFilter === 'thisMonth') {
+       fromDate.setDate(1); 
+    } else if (dateFilter === 'lastMonth') {
+       fromDate.setMonth(toDate.getMonth() - 1);
+       fromDate.setDate(1);
+       toDate.setDate(0); 
+    }
+
     try {
       const bankingRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'openBanking');
       const docSnap = await getDoc(bankingRef);
@@ -129,19 +154,21 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
           if (!bankData.accounts || bankData.accounts.length === 0) continue;
 
           try {
-            const response = await fetch('/api/transactions', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                  refreshToken: bankData.refreshToken, 
-                  clientId: import.meta.env.VITE_TL_CLIENT_ID,
-                  accounts: bankData.accounts.map(acc => ({
-                      account_id: acc.account_id,
-                      endpoint_type: acc.endpoint_type || 'accounts',
-                      type: acc.type // <--- MUST ADD THIS LINE
-                  }))
-              })
-          });
+              const response = await fetch('/api/transactions', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      refreshToken: bankData.refreshToken, 
+                      clientId: import.meta.env.VITE_TL_CLIENT_ID,
+                      from: fromDate.toISOString(),
+                      to: toDate.toISOString(),
+                      accounts: bankData.accounts.map(acc => ({
+                          account_id: acc.account_id,
+                          endpoint_type: acc.endpoint_type || 'accounts',
+                          type: acc.type 
+                      }))
+                  })
+              });
 
               const responseData = await response.json();
 
@@ -163,7 +190,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
                   allTransactions = [...allTransactions, ...txsWithBank];
 
-                  // Capture the live balances sent from the backend!
                   if (responseData.balances) {
                       setBalances(prev => ({ ...prev, ...responseData.balances }));
                   }
@@ -198,9 +224,22 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
     }
   };
 
+  // Re-fetch whenever the date filter changes
   useEffect(() => {
+    setLoading(true);
     fetchTransactions();
-  }, [user, appId]);
+  }, [user, appId, dateFilter]);
+
+  // --- ANALYTICS CALCULATIONS ---
+  const outgoings = transactions.filter(tx => tx.category !== 'Income' && tx.amount !== 0);
+  const totalSpent = outgoings.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+  
+  const categoryTotals = outgoings.reduce((acc, tx) => {
+      acc[tx.category] = (acc[tx.category] || 0) + Math.abs(tx.amount);
+      return acc;
+  }, {});
+  
+  const sortedCategories = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
 
   return (
     <div className="fixed inset-0 z-[200] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full duration-500">
@@ -223,7 +262,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
           {loading ? (
             <div className="flex flex-col items-center justify-center py-32 space-y-4">
               <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-              <p className="text-slate-500 font-medium animate-pulse">Synchronising all accounts...</p>
+              <p className="text-slate-500 font-medium animate-pulse">Synchronising financial data...</p>
             </div>
           ) : (
             <>
@@ -254,12 +293,15 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                     {userBanks.length === 0 ? (
                        <p className="text-slate-500 text-sm text-center py-4">No banks or credit cards added to your budget yet.</p>
                     ) : (
-                       userBanks.map((bank, index) => (
-                         // Notice the structural change here to accommodate the new balances sub-section
+                       userBanks.map((bank, index) => {
+                         const isExpanded = expandedBanks[bank.providerId] !== false; // Default to expanded
+
+                         return (
                          <div key={index} className="flex flex-col p-4 rounded-2xl border border-slate-100 bg-slate-50/50">
                             
-                            {/* Main Row: Bank Info & Actions */}
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 cursor-pointer" onClick={() => {
+                                if (bank.status === 'Connected') toggleBankExpansion(bank.providerId);
+                            }}>
                                 <div className="flex items-center gap-4">
                                    <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center w-12 h-12">
                                       {bank.logoUrl ? (
@@ -290,7 +332,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
                                    {bank.status === 'Inactive' && (
                                       <button 
-                                         onClick={() => onConnectBank(bank.providerId)}
+                                         onClick={(e) => { e.stopPropagation(); onConnectBank(bank.providerId); }}
                                          className="bg-indigo-600 text-white text-sm font-bold py-2 px-4 rounded-xl hover:bg-indigo-700 transition shadow-md whitespace-nowrap"
                                       >
                                          Connect
@@ -299,9 +341,15 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
                                    {bank.status === 'Connected' && (
                                       <div className="flex items-center gap-2">
+                                         
+                                         {/* Dropdown Toggle */}
+                                         <button className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition">
+                                            {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                                         </button>
+
                                          <div className="relative">
                                             <button 
-                                              onClick={() => setActiveMenu(activeMenu === bank.providerId ? null : bank.providerId)}
+                                              onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === bank.providerId ? null : bank.providerId); }}
                                               className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-full transition"
                                             >
                                                <MoreVertical className="w-5 h-5" />
@@ -309,17 +357,17 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
                                             {activeMenu === bank.providerId && (
                                                <>
-                                                 <div className="fixed inset-0 z-30" onClick={() => setActiveMenu(null)}></div>
+                                                 <div className="fixed inset-0 z-30" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}></div>
                                                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-40 animate-in fade-in zoom-in-95 origin-top-right">
                                                     <button 
-                                                      onClick={() => { setActiveMenu(null); onConnectBank(bank.providerId); }}
+                                                      onClick={(e) => { e.stopPropagation(); setActiveMenu(null); onConnectBank(bank.providerId); }}
                                                       className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition"
                                                     >
                                                       <RefreshCw className="w-4 h-4 text-slate-400" /> Reconnect Bank
                                                     </button>
                                                     <div className="h-px bg-slate-100 my-1"></div>
                                                     <button 
-                                                      onClick={() => handleDisconnect(bank.providerId)}
+                                                      onClick={(e) => { e.stopPropagation(); handleDisconnect(bank.providerId); }}
                                                       className="w-full text-left px-4 py-2.5 text-sm font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-3 transition"
                                                     >
                                                       <Trash2 className="w-4 h-4" /> Disconnect
@@ -333,9 +381,9 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                 </div>
                             </div>
 
-                            {/* --- THE NEW BALANCES BREAKDOWN SECTION --- */}
-                            {bank.status === 'Connected' && bankingData?.connections?.[bank.providerId]?.accounts && (
-                                <div className="mt-4 pt-4 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {/* COLLAPSIBLE BALANCES SECTION */}
+                            {bank.status === 'Connected' && bankingData?.connections?.[bank.providerId]?.accounts && isExpanded && (
+                                <div className="mt-4 pt-4 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-2 animate-in slide-in-from-top-2 fade-in duration-200">
                                     {bankingData.connections[bank.providerId].accounts.map(acc => (
                                         <div key={acc.account_id} className="flex justify-between items-center p-2.5 bg-white rounded-xl shadow-sm border border-slate-100">
                                             <span className="text-xs font-bold text-slate-600 truncate mr-3">{acc.name}</span>
@@ -360,61 +408,138 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                 </div>
                             )}
                          </div>
-                       ))
+                       )})
                     )}
                  </div>
               </div>
 
-              {/* SECTION 2: UNIFIED TRANSACTIONS FEED */}
+              {/* TABS & FILTERS */}
               {bankingData && Object.keys(bankingData.connections).length > 0 && transactions.length > 0 && (
-                <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden mt-6">
-                  <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                     <h3 className="font-bold text-slate-800">Unified Spending Feed</h3>
-                     <span className="text-xs font-medium text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200">Last 30 Days</span>
-                  </div>
+                <div>
+                   <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4 mt-8">
+                       <div className="flex bg-slate-200/60 p-1 rounded-2xl">
+                          <button 
+                             onClick={() => setActiveTab('feed')}
+                             className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition ${activeTab === 'feed' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                          >
+                             <List className="w-4 h-4" /> Feed
+                          </button>
+                          <button 
+                             onClick={() => setActiveTab('analytics')}
+                             className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition ${activeTab === 'analytics' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                          >
+                             <PieChart className="w-4 h-4" /> Analytics
+                          </button>
+                       </div>
 
-                  <div className="divide-y divide-slate-50">
-                    {transactions.map((tx, idx) => {
-                      const relatedBank = userBanks.find(b => b.providerId === tx.providerId);
-                      const displayLogo = relatedBank?.fallbackLogo || tx.providerLogo || relatedBank?.logoUrl;
+                       <select 
+                          value={dateFilter}
+                          onChange={(e) => setDateFilter(e.target.value)}
+                          className="bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-2xl px-4 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                       >
+                          <option value="30">Last 30 Days</option>
+                          <option value="90">Last 90 Days</option>
+                          <option value="thisMonth">This Month</option>
+                          <option value="lastMonth">Last Month</option>
+                       </select>
+                   </div>
 
-                      return (
-                      <div key={`${tx.id}-${idx}`} className="p-4 sm:p-5 flex justify-between items-center hover:bg-slate-50 transition group">
-                          <div className="flex items-center gap-4">
-                            <div className="relative">
-                                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 group-hover:bg-white group-hover:shadow-sm transition">
-                                    {getCategoryIcon(tx.category)}
-                                </div>
-                                {displayLogo && (
-                                    <div className="absolute -bottom-1 -right-1 bg-white p-0.5 rounded-full shadow-sm border border-slate-100">
-                                        <img src={displayLogo} className="w-4 h-4 object-contain rounded-full" />
-                                    </div>
-                                )}
-                            </div>
-                            <div>
-                                <p className="font-bold text-slate-800 text-sm sm:text-base">
-                                  {tx.merchant && tx.merchant !== 'Unknown' ? tx.merchant : tx.description}
-                                </p>
-                                <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                                  <span className="capitalize">{tx.category || 'Miscellaneous'}</span>
-                                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                                  <span>{new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
-                                </p>
-                            </div>
-                          </div>
+                   {/* TAB: FEED */}
+                   {activeTab === 'feed' && (
+                       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden animate-in fade-in">
+                         <div className="divide-y divide-slate-50">
+                           {transactions.map((tx, idx) => {
+                             const relatedBank = userBanks.find(b => b.providerId === tx.providerId);
+                             const displayLogo = relatedBank?.fallbackLogo || tx.providerLogo || relatedBank?.logoUrl;
+
+                             return (
+                             <div key={`${tx.id}-${idx}`} className="p-4 sm:p-5 flex justify-between items-center hover:bg-slate-50 transition group">
+                                 <div className="flex items-center gap-4">
+                                   <div className="relative">
+                                       <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 group-hover:bg-white group-hover:shadow-sm transition">
+                                           {getCategoryIcon(tx.category)}
+                                       </div>
+                                       {displayLogo && (
+                                           <div className="absolute -bottom-1 -right-1 bg-white p-0.5 rounded-full shadow-sm border border-slate-100">
+                                               <img src={displayLogo} className="w-4 h-4 object-contain rounded-full" />
+                                           </div>
+                                       )}
+                                   </div>
+                                   <div>
+                                       <p className="font-bold text-slate-800 text-sm sm:text-base">
+                                         {tx.merchant && tx.merchant !== 'Unknown' ? tx.merchant : tx.description}
+                                       </p>
+                                       <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                                         <span className="capitalize">{tx.category || 'Miscellaneous'}</span>
+                                         <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                                         <span>{new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                                       </p>
+                                   </div>
+                                 </div>
+                                 
+                                 <div className="text-right flex flex-col items-end">
+                                   <span className={`font-black text-sm sm:text-lg ${tx.category !== 'Income' ? 'text-slate-800' : 'text-emerald-600'}`}>
+                                       {tx.category === 'Income' ? '+' : ''}
+                                       {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}
+                                       {Math.abs(tx.amount).toFixed(2)}
+                                   </span>
+                                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">{tx.bankName}</span>
+                                 </div>
+                             </div>
+                           )})}
+                         </div>
+                       </div>
+                   )}
+
+                   {/* TAB: ANALYTICS */}
+                   {activeTab === 'analytics' && (
+                       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 p-6 sm:p-8 animate-in fade-in">
+                          <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                             <PieChart className="w-5 h-5 text-indigo-500" /> Spending Breakdown
+                          </h3>
                           
-                          <div className="text-right flex flex-col items-end">
-                            {/* We now decide colour based on the category, NOT the raw math sign */}
-                            <span className={`font-black text-sm sm:text-lg ${tx.category !== 'Income' ? 'text-slate-800' : 'text-emerald-600'}`}>
-                                {tx.category === 'Income' ? '+' : ''}
+                          <div className="mb-10 text-center sm:text-left">
+                             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Total Outgoings</p>
+                             <p className="text-5xl font-black text-slate-800 tracking-tight">
                                 {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}
-                                {Math.abs(tx.amount).toFixed(2)}
-                            </span>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">{tx.bankName}</span>
+                                {totalSpent.toFixed(2)}
+                             </p>
                           </div>
-                      </div>
-                    )})}
-                  </div>
+
+                          <div className="space-y-6">
+                             {sortedCategories.length === 0 ? (
+                                <p className="text-slate-500 text-center py-4 text-sm">No spending data to analyse in this period.</p>
+                             ) : (
+                                sortedCategories.map(([cat, amount]) => {
+                                   const percentage = ((amount / totalSpent) * 100).toFixed(0);
+                                   return (
+                                   <div key={cat}>
+                                      <div className="flex justify-between items-center mb-2">
+                                         <div className="flex items-center gap-3">
+                                            <div className="p-1.5 bg-slate-50 rounded-lg border border-slate-100">
+                                               {getCategoryIcon(cat)}
+                                            </div>
+                                            <span className="font-bold text-slate-700">{cat}</span>
+                                         </div>
+                                         <div className="text-right">
+                                            <span className="font-bold text-slate-800 mr-3">
+                                               {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}{amount.toFixed(2)}
+                                            </span>
+                                            <span className="text-xs font-bold text-slate-400 w-8 inline-block">{percentage}%</span>
+                                         </div>
+                                      </div>
+                                      <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                                         <div 
+                                            className="bg-indigo-500 h-full rounded-full transition-all duration-1000 ease-out" 
+                                            style={{ width: `${percentage}%` }}
+                                         ></div>
+                                      </div>
+                                   </div>
+                                )})
+                             )}
+                          </div>
+                       </div>
+                   )}
                 </div>
               )}
             </>

@@ -3,22 +3,17 @@ const categoriseTransaction = (merchant, description, tlCategory, amount, accoun
     let rawText = `${merchant} ${description}`.toLowerCase();
     let text = rawText.replace(/www\.|co\.uk|\.com|\.org/g, '').replace(/[^a-z0-9\s]/g, '');
 
-    // 1. Check if this is a credit/charge card
     const isCreditCard = ['CREDIT', 'CREDIT_CARD', 'CARD', 'CHARGE_CARD'].includes((accountType || '').toUpperCase());
 
-    // 2. Handle the Polarity Flip
     let isIncome = false;
     if (isCreditCard) {
-        // On a credit card, a negative amount usually means you paid it off (Income/Credit)
         isIncome = amount < 0; 
     } else {
-        // On a normal bank account, a positive amount is Income
         isIncome = amount > 0; 
     }
 
     if (isIncome) return 'Income';
 
-    // 3. Keyword Matching for Outgoings
     if (text.match(/tesco|sainsbury|asda|morrison|aldi|lidl|waitrose|coop|iceland|costco|ocado|farmfoods/)) return 'Groceries';
     if (text.match(/mcdonald|kfc|burger king|burgerking|nando|costa|starbucks|greggs|deliveroo|ubereats|uber eats|justeat|just eat|domino|pret|pizza hut|subway|wetherspoon|kebab/)) return 'Eating Out';
     if (text.match(/uber|trainline|tfl|rail|petrol|shell|bp|esso|texaco|parking|bus|coach|ryanair|easyjet|ba |britishairways|national express|applegreen/)) return 'Transport';
@@ -46,7 +41,8 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json();
-    const { refreshToken, clientId, accounts } = body; 
+    // NOW ACCEPTING CUSTOM DATES
+    const { refreshToken, clientId, accounts, from, to } = body; 
 
     if (!refreshToken || !accounts || !clientId) {
         return new Response(JSON.stringify({ error: "Missing required parameters." }), { status: 400 });
@@ -69,12 +65,16 @@ export async function onRequestPost(context) {
     const accessToken = tokenData.access_token;
     const newRefreshToken = tokenData.refresh_token || refreshToken; 
 
-    const toDate = new Date();
-    const fromDate = new Date();
-    fromDate.setDate(toDate.getDate() - 30); 
-
-    const fromStr = fromDate.toISOString();
-    const toStr = toDate.toISOString();
+    // USE PROVIDED DATES, OR FALLBACK TO 30 DAYS
+    let fromStr = from;
+    let toStr = to;
+    if (!fromStr || !toStr) {
+        const toDate = new Date();
+        const fromDate = new Date();
+        fromDate.setDate(toDate.getDate() - 30); 
+        fromStr = fromDate.toISOString();
+        toStr = toDate.toISOString();
+    }
 
     const fetchPromises = accounts.map(async (acc) => {
         const endpointType = acc.endpoint_type || 'accounts';
@@ -101,7 +101,6 @@ export async function onRequestPost(context) {
             date: tx.timestamp.split('T')[0],
             description: tx.description,
             amount: tx.amount,
-            // ---> WE NOW PASS THE ACCOUNT TYPE INTO THE ENGINE <---
             category: categoriseTransaction(tx.merchant_name || '', tx.description || '', tx.transaction_category, tx.amount, acc.type),
             merchant: tx.merchant_name || 'Unknown',
             account_id: acc.account_id 
@@ -115,8 +114,6 @@ export async function onRequestPost(context) {
     });
 
     const results = await Promise.all(fetchPromises);
-    
-    // Combine transactions and map out the balances
     const allTransactions = results.flatMap(r => r.transactions || []);
     const balances = {};
     results.forEach(r => {
@@ -126,7 +123,7 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({
         success: true,
         transactions: allTransactions,
-        balances: balances, // <--- We now send a dictionary of balances back to React!
+        balances: balances,
         new_refresh_token: newRefreshToken 
     }), {
       status: 200,
