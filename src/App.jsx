@@ -4937,7 +4937,7 @@ export default function App() {
   // Toast Helper
   const showToast = (msg) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    setTimeout(() => setToastMessage(null), 8000);
   };
 
   useEffect(() => {

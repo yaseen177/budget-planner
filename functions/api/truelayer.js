@@ -5,9 +5,8 @@ export async function onRequestPost(context) {
     const body = await request.json();
     const { code, redirectUri, clientId } = body;
 
-    // Safety check: ensure the app sent the connection details
     if (!code || !redirectUri || !clientId) {
-        return new Response(JSON.stringify({ error: "Missing connection details from the app." }), { status: 400 });
+        return new Response(JSON.stringify({ error: "Missing connection details." }), { status: 400 });
     }
 
     const tokenResponse = await fetch('https://auth.truelayer.com/connect/token', {
@@ -23,9 +22,10 @@ export async function onRequestPost(context) {
     });
 
     const tokenData = await tokenResponse.json();
-    if (!tokenData.access_token) {
-        // This will print the exact reason TrueLayer rejected the connection
-        return new Response(JSON.stringify({ error: `Token Exchange Failed: ${JSON.stringify(tokenData)}` }), { status: 400 });
+    
+    // FIX 1: Null check on the token itself
+    if (!tokenData || !tokenData.access_token) {
+        return new Response(JSON.stringify({ error: `Token Exchange Failed: ${JSON.stringify(tokenData || 'No response')}` }), { status: 400 });
     }
 
     const accessToken = tokenData.access_token;
@@ -39,13 +39,12 @@ export async function onRequestPost(context) {
         });
         if (accRes.ok) {
             const accData = await accRes.json();
-            accountsResults = accData.results || [];
+            // FIX 2: Ensure results actually exists before mapping
+            accountsResults = (accData && accData.results) ? accData.results : [];
         }
-    } catch (e) {
-        console.error("Failed to fetch accounts endpoint");
-    }
+    } catch (e) { console.error("Accounts fetch failed"); }
 
-    // 2. Fetch Cards (Safely - won't crash if Barclays rejects it!)
+    // 2. Fetch Cards (Safely)
     let cardsResults = [];
     try {
         const cardRes = await fetch('https://api.truelayer.com/data/v1/cards', {
@@ -53,37 +52,41 @@ export async function onRequestPost(context) {
         });
         if (cardRes.ok) {
             const cardData = await cardRes.json();
-            cardsResults = cardData.results || [];
+            // FIX 3: Ensure results actually exists before mapping
+            cardsResults = (cardData && cardData.results) ? cardData.results : [];
         }
-    } catch (e) {
-        console.error("Failed to fetch cards endpoint");
-    }
+    } catch (e) { console.error("Cards fetch failed"); }
 
-    // 3. Merge them together
+    // 3. Merge them together (Ensuring we don't map over null)
+    const safeAccounts = Array.isArray(accountsResults) ? accountsResults : [];
+    const safeCards = Array.isArray(cardsResults) ? cardsResults : [];
+
     const allAccounts = [
-        ...accountsResults.map(a => ({ ...a, endpoint_type: 'accounts' })),
-        ...cardsResults.map(c => ({ ...c, endpoint_type: 'cards' }))
+        ...safeAccounts.map(a => ({ ...a, endpoint_type: 'accounts' })),
+        ...safeCards.map(c => ({ ...c, endpoint_type: 'cards' }))
     ];
 
-    const spendingAccounts = allAccounts.filter(
-        acc => !['MORTGAGE', 'LOAN'].includes((acc.account_type || '').toUpperCase())
-    );
+    // FIX 4: Final safety check on account type before filtering
+    const spendingAccounts = allAccounts.filter(acc => {
+        if (!acc || !acc.account_type) return true; // Keep it if we aren't sure
+        return !['MORTGAGE', 'LOAN'].includes(acc.account_type.toUpperCase());
+    });
 
     if (spendingAccounts.length === 0) {
-        return new Response(JSON.stringify({ error: "No eligible spending accounts found." }), { status: 404 });
+        return new Response(JSON.stringify({ error: "No eligible accounts found." }), { status: 404 });
     }
 
     return new Response(JSON.stringify({
         success: true,
         refresh_token: refreshToken,
         accounts: spendingAccounts.map(acc => ({
-            account_id: acc.account_id,
+            account_id: acc.account_id || 'unknown',
             name: acc.display_name || acc.provider?.display_name || "Bank Account",
             type: acc.account_type || 'CARD',
-            currency: acc.currency,
+            currency: acc.currency || 'GBP',
             provider_logo: acc.provider?.logo_uri || null,
             provider_id: acc.provider?.provider_id || "unknown",
-            endpoint_type: acc.endpoint_type 
+            endpoint_type: acc.endpoint_type || 'accounts'
         }))
     }), {
       status: 200,
@@ -91,6 +94,7 @@ export async function onRequestPost(context) {
     });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    // If it still crashes, this will catch the line number and message
+    return new Response(JSON.stringify({ error: `Final Catch: ${error.message}` }), { status: 500 });
   }
 }
