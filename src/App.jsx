@@ -5190,14 +5190,15 @@ export default function App() {
         return;
     }
 
-    // By hardcoding the string, we guarantee TrueLayer gets '%20' instead of '+'
+    // We use the exact 'provider_id' you found: "mock"
+    // We encode the redirectUri but use %20 for spaces in the scope to be safe.
     const authUrl = `https://auth.truelayer-sandbox.com/?response_type=code` +
                     `&client_id=${clientId}` +
                     `&scope=info%20accounts%20balance%20offline_access` +
                     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-                    `&providers=uk-ob-all%20uk-oauth-all`;
+                    `&provider_id=mock`; 
     
-    console.log("Redirecting to TrueLayer (Fixed Encoding):", authUrl);
+    console.log("Directing to Mock Bank:", authUrl);
     window.location.href = authUrl;
   };
 
