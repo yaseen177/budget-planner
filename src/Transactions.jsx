@@ -404,8 +404,9 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                           </div>
                           
                           <div className="text-right flex flex-col items-end">
-                            <span className={`font-black text-sm sm:text-lg ${tx.amount < 0 ? 'text-slate-800' : 'text-emerald-600'}`}>
-                                {tx.amount > 0 ? '+' : ''}
+                            {/* We now decide colour based on the category, NOT the raw math sign */}
+                            <span className={`font-black text-sm sm:text-lg ${tx.category !== 'Income' ? 'text-slate-800' : 'text-emerald-600'}`}>
+                                {tx.category === 'Income' ? '+' : ''}
                                 {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}
                                 {Math.abs(tx.amount).toFixed(2)}
                             </span>
