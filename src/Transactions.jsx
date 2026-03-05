@@ -523,14 +523,21 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                        )}
                                    </div>
                                    <div>
-                                       <p className={`font-bold text-sm sm:text-base ${isTransfer ? 'text-slate-600' : 'text-slate-800'}`}>
+                                       <p className={`font-bold text-sm sm:text-base flex items-center gap-2 ${isTransfer ? 'text-slate-600' : 'text-slate-800'}`}>
                                          {tx.merchant && tx.merchant !== 'Unknown' ? tx.merchant : tx.description}
                                        </p>
-                                       <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5 font-medium">
+                                       <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5 font-medium flex-wrap">
                                          <span className="capitalize">{tx.category || 'Miscellaneous'}</span>
                                          <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                                          <span>{new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
-                                       </p>
+                                         
+                                         {/* THE NEW PENDING INDICATOR */}
+                                         {tx.is_pending && (
+                                            <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest animate-pulse">
+                                              Pending
+                                            </span>
+                                         )}
+                                       </div>
                                    </div>
                                  </div>
                                  

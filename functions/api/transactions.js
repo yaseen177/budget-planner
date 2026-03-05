@@ -22,19 +22,14 @@ const categoriseTransaction = (merchant, description, tlCategory, amount, accoun
     if (accountHolderNames && accountHolderNames.length > 0) {
         const upperRaw = rawText.toUpperCase();
         for (const name of accountHolderNames) {
-            // Split the full name into parts (e.g. ["YASEEN", "MUHAMMAD", "HUSSAIN"])
             const parts = name.toUpperCase().split(' ').filter(p => p.trim() !== '');
             if (parts.length >= 2) {
                 const first = parts[0];
                 const last = parts[parts.length - 1];
-                const initial = first.charAt(0); // "Y"
+                const initial = first.charAt(0);
 
-                // Must contain the Last Name to be considered a match
                 if (upperRaw.includes(last)) {
-                    // Check for First Name match (e.g. "YASEEN HUSSAIN")
                     if (upperRaw.includes(first)) return 'Transfer';
-                    
-                    // Check for Initial match (e.g. "Y HUSSAIN", "Y. HUSSAIN", "Y & Y HUSSAIN")
                     const initialRegex = new RegExp(`(^|[^A-Z])${initial}([^A-Z]|$)`);
                     if (initialRegex.test(upperRaw)) return 'Transfer';
                 }
@@ -42,10 +37,7 @@ const categoriseTransaction = (merchant, description, tlCategory, amount, accoun
         }
     }
 
-    // Generic transfer fallbacks just in case
     if (text.match(/transfer|saving|pot|vault|credit card|amex payment|barclaycard|monzo|starling|revolut/)) return 'Transfer';
-
-    // 3. Then Income
     if (isIncome) return 'Income';
 
     // 4. Then standard categories
@@ -99,7 +91,6 @@ export async function onRequestPost(context) {
     const accessToken = tokenData.access_token;
     const newRefreshToken = tokenData.refresh_token || refreshToken; 
 
-    // GRAB THE USER'S TRUE ACCOUNT HOLDER NAME FROM THE API
     let accountHolderNames = [];
     try {
         const infoRes = await fetch('https://api.truelayer.com/data/v1/info', {
@@ -128,16 +119,26 @@ export async function onRequestPost(context) {
     const fetchPromises = accounts.map(async (acc) => {
         const endpointType = acc.endpoint_type || 'accounts';
         
+        // 1. Fetch Settled Transactions
         const txPromise = fetch(`https://api.truelayer.com/data/v1/${endpointType}/${acc.account_id}/transactions?from=${fromStr}&to=${toStr}`, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
+        
+        // 2. Fetch Pending Transactions
+        const pendingTxPromise = fetch(`https://api.truelayer.com/data/v1/${endpointType}/${acc.account_id}/transactions/pending`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        // 3. Fetch Balance
         const balancePromise = fetch(`https://api.truelayer.com/data/v1/${endpointType}/${acc.account_id}/balance`, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
 
-        const [txResponse, balanceResponse] = await Promise.all([txPromise, balancePromise]);
+        // Wait for all three simultaneously
+        const [txResponse, pendingTxResponse, balanceResponse] = await Promise.all([txPromise, pendingTxPromise, balancePromise]);
         
         const txData = await txResponse.json();
+        const pendingTxData = await pendingTxResponse.json();
         const balanceData = await balanceResponse.json();
 
         let currentBalance = 0;
@@ -145,15 +146,24 @@ export async function onRequestPost(context) {
             currentBalance = balanceData.results[0].current || 0;
         }
 
-        const cleanedTx = txData.error ? [] : (txData.results || []).map(tx => ({
+        const settledTx = txData.error ? [] : (txData.results || []);
+        const pendingTx = pendingTxData.error ? [] : (pendingTxData.results || []);
+
+        // Combine them and tag pending ones
+        const allRawTx = [
+            ...pendingTx.map(tx => ({ ...tx, is_pending: true })),
+            ...settledTx.map(tx => ({ ...tx, is_pending: false }))
+        ];
+
+        const cleanedTx = allRawTx.map(tx => ({
             id: tx.transaction_id,
             date: tx.timestamp.split('T')[0],
             description: tx.description,
             amount: tx.amount,
-            // Pass the API names directly into the categorisation engine
             category: categoriseTransaction(tx.merchant_name || '', tx.description || '', tx.transaction_category, tx.amount, acc.type, accountHolderNames),
             merchant: tx.merchant_name || 'Unknown',
-            account_id: acc.account_id 
+            account_id: acc.account_id,
+            is_pending: tx.is_pending // Front-end can use this!
         }));
 
         return {
