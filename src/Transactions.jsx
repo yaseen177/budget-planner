@@ -1,29 +1,58 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2, Utensils, Tv, ShoppingCart, TrendingUp, Activity, PieChart, ChevronDown, ChevronUp, List, ArrowRightLeft } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2, Utensils, Tv, ShoppingCart, TrendingUp, Activity, PieChart, List, ArrowRightLeft, Wallet, Link as LinkIcon } from 'lucide-react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 const TRUELAYER_PROVIDERS = {
-  'monzo': 'ob-monzo',
-  'barclays': 'ob-barclays',
-  'natwest': 'ob-natwest',
-  'lloyds': 'ob-lloyds',
-  'halifax': 'ob-halifax',
-  'santander': 'ob-santander',
-  'hsbc': 'ob-hsbc',
-  'starling': 'ob-starling',
-  'revolut': 'ob-revolut',
-  'nationwide': 'ob-nationwide',
-  'first direct': 'ob-first-direct',
-  'tsb': 'ob-tsb',
-  'amex': 'ob-amex',
-  'american express': 'ob-amex',
-  'capital one': 'ob-capital-one',
-  'mbna': 'ob-mbna',
-  'virgin money': 'ob-virgin-money',
-  'chase': 'ob-chase',
-  'mock bank': 'mock', 
-  'mock': 'mock'
+  'monzo': 'ob-monzo', 'barclays': 'ob-barclays', 'natwest': 'ob-natwest', 'lloyds': 'ob-lloyds',
+  'halifax': 'ob-halifax', 'santander': 'ob-santander', 'hsbc': 'ob-hsbc', 'starling': 'ob-starling',
+  'revolut': 'ob-revolut', 'nationwide': 'ob-nationwide', 'first direct': 'ob-first-direct', 'tsb': 'ob-tsb',
+  'amex': 'ob-amex', 'american express': 'ob-amex', 'capital one': 'ob-capital-one', 'mbna': 'ob-mbna',
+  'virgin money': 'ob-virgin-money', 'chase': 'ob-chase', 'mock bank': 'mock', 'mock': 'mock'
 };
+
+// --- REACT BITS INSPIRED: SPOTLIGHT CARD ---
+const SpotlightCard = ({ children, className = "" }) => {
+  const divRef = useRef(null);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [opacity, setOpacity] = useState(0);
+
+  const handleMouseMove = (e) => {
+    if (!divRef.current) return;
+    const rect = divRef.current.getBoundingClientRect();
+    setPosition({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+  };
+
+  return (
+    <div
+      ref={divRef}
+      onMouseMove={handleMouseMove}
+      onMouseEnter={() => setOpacity(1)}
+      onMouseLeave={() => setOpacity(0)}
+      className={`relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md ${className}`}
+    >
+      <div
+        className="pointer-events-none absolute -inset-px opacity-0 transition duration-300 z-0"
+        style={{
+          opacity,
+          background: `radial-gradient(400px circle at ${position.x}px ${position.y}px, rgba(99,102,241,0.06), transparent 40%)`,
+        }}
+      />
+      <div className="relative z-10 h-full">{children}</div>
+    </div>
+  );
+};
+
+// --- REACT BITS INSPIRED: SHINY BUTTON ---
+const ShinyButton = ({ onClick, disabled, children, className = "" }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className={`group relative overflow-hidden rounded-full bg-slate-900 px-5 py-2 text-sm font-bold text-white transition-all hover:scale-105 hover:shadow-lg hover:shadow-slate-900/20 disabled:opacity-50 active:scale-95 ${className}`}
+  >
+    <span className="relative z-10 flex items-center justify-center gap-2">{children}</span>
+    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 ease-in-out group-hover:translate-x-full" />
+  </button>
+);
 
 const SkeletonLoader = () => (
   <div className="space-y-4 animate-pulse w-full">
@@ -53,29 +82,15 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   
   const [activeTab, setActiveTab] = useState('feed'); 
   const [dateFilter, setDateFilter] = useState('30'); 
-  const [expandedBanks, setExpandedBanks] = useState({});
-
-  const toggleBankExpansion = (providerId) => {
-      setExpandedBanks(prev => ({ ...prev, [providerId]: !prev[providerId] }));
-  };
 
   const userBanks = useMemo(() => {
     const banks = [];
-    
-    if (bankDetails?.name) {
-      banks.push({ id: 'current', name: bankDetails.name, type: 'Salary Account', fallbackLogo: bankDetails.logo });
-    }
-
+    if (bankDetails?.name) banks.push({ id: 'current', name: bankDetails.name, type: 'Salary Account', fallbackLogo: bankDetails.logo });
     if (additionalBanks && additionalBanks.length > 0) {
-        additionalBanks.forEach((b, i) => {
-            banks.push({ id: `extra-${i}`, name: b.name, type: 'Current Account', fallbackLogo: b.logo });
-        });
+        additionalBanks.forEach((b, i) => banks.push({ id: `extra-${i}`, name: b.name, type: 'Current Account', fallbackLogo: b.logo }));
     }
-
     const creditCards = expenses.filter(e => e.type === 'credit_card');
-    creditCards.forEach(cc => {
-       banks.push({ id: cc.id, name: cc.name, type: 'Credit Card', fallbackLogo: cc.logo });
-    });
+    creditCards.forEach(cc => banks.push({ id: cc.id, name: cc.name, type: 'Credit Card', fallbackLogo: cc.logo }));
 
     return banks.map(bank => {
       const searchName = bank.name.toLowerCase().trim();
@@ -84,7 +99,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
       const connection = providerId ? bankingData?.connections?.[providerId] : null;
       const isConnected = !!connection;
-
       const liveLogo = isConnected && connection.accounts?.[0]?.provider_logo ? connection.accounts[0].provider_logo : null;
 
       return {
@@ -95,6 +109,26 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
       };
     });
   }, [bankDetails, additionalBanks, expenses, bankingData]);
+
+  // Extract all individual connected accounts for the Digital Wallet
+  const activeWalletAccounts = useMemo(() => {
+    if (!bankingData?.connections) return [];
+    const accountsList = [];
+    Object.entries(bankingData.connections).forEach(([providerId, bankData]) => {
+        const relatedBank = userBanks.find(b => b.providerId === providerId);
+        if (bankData.accounts) {
+            bankData.accounts.forEach(acc => {
+                accountsList.push({
+                    ...acc,
+                    providerId,
+                    displayLogo: relatedBank?.fallbackLogo || acc.provider_logo || relatedBank?.logoUrl,
+                    parentBankName: relatedBank?.name || 'Bank'
+                });
+            });
+        }
+    });
+    return accountsList;
+  }, [bankingData, userBanks]);
 
   const getCategoryIcon = (category) => {
     switch(category) {
@@ -264,8 +298,8 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   return (
     <div className="fixed inset-0 z-[200] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full duration-500">
       
-      {/* Main Glassmorphic Header */}
-      <div className="bg-white/80 backdrop-blur-md px-6 pt-12 pb-4 shadow-sm flex items-center justify-between sticky top-0 z-30 border-b border-slate-200/50">
+      {/* Modern Glassmorphic Header */}
+      <div className="bg-white/80 backdrop-blur-md px-6 pt-12 pb-4 shadow-sm flex items-center justify-between sticky top-0 z-40 border-b border-slate-200/50">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
             <Landmark className="w-6 h-6 text-indigo-600" /> Bank Connections
@@ -278,7 +312,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 no-scrollbar pb-32">
-        <div className="max-w-3xl mx-auto space-y-8">
+        <div className="max-w-3xl mx-auto space-y-10">
           
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 space-y-6">
@@ -293,151 +327,152 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                 </div>
               )}
 
-              {/* SECTION 1: MY BANKS LIST */}
-              <div className="bg-white rounded-[2rem] p-6 sm:p-8 shadow-sm border border-slate-200">
-                 <div className="flex justify-between items-center mb-6">
+              {/* NEW: THE DIGITAL WALLET (Live Balances Grid) */}
+              {activeWalletAccounts.length > 0 && (
+                <div>
+                  <div className="flex justify-between items-end mb-4 px-1">
+                      <div>
+                          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                             <Wallet className="w-5 h-5 text-indigo-500" /> Digital Wallet
+                          </h3>
+                          <p className="text-xs font-medium text-slate-500 mt-1">Live balances across all connected accounts.</p>
+                      </div>
+                      <ShinyButton 
+                          onClick={() => fetchTransactions(true)}
+                          disabled={isRefreshing}
+                      >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} /> Sync
+                      </ShinyButton>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     {activeWalletAccounts.map(acc => (
+                         <SpotlightCard key={acc.account_id} className="flex flex-col justify-between p-5 min-h-[140px]">
+                            <div className="flex justify-between items-start">
+                                <div className="p-2 bg-slate-50 rounded-xl border border-slate-100 shadow-sm flex items-center justify-center w-10 h-10">
+                                   {acc.displayLogo ? (
+                                       <img src={acc.displayLogo} alt={acc.name} className="w-6 h-6 object-contain" />
+                                   ) : (
+                                       <CreditCard className="w-5 h-5 text-slate-400" />
+                                   )}
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                                   {acc.parentBankName}
+                               </span>
+                            </div>
+                            <div className="mt-4">
+                               <p className="text-xs font-bold text-slate-500 truncate mb-1">{acc.name}</p>
+                               <p className={`text-2xl font-black tracking-tight ${balances[acc.account_id] !== undefined && balances[acc.account_id] < 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+                                  {balances[acc.account_id] !== undefined ? (
+                                      <>
+                                         {balances[acc.account_id] < 0 ? '-' : ''}
+                                         {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}
+                                         {Math.abs(balances[acc.account_id]).toFixed(2)}
+                                      </>
+                                  ) : (
+                                      <span className="w-16 h-6 bg-slate-200 rounded animate-pulse inline-block"></span>
+                                  )}
+                               </p>
+                            </div>
+                         </SpotlightCard>
+                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* NEW: LINKED CONNECTIONS (Slimline connection manager) */}
+              <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-200">
+                 <div className="mb-6">
                      <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <Shield className="w-5 h-5 text-emerald-500" /> Your Accounts
+                        <LinkIcon className="w-5 h-5 text-emerald-500" /> Linked Connections
                      </h3>
-                     {bankingData && Object.keys(bankingData.connections).length > 0 && (
-                        <button 
-                            onClick={() => fetchTransactions(true)}
-                            disabled={isRefreshing}
-                            className="text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 py-1.5 px-3 rounded-full transition flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
-                        >
-                            <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} /> Sync All
-                        </button>
-                     )}
+                     <p className="text-xs font-medium text-slate-500 mt-1">Manage your Open Banking integrations.</p>
                  </div>
                  
-                 <div className="space-y-4">
+                 <div className="divide-y divide-slate-100">
                     {userBanks.length === 0 ? (
-                       <div className="text-center py-8 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
-                           <Landmark className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                           <p className="text-slate-500 text-sm font-medium">No accounts connected yet.</p>
-                       </div>
+                       <p className="text-slate-500 text-sm text-center py-4">No banks or credit cards added to your budget yet.</p>
                     ) : (
-                       userBanks.map((bank, index) => {
-                         const isExpanded = expandedBanks[bank.providerId] !== false; 
-
-                         return (
-                         <div key={index} className="flex flex-col p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:border-slate-200 transition">
-                            
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 cursor-pointer" onClick={() => {
-                                if (bank.status === 'Connected') toggleBankExpansion(bank.providerId);
-                            }}>
-                                <div className="flex items-center gap-4">
-                                   <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center w-12 h-12">
-                                      {bank.logoUrl ? (
-                                          <img src={bank.logoUrl} alt={bank.name} className="w-7 h-7 object-contain" />
-                                      ) : bank.type === 'Credit Card' ? (
-                                          <CreditCard className="w-6 h-6 text-slate-400" />
-                                      ) : (
-                                          <Landmark className="w-6 h-6 text-slate-400" />
-                                      )}
-                                   </div>
-                                   <div>
-                                      <h4 className="font-bold text-slate-800">{bank.name}</h4>
-                                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{bank.type}</p>
-                                   </div>
-                                </div>
-
-                                <div className="flex items-center justify-between w-full sm:w-auto gap-4 pl-14 sm:pl-0">
-                                   <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                                      bank.status === 'Connected' ? 'bg-emerald-100 text-emerald-700' :
-                                      bank.status === 'Inactive' ? 'bg-slate-200 text-slate-600' :
-                                      'bg-rose-100 text-rose-700'
-                                   }`}>
-                                      {bank.status === 'Connected' && <CheckCircle2 className="w-3.5 h-3.5" />}
-                                      {bank.status === 'Inactive' && <AlertCircle className="w-3.5 h-3.5" />}
-                                      {bank.status === 'Unavailable' && <AlertTriangle className="w-3.5 h-3.5" />}
-                                      {bank.status}
-                                   </div>
-
-                                   {bank.status === 'Inactive' && (
-                                      <button 
-                                         onClick={(e) => { e.stopPropagation(); onConnectBank(bank.providerId); }}
-                                         className="bg-indigo-600 text-white text-sm font-bold py-2 px-4 rounded-xl hover:bg-indigo-700 transition shadow-md whitespace-nowrap active:scale-95"
-                                      >
-                                         Connect
-                                      </button>
-                                   )}
-
-                                   {bank.status === 'Connected' && (
-                                      <div className="flex items-center gap-2">
-                                         <button className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition">
-                                            {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                                         </button>
-
-                                         <div className="relative">
-                                            <button 
-                                              onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === bank.providerId ? null : bank.providerId); }}
-                                              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-full transition"
-                                            >
-                                               <MoreVertical className="w-5 h-5" />
-                                            </button>
-
-                                            {activeMenu === bank.providerId && (
-                                               <>
-                                                 <div className="fixed inset-0 z-30" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}></div>
-                                                 <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-40 animate-in fade-in zoom-in-95 origin-top-right">
-                                                    <button 
-                                                      onClick={(e) => { e.stopPropagation(); setActiveMenu(null); onConnectBank(bank.providerId); }}
-                                                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition"
-                                                    >
-                                                      <RefreshCw className="w-4 h-4 text-slate-400" /> Reconnect Bank
-                                                    </button>
-                                                    <div className="h-px bg-slate-100 my-1"></div>
-                                                    <button 
-                                                      onClick={(e) => { e.stopPropagation(); handleDisconnect(bank.providerId); }}
-                                                      className="w-full text-left px-4 py-2.5 text-sm font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-3 transition"
-                                                    >
-                                                      <Trash2 className="w-4 h-4" /> Disconnect
-                                                    </button>
-                                                 </div>
-                                               </>
-                                            )}
-                                         </div>
-                                      </div>
-                                   )}
-                                </div>
+                       userBanks.map((bank, index) => (
+                         <div key={index} className="flex items-center justify-between py-4 group">
+                            <div className="flex items-center gap-3">
+                               <div className="w-8 h-8 flex items-center justify-center opacity-80 group-hover:opacity-100 transition">
+                                  {bank.logoUrl ? (
+                                      <img src={bank.logoUrl} alt={bank.name} className="w-full h-full object-contain" />
+                                  ) : (
+                                      <Landmark className="w-6 h-6 text-slate-400" />
+                                  )}
+                               </div>
+                               <div>
+                                  <h4 className="font-bold text-slate-700 text-sm">{bank.name}</h4>
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{bank.type}</p>
+                               </div>
                             </div>
 
-                            {bank.status === 'Connected' && bankingData?.connections?.[bank.providerId]?.accounts && isExpanded && (
-                                <div className="mt-4 pt-4 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-2 animate-in slide-in-from-top-2 fade-in duration-200">
-                                    {bankingData.connections[bank.providerId].accounts.map(acc => (
-                                        <div key={acc.account_id} className="flex justify-between items-center p-2.5 bg-white rounded-xl shadow-sm border border-slate-100 hover:border-slate-200 transition">
-                                            <span className="text-xs font-bold text-slate-600 truncate mr-3">{acc.name}</span>
-                                            
-                                            <span className={`text-sm font-black whitespace-nowrap ${
-                                                balances[acc.account_id] !== undefined && balances[acc.account_id] < 0 
-                                                ? 'text-rose-600' 
-                                                : 'text-slate-800'
-                                            }`}>
-                                                {balances[acc.account_id] !== undefined ? (
-                                                    <>
-                                                       {balances[acc.account_id] < 0 ? '-' : ''}
-                                                       {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}
-                                                       {Math.abs(balances[acc.account_id]).toFixed(2)}
-                                                    </>
-                                                ) : (
-                                                    <span className="w-12 h-4 bg-slate-200 rounded animate-pulse inline-block"></span>
-                                                )}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                            <div className="flex items-center gap-3">
+                               <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                  bank.status === 'Connected' ? 'bg-emerald-50 text-emerald-600' :
+                                  bank.status === 'Inactive' ? 'bg-slate-100 text-slate-500' :
+                                  'bg-rose-50 text-rose-600'
+                               }`}>
+                                  {bank.status === 'Connected' && <CheckCircle2 className="w-3 h-3" />}
+                                  {bank.status === 'Inactive' && <AlertCircle className="w-3 h-3" />}
+                                  {bank.status === 'Unavailable' && <AlertTriangle className="w-3 h-3" />}
+                                  {bank.status}
+                               </div>
+
+                               {bank.status === 'Inactive' && (
+                                  <button 
+                                     onClick={(e) => { e.stopPropagation(); onConnectBank(bank.providerId); }}
+                                     className="bg-indigo-50 text-indigo-600 text-xs font-bold py-1.5 px-3 rounded-lg hover:bg-indigo-100 transition active:scale-95"
+                                  >
+                                     Connect
+                                  </button>
+                               )}
+
+                               {bank.status === 'Connected' && (
+                                  <div className="relative">
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === bank.providerId ? null : bank.providerId); }}
+                                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition"
+                                      >
+                                         <MoreVertical className="w-4 h-4" />
+                                      </button>
+
+                                      {/* Modern iOS Style Context Menu */}
+                                      {activeMenu === bank.providerId && (
+                                         <>
+                                           <div className="fixed inset-0 z-30" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}></div>
+                                           <div className="absolute right-0 top-full mt-2 w-48 bg-white/90 backdrop-blur-xl rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)] border border-white p-1.5 z-40 animate-in fade-in zoom-in-95 origin-top-right">
+                                              <button 
+                                                onClick={(e) => { e.stopPropagation(); setActiveMenu(null); onConnectBank(bank.providerId); }}
+                                                className="w-full text-left px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 rounded-xl flex items-center gap-2 transition"
+                                              >
+                                                <RefreshCw className="w-4 h-4 text-slate-400" /> Reconnect
+                                              </button>
+                                              <div className="h-px bg-slate-200/50 my-1 mx-2"></div>
+                                              <button 
+                                                onClick={(e) => { e.stopPropagation(); handleDisconnect(bank.providerId); }}
+                                                className="w-full text-left px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50 rounded-xl flex items-center gap-2 transition"
+                                              >
+                                                <Trash2 className="w-4 h-4" /> Disconnect
+                                              </button>
+                                           </div>
+                                         </>
+                                      )}
+                                  </div>
+                               )}
+                            </div>
                          </div>
-                       )})
+                       ))
                     )}
                  </div>
               </div>
 
-              {/* TABS & FILTERS - NO LONGER STICKY */}
+              {/* TABS & FILTERS */}
               {bankingData && Object.keys(bankingData.connections).length > 0 && transactions.length > 0 && (
                 <div className="space-y-6 mt-8">
-                   <div className="flex flex-col sm:flex-row justify-between items-center gap-4 z-20 py-4 -mx-4 px-4 sm:mx-0 sm:px-0">
+                   <div className="flex flex-col sm:flex-row justify-between items-center gap-4 py-2">
                        <div className="flex bg-slate-200/60 p-1.5 rounded-2xl w-full sm:w-auto shadow-inner">
                           <button 
                              onClick={() => setActiveTab('feed')}
@@ -472,7 +507,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                            {transactions.map((tx, idx) => {
                              const relatedBank = userBanks.find(b => b.providerId === tx.providerId);
                              const displayLogo = relatedBank?.fallbackLogo || tx.providerLogo || relatedBank?.logoUrl;
-                             
                              const isTransfer = tx.category === 'Transfer';
 
                              return (
@@ -514,7 +548,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                        </div>
                    )}
 
-                   {/* TAB: ANALYTICS */}
+                   {/* TAB: ANALYTICS (EXCLUDING TRANSFERS) */}
                    {activeTab === 'analytics' && (
                        <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-6 sm:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                           <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
