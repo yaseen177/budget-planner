@@ -2561,12 +2561,12 @@ const CollapsibleSection = ({ title, count, children, defaultOpen = true }) => {
   );
 };
 
-// --- NEW: COLLAPSIBLE SETTINGS GROUP COMPONENT ---
+// --- FIND AND REPLACE THE ENTIRE SettingsGroup COMPONENT ---
 const SettingsGroup = ({ title, icon: Icon, children, defaultOpen = false, subtitle }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm mb-4 transition-all duration-300">
+    <div className={`border border-slate-200 rounded-2xl bg-white shadow-sm mb-4 transition-all duration-300 ${isOpen ? 'overflow-visible relative z-10' : 'overflow-hidden'}`}>
       <button 
         onClick={() => setIsOpen(!isOpen)} 
         className={`w-full flex items-center justify-between p-4 transition-colors ${isOpen ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'}`}
@@ -2585,7 +2585,7 @@ const SettingsGroup = ({ title, icon: Icon, children, defaultOpen = false, subti
          </div>
       </button>
       
-      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+      <div className={`transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[2000px] opacity-100 overflow-visible' : 'max-h-0 opacity-0 overflow-hidden'}`}>
          <div className="p-4 border-t border-slate-100 space-y-4">
             {children}
          </div>
@@ -3035,15 +3035,18 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                     </div>
                  ))}
 
-                 <div className="flex gap-2 items-start pt-2">
-                 <div className="flex-1">
+<div className="flex gap-2 items-start pt-2">
+                     <div className="flex-1">
                        <BrandSearchInput
                           placeholder="New Bill Name"
                           value={newDefExpName}
                           onChange={setNewDefExpName}
-                          onSelectBrand={(name, logo) => { setNewDefExpName(name); setNewDefExpLogo(logo); }}
+                          onSelectBrand={(name, logo) => { 
+                              setNewDefExpName(name); 
+                              setNewDefExpLogo(logo); 
+                          }}
                           
-                          // ADD THESE TWO LINES:
+                          // THESE TWO LINES ENABLE THE LOGO LOCK
                           selectedLogo={newDefExpLogo}
                           onClearLogo={() => setNewDefExpLogo(null)}
                           
@@ -3057,7 +3060,9 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                         value={newDefExpAmount} 
                         onChange={e => setNewDefExpAmount(e.target.value)} 
                      />
-                     <button onClick={addDefaultExpense} className="bg-slate-900 text-white p-3 rounded-xl"><Plus className="w-5 h-5" /></button>
+                     <button onClick={addDefaultExpense} className="bg-slate-900 text-white p-3 rounded-xl">
+                        <Plus className="w-5 h-5" />
+                     </button>
                  </div>
               </div>
           </SettingsGroup>
