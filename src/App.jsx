@@ -2811,10 +2811,15 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                  </div>
                  
                  <BankSelector 
-                    selectedBank={null} 
-                    onSelect={addAdditionalBank} 
-                    placeholder="+ Add another bank account..."
-                 />
+   selectedBanks={additionalBanks} 
+   onSelect={(b) => {
+      if (additionalBanks.some(existing => existing.name === b.name)) {
+         setAdditionalBanks(additionalBanks.filter(existing => existing.name !== b.name));
+      } else {
+         addAdditionalBank(b);
+      }
+   }} 
+/>
               </div>
 
               {/* Payday */}
@@ -3752,7 +3757,17 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
                       </div>
                   ))}
                   <div className="pt-2">
-                      <BankSelector selectedBank={null} onSelect={(b) => setAdditionalBanks([...additionalBanks, {...b, id: Date.now().toString()}])} />
+                  <BankSelector 
+   selectedBanks={additionalBanks} 
+   onSelect={(b) => {
+      // Toggle logic: If it's already selected, remove it. If not, add it.
+      if (additionalBanks.some(existing => existing.name === b.name)) {
+          setAdditionalBanks(additionalBanks.filter(existing => existing.name !== b.name));
+      } else {
+          setAdditionalBanks([...additionalBanks, {...b, id: Date.now().toString()}]);
+      }
+   }} 
+/>
                   </div>
               </div>
           )}
@@ -4303,34 +4318,45 @@ const SwipeableExpenseRow = ({ children, onEdit, onDelete, isMobile }) => {
 };
 
 
-const BankSelector = ({ selectedBank, onSelect }) => {
+const BankSelector = ({ selectedBank, selectedBanks = [], onSelect }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Get key from env
   const LOGO_PUBLIC_KEY = import.meta.env.VITE_LOGO_DEV_PUBLIC_KEY;
+
+  // Checks if the bank is the main salary bank OR in the additional banks array
+  const isSelected = (bankName) => {
+    if (selectedBank && selectedBank.name === bankName) return true;
+    if (selectedBanks && selectedBanks.some(b => b.name === bankName)) return true;
+    return false;
+  };
 
   return (
     <div className="space-y-4">
       {!isSearching ? (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-60 overflow-y-auto p-1">
-            {UK_BANKS.map(bank => (
+            {UK_BANKS.map(bank => {
+              const active = isSelected(bank.name);
+              return (
               <button
                 key={bank.id}
-                // UPDATED: Used LOGO_PUBLIC_KEY variable here
                 onClick={() => onSelect({ name: bank.name, logo: `https://img.logo.dev/${bank.domain}?token=${LOGO_PUBLIC_KEY}`, color: bank.color })}
-                className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${selectedBank?.name === bank.name ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-200 hover:border-slate-300 bg-white'}`}
+                className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all relative ${active ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-200 hover:border-slate-300 bg-white'}`}
               >
+                {active && (
+                  <div className="absolute top-2 right-2 bg-emerald-500 text-white rounded-full p-0.5 shadow-sm animate-in zoom-in">
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </div>
+                )}
                 <img 
-                  // UPDATED: Used LOGO_PUBLIC_KEY variable here
                   src={`https://img.logo.dev/${bank.domain}?token=${LOGO_PUBLIC_KEY}`} 
                   alt={bank.name} 
                   className="w-8 h-8 object-contain rounded-full"
                 />
-                <span className="text-xs font-bold text-slate-700">{bank.name}</span>
+                <span className={`text-xs font-bold ${active ? 'text-emerald-700' : 'text-slate-700'}`}>{bank.name}</span>
               </button>
-            ))}
+            )})}
           </div>
           <button 
             onClick={() => setIsSearching(true)}
@@ -4345,13 +4371,16 @@ const BankSelector = ({ selectedBank, onSelect }) => {
               <label className="text-xs font-bold text-slate-400 uppercase">Search Bank</label>
               <button onClick={() => setIsSearching(false)} className="text-xs text-indigo-500 font-bold">Back to list</button>
            </div>
-           {/* FIX: Connected value and onChange to state */}
            <BrandSearchInput 
               placeholder="e.g. Chase, Virgin Money..."
               value={searchTerm}
               onChange={setSearchTerm}
-              onSelectBrand={(name, logo) => onSelect({ name, logo, color: '#64748b' })} // Default color for unknown banks
-              className="w-full p-3 rounded-xl border border-slate-200"
+              onSelectBrand={(name, logo) => {
+                 onSelect({ name, logo, color: '#64748b' });
+                 setSearchTerm('');
+                 setIsSearching(false);
+              }}
+              className="w-full p-3 rounded-xl border border-slate-200 bg-white"
               autoFocus
            />
         </div>
