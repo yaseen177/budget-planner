@@ -75,7 +75,8 @@ import {
   Menu,
   Shield,
   ChevronDown,
-  RefreshCw
+  RefreshCw,
+  CheckCircle2
 } from 'lucide-react';
 
 import { evaluate } from 'mathjs';
