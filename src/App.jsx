@@ -4762,6 +4762,8 @@ export default function App() {
   // --- ADMIN DEMO STATE ---
   const [activeDemoId, setActiveDemoId] = useState(null);
 
+  const [bankingData, setBankingData] = useState(null);
+
   // Add these new states
   const [showPaceModal, setShowPaceModal] = useState(false);
   const [paceView, setPaceView] = useState('daily'); // 'daily' or 'weekly'
@@ -5252,6 +5254,22 @@ export default function App() {
 
     return () => unsubscribe();
   }, [user, currentDate, userSettings.defaultFixedExpenses]);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    // Listen to the openBanking document to see live connection status
+    const bankingRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'openBanking');
+    const unsub = onSnapshot(bankingRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setBankingData(docSnap.data());
+      } else {
+        setBankingData(null);
+      }
+    });
+    
+    return () => unsub();
+  }, [user]);
 
   const handleReportSelection = async (type) => {
     if (type === 'month') {
