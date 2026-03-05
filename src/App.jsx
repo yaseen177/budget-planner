@@ -3490,41 +3490,42 @@ const calculateDaysUntilPayday = (payDayStr, salaryInputted) => {
 // --- NEW COMPONENT: ONBOARDING WIZARD ---
 
 // --- FULLY REVAMPED 10-STEP ONBOARDING WIZARD ---
-const OnboardingWizard = ({ user, currentSettings, onComplete, onSaveDraft, onConnectBank, bankingData }) => {
-  const [step, setStep] = useState(currentSettings.onboardingStep || 0); 
+const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft, onConnectBank, bankingData }) => {
+  // FIX: Added ?. to safely check values even if currentSettings is completely empty
+  const [step, setStep] = useState(currentSettings?.onboardingStep || 0); 
   
   // States
-  const [name, setName] = useState(currentSettings.displayName || user.displayName || '');
-  const [currency, setCurrency] = useState(currentSettings.currency || 'GBP');
-  const [bank, setBank] = useState(currentSettings.bankDetails || null);
-  const [additionalBanks, setAdditionalBanks] = useState(currentSettings.additionalBanks || []);
-  const [payDay, setPayDay] = useState(currentSettings.payDay || '');
+  const [name, setName] = useState(currentSettings?.displayName || user?.displayName || '');
+  const [currency, setCurrency] = useState(currentSettings?.currency || 'GBP');
+  const [bank, setBank] = useState(currentSettings?.bankDetails || null);
+  const [additionalBanks, setAdditionalBanks] = useState(currentSettings?.additionalBanks || []);
+  const [payDay, setPayDay] = useState(currentSettings?.payDay || '');
   
-  const [hasAdditional, setHasAdditional] = useState(currentSettings.additionalBanks?.length > 0 ? 'yes' : null);
-  const [hasCreditCards, setHasCreditCards] = useState(currentSettings.creditCards?.length > 0 ? 'yes' : null);
-  const [creditCards, setCreditCards] = useState(currentSettings.creditCards || []);
-  const [hasMortgages, setHasMortgages] = useState(currentSettings.mortgages?.length > 0 ? 'yes' : null);
-  const [mortgages, setMortgages] = useState(currentSettings.mortgages || []);
+  const [hasAdditional, setHasAdditional] = useState(currentSettings?.additionalBanks?.length > 0 ? 'yes' : null);
+  const [hasCreditCards, setHasCreditCards] = useState(currentSettings?.creditCards?.length > 0 ? 'yes' : null);
+  const [creditCards, setCreditCards] = useState(currentSettings?.creditCards || []);
+  const [hasMortgages, setHasMortgages] = useState(currentSettings?.mortgages?.length > 0 ? 'yes' : null);
+  const [mortgages, setMortgages] = useState(currentSettings?.mortgages || []);
   
-  const [pots, setPots] = useState(currentSettings.allocationRules || DEFAULT_ALLOCATIONS);
+  const [pots, setPots] = useState(currentSettings?.allocationRules || DEFAULT_ALLOCATIONS);
   const [newPotName, setNewPotName] = useState('');
   const [newPotPercent, setNewPotPercent] = useState('');
   
-  const [bills, setBills] = useState(currentSettings.defaultFixedExpenses || []);
+  const [bills, setBills] = useState(currentSettings?.defaultFixedExpenses || []);
   const [newBillName, setNewBillName] = useState('');
   const [newBillAmount, setNewBillAmount] = useState('');
   const [newBillLogo, setNewBillLogo] = useState(null);
 
-  const [paceTargets, setPaceTargets] = useState(currentSettings.dailyPaceTargets || { low: 10, high: 30 });
+  const [paceTargets, setPaceTargets] = useState(currentSettings?.dailyPaceTargets || { low: 10, high: 30 });
 
   const totalPercent = pots.reduce((sum, p) => sum + p.percentage, 0);
 
   // Sync step if it changes (e.g., returning from TrueLayer redirect)
   useEffect(() => {
-     if (currentSettings.onboardingStep !== undefined && currentSettings.onboardingStep > step) {
+     if (currentSettings?.onboardingStep !== undefined && currentSettings.onboardingStep > step) {
          setStep(currentSettings.onboardingStep);
      }
-  }, [currentSettings.onboardingStep]);
+  }, [currentSettings?.onboardingStep]);
 
   // Checks TrueLayer status
   const checkConnection = (bankName) => {
