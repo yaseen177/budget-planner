@@ -3489,6 +3489,14 @@ const calculateDaysUntilPayday = (payDayStr, salaryInputted) => {
 
 // --- NEW COMPONENT: ONBOARDING WIZARD ---
 
+const TRUELAYER_PROVIDERS = {
+  'monzo': 'ob-monzo', 'barclays': 'ob-barclays', 'natwest': 'ob-natwest', 'lloyds': 'ob-lloyds',
+  'halifax': 'ob-halifax', 'santander': 'ob-santander', 'hsbc': 'ob-hsbc', 'starling': 'ob-starling',
+  'revolut': 'ob-revolut', 'nationwide': 'ob-nationwide', 'first direct': 'ob-first-direct', 'tsb': 'ob-tsb',
+  'amex': 'ob-amex', 'american express': 'ob-amex', 'capital one': 'ob-capital-one', 'mbna': 'ob-mbna',
+  'virgin money': 'ob-virgin-money', 'chase': 'ob-chase', 'mock bank': 'mock', 'mock': 'mock'
+};
+
 // --- FULLY REVAMPED 10-STEP ONBOARDING WIZARD ---
 const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft, onConnectBank, bankingData }) => {
   // FIX: Added ?. to safely check values even if currentSettings is completely empty
@@ -5967,6 +5975,25 @@ export default function App() {
       {!loading && !effectiveOnboardingComplete && user && ( 
         <OnboardingWizard 
           user={user}
+          
+          // 1. Pass current settings so it knows where you left off
+          currentSettings={userSettings || {}} 
+          
+          // 2. Pass banking data to show the green "Connected" checkmarks
+          bankingData={bankingData} 
+          
+          // 3. Pass the function to trigger the TrueLayer popup
+          onConnectBank={startBankConnection} 
+          
+          // 4. Save draft progress before leaving to connect a bank
+          onSaveDraft={async (draftSettings) => {
+             if (activeDemoId) return; // Do nothing in demo mode
+             
+             const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
+             await setDoc(settingsRef, draftSettings, { merge: true });
+             setUserSettings(draftSettings);
+          }}
+          
           onComplete={async (newSettings) => {
              // GUARD: If in Demo Mode, DO NOT SAVE. Just exit the demo.
              if (activeDemoId) {
