@@ -25,7 +25,6 @@ const TRUELAYER_PROVIDERS = {
   'mock': 'mock'
 };
 
-// --- NEW: SKELETON LOADER COMPONENT ---
 const SkeletonLoader = () => (
   <div className="space-y-4 animate-pulse w-full">
     {[1, 2, 3, 4].map((i) => (
@@ -107,7 +106,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
         case 'Shopping': return <ShoppingCart className="w-5 h-5 text-pink-500" />;
         case 'Health': return <Activity className="w-5 h-5 text-rose-500" />;
         case 'Income': return <TrendingUp className="w-5 h-5 text-emerald-600" />;
-        case 'Transfer': return <ArrowRightLeft className="w-5 h-5 text-slate-400" />; // NEW ICON
+        case 'Transfer': return <ArrowRightLeft className="w-5 h-5 text-slate-400" />;
         default: return <CreditCard className="w-5 h-5 text-slate-400" />;
     }
   };
@@ -252,7 +251,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
     fetchTransactions();
   }, [user, appId, dateFilter]);
 
-  // --- NEW: ANALYTICS CALCULATIONS EXCLUDING TRANSFERS ---
   const outgoings = transactions.filter(tx => tx.category !== 'Income' && tx.category !== 'Transfer' && tx.amount !== 0);
   const totalSpent = outgoings.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
   
@@ -266,7 +264,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   return (
     <div className="fixed inset-0 z-[200] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full duration-500">
       
-      {/* NEW: MODERN GLASSMORPHIC HEADER */}
+      {/* Main Glassmorphic Header */}
       <div className="bg-white/80 backdrop-blur-md px-6 pt-12 pb-4 shadow-sm flex items-center justify-between sticky top-0 z-30 border-b border-slate-200/50">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
@@ -282,7 +280,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 no-scrollbar pb-32">
         <div className="max-w-3xl mx-auto space-y-8">
           
-          {/* NEW: SKELETON LOADER */}
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 space-y-6">
               <SkeletonLoader />
@@ -315,7 +312,10 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                  
                  <div className="space-y-4">
                     {userBanks.length === 0 ? (
-                       <p className="text-slate-500 text-sm text-center py-4">No banks or credit cards added to your budget yet.</p>
+                       <div className="text-center py-8 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
+                           <Landmark className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                           <p className="text-slate-500 text-sm font-medium">No accounts connected yet.</p>
+                       </div>
                     ) : (
                        userBanks.map((bank, index) => {
                          const isExpanded = expandedBanks[bank.providerId] !== false; 
@@ -434,10 +434,10 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                  </div>
               </div>
 
-              {/* NEW: STICKY TABS & FILTERS */}
+              {/* TABS & FILTERS - NO LONGER STICKY */}
               {bankingData && Object.keys(bankingData.connections).length > 0 && transactions.length > 0 && (
                 <div className="space-y-6 mt-8">
-                   <div className="flex flex-col sm:flex-row justify-between items-center gap-4 sticky top-[72px] z-20 bg-slate-50/90 backdrop-blur-md py-4 -mx-4 px-4 sm:mx-0 sm:px-0">
+                   <div className="flex flex-col sm:flex-row justify-between items-center gap-4 z-20 py-4 -mx-4 px-4 sm:mx-0 sm:px-0">
                        <div className="flex bg-slate-200/60 p-1.5 rounded-2xl w-full sm:w-auto shadow-inner">
                           <button 
                              onClick={() => setActiveTab('feed')}
@@ -473,7 +473,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                              const relatedBank = userBanks.find(b => b.providerId === tx.providerId);
                              const displayLogo = relatedBank?.fallbackLogo || tx.providerLogo || relatedBank?.logoUrl;
                              
-                             // NEW: Subtly style Internal Transfers
                              const isTransfer = tx.category === 'Transfer';
 
                              return (
@@ -515,7 +514,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                        </div>
                    )}
 
-                   {/* TAB: ANALYTICS (EXCLUDING TRANSFERS) */}
+                   {/* TAB: ANALYTICS */}
                    {activeTab === 'analytics' && (
                        <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-6 sm:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                           <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">

@@ -1,5 +1,5 @@
 // --- SMART CATEGORISATION ENGINE ---
-const categoriseTransaction = (merchant, description, tlCategory, amount, accountType) => {
+const categoriseTransaction = (merchant, description, tlCategory, amount, accountType, accountHolderNames) => {
     let rawText = `${merchant} ${description}`.toLowerCase();
     let text = rawText.replace(/www\.|co\.uk|\.com|\.org/g, '').replace(/[^a-z0-9\s]/g, '');
 
@@ -12,17 +12,43 @@ const categoriseTransaction = (merchant, description, tlCategory, amount, accoun
         isIncome = amount > 0; 
     }
 
-    // 1. CATCH TRANSFERS & CREDIT CARD PAYMENTS FIRST
+    // 1. CATCH EXPLICIT TRANSFERS & CREDIT CARD PAYMENTS
     if (tlCategory) {
         const cat = tlCategory.toUpperCase();
         if (cat.includes('TRANSFER') || cat.includes('CREDIT_CARD_PAYMENT')) return 'Transfer';
     }
+
+    // 2. DYNAMIC NAME MATCHING (Identifies Internal Transfers to self)
+    if (accountHolderNames && accountHolderNames.length > 0) {
+        const upperRaw = rawText.toUpperCase();
+        for (const name of accountHolderNames) {
+            // Split the full name into parts (e.g. ["YASEEN", "MUHAMMAD", "HUSSAIN"])
+            const parts = name.toUpperCase().split(' ').filter(p => p.trim() !== '');
+            if (parts.length >= 2) {
+                const first = parts[0];
+                const last = parts[parts.length - 1];
+                const initial = first.charAt(0); // "Y"
+
+                // Must contain the Last Name to be considered a match
+                if (upperRaw.includes(last)) {
+                    // Check for First Name match (e.g. "YASEEN HUSSAIN")
+                    if (upperRaw.includes(first)) return 'Transfer';
+                    
+                    // Check for Initial match (e.g. "Y HUSSAIN", "Y. HUSSAIN", "Y & Y HUSSAIN")
+                    const initialRegex = new RegExp(`(^|[^A-Z])${initial}([^A-Z]|$)`);
+                    if (initialRegex.test(upperRaw)) return 'Transfer';
+                }
+            }
+        }
+    }
+
+    // Generic transfer fallbacks just in case
     if (text.match(/transfer|saving|pot|vault|credit card|amex payment|barclaycard|monzo|starling|revolut/)) return 'Transfer';
 
-    // 2. Then Income
+    // 3. Then Income
     if (isIncome) return 'Income';
 
-    // 3. Then standard categories
+    // 4. Then standard categories
     if (text.match(/tesco|sainsbury|asda|morrison|aldi|lidl|waitrose|coop|iceland|costco|ocado|farmfoods/)) return 'Groceries';
     if (text.match(/mcdonald|kfc|burger king|burgerking|nando|costa|starbucks|greggs|deliveroo|ubereats|uber eats|justeat|just eat|domino|pret|pizza hut|subway|wetherspoon|kebab/)) return 'Eating Out';
     if (text.match(/uber|trainline|tfl|rail|petrol|shell|bp|esso|texaco|parking|bus|coach|ryanair|easyjet|ba |britishairways|national express|applegreen/)) return 'Transport';
@@ -73,6 +99,22 @@ export async function onRequestPost(context) {
     const accessToken = tokenData.access_token;
     const newRefreshToken = tokenData.refresh_token || refreshToken; 
 
+    // GRAB THE USER'S TRUE ACCOUNT HOLDER NAME FROM THE API
+    let accountHolderNames = [];
+    try {
+        const infoRes = await fetch('https://api.truelayer.com/data/v1/info', {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (infoRes.ok) {
+            const infoData = await infoRes.json();
+            if (infoData.results) {
+                accountHolderNames = infoData.results.map(r => r.full_name).filter(Boolean);
+            }
+        }
+    } catch (e) {
+        console.error("Failed to fetch info for transfer matching");
+    }
+
     let fromStr = from;
     let toStr = to;
     if (!fromStr || !toStr) {
@@ -108,7 +150,8 @@ export async function onRequestPost(context) {
             date: tx.timestamp.split('T')[0],
             description: tx.description,
             amount: tx.amount,
-            category: categoriseTransaction(tx.merchant_name || '', tx.description || '', tx.transaction_category, tx.amount, acc.type),
+            // Pass the API names directly into the categorisation engine
+            category: categoriseTransaction(tx.merchant_name || '', tx.description || '', tx.transaction_category, tx.amount, acc.type, accountHolderNames),
             merchant: tx.merchant_name || 'Unknown',
             account_id: acc.account_id 
         }));
