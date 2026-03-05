@@ -3498,9 +3498,18 @@ const TRUELAYER_PROVIDERS = {
   'virgin money': 'ob-virgin-money', 'chase': 'ob-chase', 'mock bank': 'mock', 'mock': 'mock'
 };
 
-// --- FULLY REVAMPED 10-STEP ONBOARDING WIZARD ---
+// --- FULLY REVAMPED 10-STEP CAROUSEL ONBOARDING WIZARD ---
+
+// Helper component to create the Parallax Slide effect
+const OnboardingSlide = ({ isActive, children, center = false }) => (
+  <div className={`w-full h-full shrink-0 overflow-y-auto px-4 sm:px-6 flex flex-col items-center ${center ? 'justify-center py-6' : 'justify-start pt-28 pb-48'} no-scrollbar`}>
+     <div className={`max-w-md w-full space-y-8 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] transform ${isActive ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-12 scale-[0.95] pointer-events-none'}`}>
+        {children}
+     </div>
+  </div>
+);
+
 const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft, onConnectBank, bankingData }) => {
-  // FIX: Added ?. to safely check values even if currentSettings is completely empty
   const [step, setStep] = useState(currentSettings?.onboardingStep || 0); 
   
   // States
@@ -3529,14 +3538,13 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
 
   const totalPercent = pots.reduce((sum, p) => sum + p.percentage, 0);
 
-  // Sync step if it changes (e.g., returning from TrueLayer redirect)
+  // Sync step if returning from TrueLayer
   useEffect(() => {
      if (currentSettings?.onboardingStep !== undefined && currentSettings.onboardingStep > step) {
          setStep(currentSettings.onboardingStep);
      }
   }, [currentSettings?.onboardingStep]);
 
-  // Checks TrueLayer status
   const checkConnection = (bankName) => {
       if (!bankName) return false;
       const searchName = bankName.toLowerCase().trim();
@@ -3565,7 +3573,6 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
           alert("Automatic connection is not available for this specific bank yet. You can still track it manually!");
           return;
       }
-      // Save draft BEFORE leaving the page so we return exactly here
       const draft = {
           displayName: name, currency, bankDetails: bank, additionalBanks, payDay, creditCards, mortgages, allocationRules: pots, defaultFixedExpenses: bills, dailyPaceTargets: paceTargets, onboardingStep: currentStep, onboardingComplete: false
       };
@@ -3599,21 +3606,29 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
   const updateMortgageAmount = (lenderName, amt) => setMortgages(prev => prev.map(m => m.name === lenderName ? { ...m, amount: parseFloat(amt) || 0 } : m));
 
   return (
-    <div className="fixed inset-0 bg-slate-50 z-[200] flex flex-col items-center justify-start p-6 animate-in fade-in duration-500 overflow-y-auto">
-      <div className="max-w-md w-full space-y-8 py-10 pb-32">
-        
-        {/* SLEEK PROGRESS BAR */}
-        {step > 0 && (
-            <div className="flex justify-center gap-1.5 mb-8 flex-wrap">
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
-                <div key={i} className={`h-2 rounded-full transition-all duration-500 ${step === i ? 'w-8 bg-slate-900' : step > i ? 'w-2 bg-emerald-500' : 'w-2 bg-slate-200'}`} />
-            ))}
-            </div>
-        )}
+    <div className="fixed inset-0 bg-slate-50 z-[200] overflow-hidden flex flex-col font-sans">
+      
+      {/* HEADER: PROGRESS BAR (Sticky) */}
+      <div className="absolute top-0 left-0 right-0 h-28 bg-gradient-to-b from-slate-50 to-transparent z-10 pointer-events-none" />
+      <div className="absolute top-8 left-0 right-0 z-20 px-6 pointer-events-auto">
+         {step > 0 && (
+             <div className="flex justify-center gap-1.5 max-w-md mx-auto flex-wrap">
+             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
+                 <div key={i} className={`h-2 rounded-full transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${step === i ? 'w-8 bg-slate-900 shadow-md' : step > i ? 'w-2 bg-emerald-500' : 'w-2 bg-slate-200'}`} />
+             ))}
+             </div>
+         )}
+      </div>
 
+      {/* CAROUSEL TRACK */}
+      <div 
+         className="flex w-full h-full transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)]"
+         style={{ transform: `translateX(-${step * 100}%)` }}
+      >
+        
         {/* STEP 0: INTRO */}
-        {step === 0 && (
-          <div className="text-center space-y-6 animate-in slide-in-from-bottom-8">
+        <OnboardingSlide isActive={step === 0} center>
+          <div className="text-center space-y-6">
             <div className="bg-emerald-100 w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl rotate-3">
                <Wallet className="w-12 h-12 text-emerald-600" />
             </div>
@@ -3623,413 +3638,395 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
               Let's Begin
             </button>
           </div>
-        )}
+        </OnboardingSlide>
 
         {/* STEP 1: NAME */}
-        {step === 1 && (
-          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
-             <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">What's your name?</h2>
-              <p className="text-slate-500">So we know what to call you.</p>
-            </div>
-            <input 
-                autoFocus
-                type="text" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-                className="w-full p-4 rounded-2xl bg-white border border-slate-200 text-xl font-bold text-slate-800 text-center outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm transition"
-                placeholder="e.g. Yaseen"
-            />
-            <button disabled={!name} onClick={() => handleNext(2)} className="w-full bg-slate-900 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition active:scale-95">
-              Next
-            </button>
+        <OnboardingSlide isActive={step === 1}>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-800">What's your name?</h2>
+            <p className="text-slate-500 mt-2">So we know what to call you.</p>
           </div>
-        )}
+          <input 
+              autoFocus={step === 1}
+              type="text" 
+              value={name} 
+              onChange={(e) => setName(e.target.value)} 
+              className="w-full p-4 rounded-2xl bg-white border border-slate-200 text-xl font-bold text-slate-800 text-center outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm transition"
+              placeholder="e.g. Yaseen"
+          />
+          <div className="flex gap-3 pt-4">
+              <button disabled={!name} onClick={() => handleNext(2)} className="w-full bg-slate-900 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition active:scale-95">
+                Next
+              </button>
+          </div>
+        </OnboardingSlide>
 
         {/* STEP 2: CURRENCY */}
-        {step === 2 && (
-          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Choose Currency</h2>
-              <p className="text-slate-500">Select your primary currency.</p>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              {['GBP', 'USD', 'EUR'].map(c => (
-                <button 
-                  key={c} onClick={() => setCurrency(c)}
-                  className={`py-6 rounded-2xl font-bold text-xl border-2 transition active:scale-95 ${currency === c ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-md' : 'border-slate-200 bg-white hover:border-slate-300 text-slate-600'}`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-3 mt-4">
-                <button onClick={() => handleNext(1)} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
-                <button onClick={() => handleNext(3)} className="w-2/3 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Continue</button>
-            </div>
+        <OnboardingSlide isActive={step === 2}>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-800">Choose Currency</h2>
+            <p className="text-slate-500 mt-2">Select your primary currency.</p>
           </div>
-        )}
+          <div className="grid grid-cols-3 gap-4">
+            {['GBP', 'USD', 'EUR'].map(c => (
+              <button 
+                key={c} onClick={() => setCurrency(c)}
+                className={`py-6 rounded-2xl font-bold text-xl border-2 transition active:scale-95 ${currency === c ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-md' : 'border-slate-200 bg-white hover:border-slate-300 text-slate-600'}`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-3 pt-4">
+              <button onClick={() => handleNext(1)} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition active:scale-95">Back</button>
+              <button onClick={() => handleNext(3)} className="w-2/3 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Continue</button>
+          </div>
+        </OnboardingSlide>
 
         {/* STEP 3: SALARY BANK */}
-        {step === 3 && (
-          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Salary Bank</h2>
-              <p className="text-slate-500">Which bank is your salary paid into?</p>
-            </div>
-            
-            {!bank ? (
-               <BankSelector selectedBank={null} onSelect={setBank} />
-            ) : (
-               <div className="bg-white border border-slate-200 p-6 rounded-2xl text-center space-y-4 shadow-sm animate-in zoom-in-95">
-                  <img src={bank.logo} className="w-16 h-16 mx-auto rounded-full object-contain bg-white border border-slate-100 p-1 shadow-sm" />
-                  <h3 className="font-bold text-xl text-slate-800">{bank.name}</h3>
-                  
-                  {checkConnection(bank.name) ? (
-                      <div className="bg-emerald-100 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl font-bold flex items-center justify-center gap-2 animate-in zoom-in-95">
-                         <CheckCircle2 className="w-6 h-6 animate-pulse" /> Connected Successfully!
-                      </div>
-                  ) : (
-                      <div className="space-y-3">
-                         <p className="text-sm text-slate-500">Connect securely via Open Banking to automatically sync your live balances.</p>
-                         <button onClick={() => handleConnect(getProviderId(bank.name), 3)} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl transition shadow-lg active:scale-95">
-                            Connect {bank.name} Securely
-                         </button>
-                         <button onClick={() => setBank(null)} className="text-sm text-slate-400 font-bold hover:text-slate-600 transition">Choose a different bank</button>
-                      </div>
-                  )}
-               </div>
-            )}
-
-            <div className="flex gap-3 pt-4">
-                <button onClick={() => { setBank(null); handleNext(2); }} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
-                <button disabled={!bank} onClick={() => handleNext(4)} className="w-2/3 bg-slate-900 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">
-                  {bank && !checkConnection(bank.name) ? 'Skip Connection' : 'Next Step'}
-                </button>
-            </div>
+        <OnboardingSlide isActive={step === 3}>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-800">Salary Bank</h2>
+            <p className="text-slate-500 mt-2">Which bank is your salary paid into?</p>
           </div>
-        )}
+          
+          {!bank ? (
+             <BankSelector selectedBank={null} onSelect={setBank} />
+          ) : (
+             <div className="bg-white border border-slate-200 p-6 rounded-2xl text-center space-y-4 shadow-sm animate-in zoom-in-95">
+                <img src={bank.logo} className="w-16 h-16 mx-auto rounded-full object-contain bg-white border border-slate-100 p-1 shadow-sm" />
+                <h3 className="font-bold text-xl text-slate-800">{bank.name}</h3>
+                
+                {checkConnection(bank.name) ? (
+                    <div className="bg-emerald-100 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl font-bold flex items-center justify-center gap-2 animate-in zoom-in-95">
+                       <CheckCircle2 className="w-6 h-6 animate-pulse" /> Connected Successfully!
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                       <p className="text-sm text-slate-500">Connect securely via Open Banking to automatically sync your live balances.</p>
+                       <button onClick={() => handleConnect(getProviderId(bank.name), 3)} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl transition shadow-lg active:scale-95">
+                          Connect {bank.name}
+                       </button>
+                       <button onClick={() => setBank(null)} className="text-sm text-slate-400 font-bold hover:text-slate-600 transition">Choose a different bank</button>
+                    </div>
+                )}
+             </div>
+          )}
+
+          <div className="flex gap-3 pt-4">
+              <button onClick={() => { setBank(null); handleNext(2); }} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition active:scale-95">Back</button>
+              <button disabled={!bank} onClick={() => handleNext(4)} className="w-2/3 bg-slate-900 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">
+                {bank && !checkConnection(bank.name) ? 'Skip Connection' : 'Next Step'}
+              </button>
+          </div>
+        </OnboardingSlide>
 
         {/* STEP 4: ADDITIONAL ACCOUNTS */}
-        {step === 4 && (
-          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Other Accounts</h2>
-              <p className="text-slate-500">Do you have any other current accounts?</p>
-            </div>
-
-            {hasAdditional === null ? (
-                <div className="grid grid-cols-2 gap-4">
-                    <button onClick={() => setHasAdditional('yes')} className="bg-white border-2 border-slate-200 hover:border-indigo-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">Yes</button>
-                    <button onClick={() => { setHasAdditional('no'); handleNext(5); }} className="bg-white border-2 border-slate-200 hover:border-emerald-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">No</button>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {additionalBanks.map(b => (
-                        <div key={b.id || b.name} className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-xl shadow-sm animate-in zoom-in-95">
-                            <div className="flex items-center gap-3">
-                                {b.logo && <img src={b.logo} className="w-8 h-8 rounded-full object-contain bg-white border border-slate-100 p-0.5" />}
-                                <span className="font-bold text-slate-700">{b.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {checkConnection(b.name) ? (
-                                    <span className="text-emerald-600 font-bold text-xs flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100"><CheckCircle2 className="w-4 h-4"/> Connected</span>
-                                ) : (
-                                    <button onClick={() => handleConnect(getProviderId(b.name), 4)} className="text-xs font-bold bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition shadow-sm">Connect</button>
-                                )}
-                                <button onClick={() => setAdditionalBanks(additionalBanks.filter(x => x.id !== b.id))} className="text-slate-300 hover:text-rose-500 p-1"><X className="w-4 h-4"/></button>
-                            </div>
-                        </div>
-                    ))}
-                    <div className="pt-2">
-                        <BankSelector selectedBank={null} onSelect={(b) => setAdditionalBanks([...additionalBanks, {...b, id: Date.now().toString()}])} />
-                    </div>
-                </div>
-            )}
-
-            <div className="flex gap-3 pt-4">
-                <button onClick={() => { setHasAdditional(null); handleNext(3); }} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
-                <button onClick={() => handleNext(5)} className="w-2/3 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Continue</button>
-            </div>
+        <OnboardingSlide isActive={step === 4}>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-800">Other Accounts</h2>
+            <p className="text-slate-500 mt-2">Do you have any other current accounts?</p>
           </div>
-        )}
+
+          {hasAdditional === null ? (
+              <div className="grid grid-cols-2 gap-4">
+                  <button onClick={() => setHasAdditional('yes')} className="bg-white border-2 border-slate-200 hover:border-indigo-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">Yes</button>
+                  <button onClick={() => { setHasAdditional('no'); handleNext(5); }} className="bg-white border-2 border-slate-200 hover:border-emerald-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">No</button>
+              </div>
+          ) : (
+              <div className="space-y-4">
+                  {additionalBanks.map(b => (
+                      <div key={b.id || b.name} className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-xl shadow-sm animate-in zoom-in-95">
+                          <div className="flex items-center gap-3">
+                              {b.logo && <img src={b.logo} className="w-8 h-8 rounded-full object-contain bg-white border border-slate-100 p-0.5" />}
+                              <span className="font-bold text-slate-700">{b.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                              {checkConnection(b.name) ? (
+                                  <span className="text-emerald-600 font-bold text-xs flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100"><CheckCircle2 className="w-4 h-4"/> Connected</span>
+                              ) : (
+                                  <button onClick={() => handleConnect(getProviderId(b.name), 4)} className="text-xs font-bold bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition shadow-sm">Connect</button>
+                              )}
+                              <button onClick={() => setAdditionalBanks(additionalBanks.filter(x => x.id !== b.id))} className="text-slate-300 hover:text-rose-500 p-1"><X className="w-4 h-4"/></button>
+                          </div>
+                      </div>
+                  ))}
+                  <div className="pt-2">
+                      <BankSelector selectedBank={null} onSelect={(b) => setAdditionalBanks([...additionalBanks, {...b, id: Date.now().toString()}])} />
+                  </div>
+              </div>
+          )}
+
+          <div className="flex gap-3 pt-4">
+              <button onClick={() => { setHasAdditional(null); handleNext(3); }} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition active:scale-95">Back</button>
+              <button onClick={() => handleNext(5)} className="w-2/3 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Continue</button>
+          </div>
+        </OnboardingSlide>
 
         {/* STEP 5: PAYDAY */}
-        {step === 5 && (
-           <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
-             <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">When is Payday?</h2>
-              <p className="text-slate-500">We use this to track your monthly cycle.</p>
-            </div>
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-                <div className="grid grid-cols-7 gap-2">
-                {Array.from({length: 31}, (_, i) => i + 1).map(day => (
-                    <button 
-                        key={day} onClick={() => setPayDay(String(day))}
-                        className={`aspect-square rounded-lg font-bold flex items-center justify-center transition active:scale-95 ${payDay === String(day) ? 'bg-slate-900 text-white shadow-md scale-110' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-100'}`}
-                    >
-                        {day}
-                    </button>
-                ))}
-                </div>
-            </div>
-            {payDay && (
-              <div className="text-center font-bold text-emerald-600 bg-emerald-50 p-3 rounded-xl border border-emerald-100 animate-in zoom-in-95">
-                Payday is on the {payDay}{['1','21','31'].includes(payDay)?'st':['2','22'].includes(payDay)?'nd':['3','23'].includes(payDay)?'rd':'th'}
+        <OnboardingSlide isActive={step === 5}>
+           <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-800">When is Payday?</h2>
+            <p className="text-slate-500 mt-2">We use this to track your monthly cycle.</p>
+          </div>
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+              <div className="grid grid-cols-7 gap-2">
+              {Array.from({length: 31}, (_, i) => i + 1).map(day => (
+                  <button 
+                      key={day} onClick={() => setPayDay(String(day))}
+                      className={`aspect-square rounded-lg font-bold flex items-center justify-center transition active:scale-95 ${payDay === String(day) ? 'bg-slate-900 text-white shadow-md scale-110' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-100'}`}
+                  >
+                      {day}
+                  </button>
+              ))}
               </div>
-            )}
-            <div className="flex gap-3 pt-4">
-                <button onClick={() => handleNext(4)} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
-                <button disabled={!payDay} onClick={() => handleNext(6)} className="w-2/3 bg-slate-900 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Next</button>
+          </div>
+          {payDay && (
+            <div className="text-center font-bold text-emerald-600 bg-emerald-50 p-3 rounded-xl border border-emerald-100 animate-in zoom-in-95">
+              Payday is on the {payDay}{['1','21','31'].includes(payDay)?'st':['2','22'].includes(payDay)?'nd':['3','23'].includes(payDay)?'rd':'th'}
             </div>
-           </div>
-        )}
+          )}
+          <div className="flex gap-3 pt-4">
+              <button onClick={() => handleNext(4)} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition active:scale-95">Back</button>
+              <button disabled={!payDay} onClick={() => handleNext(6)} className="w-2/3 bg-slate-900 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Next</button>
+          </div>
+        </OnboardingSlide>
 
         {/* STEP 6: CREDIT CARDS */}
-        {step === 6 && (
-          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Credit Cards</h2>
-              <p className="text-slate-500">Do you have any credit cards you pay off monthly?</p>
-            </div>
-
-            {hasCreditCards === null ? (
-                <div className="grid grid-cols-2 gap-4">
-                    <button onClick={() => setHasCreditCards('yes')} className="bg-white border-2 border-slate-200 hover:border-indigo-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">Yes</button>
-                    <button onClick={() => { setHasCreditCards('no'); handleNext(7); }} className="bg-white border-2 border-slate-200 hover:border-emerald-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">No</button>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {creditCards.map(c => (
-                        <div key={c.name} className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-xl shadow-sm animate-in zoom-in-95">
-                            <div className="flex items-center gap-3">
-                                {c.logo && <img src={c.logo} className="w-8 h-8 rounded-full object-contain bg-white border border-slate-100 p-0.5" />}
-                                <span className="font-bold text-slate-700">{c.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {checkConnection(c.name) ? (
-                                    <span className="text-emerald-600 font-bold text-xs flex items-center gap-1 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-lg"><CheckCircle2 className="w-4 h-4"/> Connected</span>
-                                ) : (
-                                    <button onClick={() => handleConnect(getProviderId(c.name), 6)} className="text-xs font-bold bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition shadow-sm">Connect</button>
-                                )}
-                                <button onClick={() => toggleCard(c)} className="text-slate-300 hover:text-rose-500 p-1"><X className="w-4 h-4"/></button>
-                            </div>
-                        </div>
-                    ))}
-                    <CreditCardSelector selectedCards={creditCards} onToggle={toggleCard} />
-                </div>
-            )}
-
-            <div className="flex gap-3 pt-4">
-                <button onClick={() => { setHasCreditCards(null); handleNext(5); }} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
-                <button onClick={() => handleNext(7)} className="w-2/3 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Continue</button>
-            </div>
+        <OnboardingSlide isActive={step === 6}>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-800">Credit Cards</h2>
+            <p className="text-slate-500 mt-2">Do you have any credit cards you pay off monthly?</p>
           </div>
-        )}
+
+          {hasCreditCards === null ? (
+              <div className="grid grid-cols-2 gap-4">
+                  <button onClick={() => setHasCreditCards('yes')} className="bg-white border-2 border-slate-200 hover:border-indigo-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">Yes</button>
+                  <button onClick={() => { setHasCreditCards('no'); handleNext(7); }} className="bg-white border-2 border-slate-200 hover:border-emerald-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">No</button>
+              </div>
+          ) : (
+              <div className="space-y-4">
+                  {creditCards.map(c => (
+                      <div key={c.name} className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-xl shadow-sm animate-in zoom-in-95">
+                          <div className="flex items-center gap-3">
+                              {c.logo && <img src={c.logo} className="w-8 h-8 rounded-full object-contain bg-white border border-slate-100 p-0.5" />}
+                              <span className="font-bold text-slate-700">{c.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                              {checkConnection(c.name) ? (
+                                  <span className="text-emerald-600 font-bold text-xs flex items-center gap-1 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-lg"><CheckCircle2 className="w-4 h-4"/> Connected</span>
+                              ) : (
+                                  <button onClick={() => handleConnect(getProviderId(c.name), 6)} className="text-xs font-bold bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition shadow-sm">Connect</button>
+                              )}
+                              <button onClick={() => toggleCard(c)} className="text-slate-300 hover:text-rose-500 p-1"><X className="w-4 h-4"/></button>
+                          </div>
+                      </div>
+                  ))}
+                  <CreditCardSelector selectedCards={creditCards} onToggle={toggleCard} />
+              </div>
+          )}
+
+          <div className="flex gap-3 pt-4">
+              <button onClick={() => { setHasCreditCards(null); handleNext(5); }} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition active:scale-95">Back</button>
+              <button onClick={() => handleNext(7)} className="w-2/3 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Continue</button>
+          </div>
+        </OnboardingSlide>
 
         {/* STEP 7: MORTGAGE */}
-        {step === 7 && (
-          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Mortgages</h2>
-              <p className="text-slate-500">Do you have a mortgage?</p>
-            </div>
-
-            {hasMortgages === null ? (
-                <div className="grid grid-cols-2 gap-4">
-                    <button onClick={() => setHasMortgages('yes')} className="bg-white border-2 border-slate-200 hover:border-indigo-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">Yes</button>
-                    <button onClick={() => { setHasMortgages('no'); handleNext(8); }} className="bg-white border-2 border-slate-200 hover:border-emerald-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">No</button>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {mortgages.map(m => (
-                        <div key={m.name} className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-xl shadow-sm animate-in zoom-in-95">
-                            <div className="flex items-center gap-3">
-                                {m.logo && <img src={m.logo} className="w-8 h-8 rounded-full object-contain bg-white border border-slate-100 p-0.5" />}
-                                <span className="font-bold text-slate-700 text-sm">{m.name}</span>
-                            </div>
-                            <div className="relative w-28">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">£</span>
-                                <input 
-                                    type="number" placeholder="Amount" value={m.amount} onChange={(e) => updateMortgageAmount(m.name, e.target.value)}
-                                    className="w-full pl-6 pr-2 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-200"
-                                />
-                            </div>
-                        </div>
-                    ))}
-                    <MortgageSelector selectedLenders={mortgages} onToggle={toggleMortgage} />
-                </div>
-            )}
-
-            <div className="flex gap-3 pt-4">
-                <button onClick={() => { setHasMortgages(null); handleNext(6); }} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
-                <button onClick={() => handleNext(8)} className="w-2/3 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Continue</button>
-            </div>
+        <OnboardingSlide isActive={step === 7}>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-800">Mortgages</h2>
+            <p className="text-slate-500 mt-2">Do you have a mortgage?</p>
           </div>
-        )}
+
+          {hasMortgages === null ? (
+              <div className="grid grid-cols-2 gap-4">
+                  <button onClick={() => setHasMortgages('yes')} className="bg-white border-2 border-slate-200 hover:border-indigo-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">Yes</button>
+                  <button onClick={() => { setHasMortgages('no'); handleNext(8); }} className="bg-white border-2 border-slate-200 hover:border-emerald-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">No</button>
+              </div>
+          ) : (
+              <div className="space-y-4">
+                  {mortgages.map(m => (
+                      <div key={m.name} className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-xl shadow-sm animate-in zoom-in-95">
+                          <div className="flex items-center gap-3">
+                              {m.logo && <img src={m.logo} className="w-8 h-8 rounded-full object-contain bg-white border border-slate-100 p-0.5" />}
+                              <span className="font-bold text-slate-700 text-sm">{m.name}</span>
+                          </div>
+                          <div className="relative w-28">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">£</span>
+                              <input 
+                                  type="number" placeholder="Amount" value={m.amount} onChange={(e) => updateMortgageAmount(m.name, e.target.value)}
+                                  className="w-full pl-6 pr-2 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-200"
+                              />
+                          </div>
+                      </div>
+                  ))}
+                  <MortgageSelector selectedLenders={mortgages} onToggle={toggleMortgage} />
+              </div>
+          )}
+
+          <div className="flex gap-3 pt-4">
+              <button onClick={() => { setHasMortgages(null); handleNext(6); }} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition active:scale-95">Back</button>
+              <button onClick={() => handleNext(8)} className="w-2/3 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Continue</button>
+          </div>
+        </OnboardingSlide>
 
         {/* STEP 8: SPENDING POTS */}
-        {step === 8 && (
-          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Spending Pots</h2>
-              
-              {/* BEAUTIFUL EXPLANATION CARD */}
-              <div className="mt-4 bg-indigo-50 border border-indigo-100 p-5 rounded-2xl text-left shadow-sm">
-                  <h3 className="font-bold text-indigo-900 flex items-center gap-2 mb-2">
-                     <Target className="w-5 h-5 text-indigo-600" /> The Secret: Disposable Income
-                  </h3>
-                  <p className="text-indigo-800 text-sm leading-relaxed">
-                     Once your Salary comes in and your Fixed Bills go out, you are left with your <strong>Disposable Income</strong>. 
-                     <br/><br/>
-                     Split this remaining money into percentage "Pots" (e.g. Holidays, Savings) so you know exactly where every penny goes. Any unassigned percentage simply stays in your main account!
-                  </p>
-              </div>
+        <OnboardingSlide isActive={step === 8}>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-800">Spending Pots</h2>
+            
+            {/* BEAUTIFUL EXPLANATION CARD */}
+            <div className="mt-4 bg-indigo-50 border border-indigo-100 p-5 rounded-2xl text-left shadow-sm">
+                <h3 className="font-bold text-indigo-900 flex items-center gap-2 mb-2">
+                   <Target className="w-5 h-5 text-indigo-600" /> Disposable Income
+                </h3>
+                <p className="text-indigo-800 text-sm leading-relaxed">
+                   Once your Salary comes in and your Fixed Bills go out, you are left with your <strong>Disposable Income</strong>. 
+                   <br/><br/>
+                   Split this remaining money into percentage "Pots" (e.g. Holidays, Savings). Any unassigned percentage safely stays in your main account!
+                </p>
             </div>
+          </div>
 
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3 max-h-60 overflow-y-auto">
-              {pots.map(p => (
-                <div key={p.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <span className="font-bold text-slate-700 flex items-center gap-2">
-                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color ? p.color.split(' ')[0] : p.hex }}></span>
-                     {p.name}
-                  </span>
-                  <div className="flex items-center gap-3">
-                    <span className="bg-white border border-slate-200 px-2 py-1 rounded text-sm font-bold shadow-sm">{p.percentage}%</span>
-                    <button onClick={() => setPots(pots.filter(x => x.id !== p.id))}><X className="w-4 h-4 text-slate-300 hover:text-red-500 transition" /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-2">
-               <input className="flex-1 p-3 rounded-xl border border-slate-200 bg-white shadow-sm outline-none focus:ring-2 focus:ring-slate-200" placeholder="e.g. Holiday Fund" value={newPotName} onChange={e => setNewPotName(e.target.value)} />
-               <input type="number" className="w-20 p-3 rounded-xl border border-slate-200 bg-white shadow-sm outline-none focus:ring-2 focus:ring-slate-200 text-center" placeholder="%" value={newPotPercent} onChange={e => setNewPotPercent(e.target.value)} />
-               <button onClick={addPot} className="bg-slate-900 text-white p-3 rounded-xl shadow-md active:scale-95 transition"><Plus className="w-5 h-5" /></button>
-            </div>
-
-            <div className={`p-4 rounded-xl flex justify-between items-center border shadow-sm transition-colors ${totalPercent > 100 ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3 max-h-60 overflow-y-auto">
+            {pots.map(p => (
+              <div key={p.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <span className="font-bold text-slate-700 flex items-center gap-2">
+                   <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color ? p.color.split(' ')[0] : p.hex }}></span>
+                   {p.name}
+                </span>
                 <div className="flex items-center gap-3">
-                   {bank?.logo ? (
-                     <img src={bank.logo} className="w-8 h-8 rounded-full shadow-sm bg-white object-contain p-0.5 border border-slate-200"/> 
-                   ) : (
-                     <div className="bg-white p-1.5 rounded-full shadow-sm border border-slate-200"><Wallet className="w-5 h-5 text-slate-500"/></div>
-                   )}
-                   <div>
-                     <p className={`text-[10px] font-bold uppercase tracking-wider ${totalPercent > 100 ? 'text-red-500' : 'text-slate-500'}`}>Remains in {bank?.name || 'Account'}</p>
-                     <p className={`font-black text-xl ${totalPercent > 100 ? 'text-red-700' : 'text-slate-800'}`}>{Math.max(0, 100 - totalPercent)}%</p>
-                   </div>
+                  <span className="bg-white border border-slate-200 px-2 py-1 rounded text-sm font-bold shadow-sm">{p.percentage}%</span>
+                  <button onClick={() => setPots(pots.filter(x => x.id !== p.id))}><X className="w-4 h-4 text-slate-300 hover:text-red-500 transition" /></button>
                 </div>
-                {totalPercent > 100 && <AlertCircle className="w-6 h-6 text-red-500" />}
-            </div>
-
-            <div className="flex gap-3 pt-4">
-                <button onClick={() => handleNext(7)} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
-                <button disabled={totalPercent > 100} onClick={() => handleNext(9)} className="w-2/3 bg-slate-900 disabled:bg-slate-300 disabled:text-slate-500 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">
-                  {totalPercent > 100 ? 'Exceeds 100%' : 'Next Step'}
-                </button>
-            </div>
+              </div>
+            ))}
           </div>
-        )}
 
-        {/* STEP 9: RECURRING BILLS (WITH LOGO LOCK) */}
-        {step === 9 && (
-          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Recurring Bills</h2>
-              <p className="text-slate-500">Add bills that stay the same every month (Netflix, Gym, Spotify). You can easily change these later!</p>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 max-h-60 overflow-y-auto">
-              {bills.length === 0 && <p className="text-center text-sm text-slate-400 py-4 font-medium">No bills added yet.</p>}
-              {bills.map(b => (
-                <div key={b.id} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-slate-100 animate-in zoom-in-95">
-                   <div className="flex items-center gap-3">
-                     {b.logo ? <img src={b.logo} className="w-8 h-8 object-contain rounded-full border border-slate-100 bg-white p-0.5" alt="" /> : <div className="w-8 h-8 bg-slate-100 border border-slate-200 rounded-full flex items-center justify-center"><Zap className="w-4 h-4 text-slate-400" /></div>}
-                     <span className="font-bold text-slate-700">{b.name}</span>
-                   </div>
-                   <div className="flex items-center gap-3">
-                     <span className="text-sm font-bold text-slate-500">{b.amount > 0 ? formatCurrency(b.amount, currency) : 'Var'}</span>
-                     <button onClick={() => setBills(bills.filter(x => x.id !== b.id))} className="text-slate-300 hover:text-rose-500 p-1"><X className="w-4 h-4" /></button>
-                   </div>
-                </div>
-              ))}
-            </div>
-
-            {/* WITH LOGO LOCK ENABLED */}
-            <div className="flex gap-2 items-start relative overflow-visible z-50">
-               <div className="flex-1">
-                 <BrandSearchInput
-                    placeholder="Search (e.g. Spotify)"
-                    value={newBillName}
-                    onChange={setNewBillName}
-                    onSelectBrand={(name, logo) => { setNewBillName(name); setNewBillLogo(logo); }}
-                    selectedLogo={newBillLogo}
-                    onClearLogo={() => setNewBillLogo(null)}
-                    className="w-full p-3.5 rounded-xl border border-slate-200 bg-white text-sm font-bold outline-none focus:ring-2 focus:ring-slate-200 shadow-sm"
-                 />
-               </div>
-               <div className="relative w-24">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">£</span>
-                  <input type="number" className="w-full pl-6 pr-2 py-3.5 rounded-xl border border-slate-200 bg-white text-sm font-bold outline-none focus:ring-2 focus:ring-slate-200 shadow-sm" placeholder="0.00" value={newBillAmount} onChange={e => setNewBillAmount(e.target.value)} />
-               </div>
-               <button onClick={addBill} className="bg-slate-900 text-white p-3.5 rounded-xl shadow-md active:scale-95 transition"><Plus className="w-5 h-5" /></button>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-                <button onClick={() => handleNext(8)} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
-                <button onClick={() => handleNext(10)} className="w-2/3 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Continue</button>
-            </div>
+          <div className="flex gap-2">
+             <input className="flex-1 p-3 rounded-xl border border-slate-200 bg-white shadow-sm outline-none focus:ring-2 focus:ring-slate-200" placeholder="e.g. Holiday Fund" value={newPotName} onChange={e => setNewPotName(e.target.value)} />
+             <input type="number" className="w-20 p-3 rounded-xl border border-slate-200 bg-white shadow-sm outline-none focus:ring-2 focus:ring-slate-200 text-center" placeholder="%" value={newPotPercent} onChange={e => setNewPotPercent(e.target.value)} />
+             <button onClick={addPot} className="bg-slate-900 text-white p-3 rounded-xl shadow-md active:scale-95 transition"><Plus className="w-5 h-5" /></button>
           </div>
-        )}
+
+          <div className={`p-4 rounded-xl flex justify-between items-center border shadow-sm transition-colors ${totalPercent > 100 ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex items-center gap-3">
+                 {bank?.logo ? (
+                   <img src={bank.logo} className="w-8 h-8 rounded-full shadow-sm bg-white object-contain p-0.5 border border-slate-200"/> 
+                 ) : (
+                   <div className="bg-white p-1.5 rounded-full shadow-sm border border-slate-200"><Wallet className="w-5 h-5 text-slate-500"/></div>
+                 )}
+                 <div>
+                   <p className={`text-[10px] font-bold uppercase tracking-wider ${totalPercent > 100 ? 'text-red-500' : 'text-slate-500'}`}>Remains in {bank?.name || 'Account'}</p>
+                   <p className={`font-black text-xl ${totalPercent > 100 ? 'text-red-700' : 'text-slate-800'}`}>{Math.max(0, 100 - totalPercent)}%</p>
+                 </div>
+              </div>
+              {totalPercent > 100 && <AlertCircle className="w-6 h-6 text-red-500" />}
+          </div>
+
+          <div className="flex gap-3 pt-4">
+              <button onClick={() => handleNext(7)} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition active:scale-95">Back</button>
+              <button disabled={totalPercent > 100} onClick={() => handleNext(9)} className="w-2/3 bg-slate-900 disabled:bg-slate-300 disabled:text-slate-500 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">
+                {totalPercent > 100 ? 'Exceeds 100%' : 'Next Step'}
+              </button>
+          </div>
+        </OnboardingSlide>
+
+        {/* STEP 9: RECURRING BILLS */}
+        <OnboardingSlide isActive={step === 9}>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-800">Recurring Bills</h2>
+            <p className="text-slate-500 mt-2">Add bills that stay the same every month (Netflix, Gym, Spotify). You can easily change these later!</p>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 max-h-60 overflow-y-auto">
+            {bills.length === 0 && <p className="text-center text-sm text-slate-400 py-4 font-medium">No bills added yet.</p>}
+            {bills.map(b => (
+              <div key={b.id} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-slate-100 animate-in zoom-in-95">
+                 <div className="flex items-center gap-3">
+                   {b.logo ? <img src={b.logo} className="w-8 h-8 object-contain rounded-full border border-slate-100 bg-white p-0.5" alt="" /> : <div className="w-8 h-8 bg-slate-100 border border-slate-200 rounded-full flex items-center justify-center"><Zap className="w-4 h-4 text-slate-400" /></div>}
+                   <span className="font-bold text-slate-700">{b.name}</span>
+                 </div>
+                 <div className="flex items-center gap-3">
+                   <span className="text-sm font-bold text-slate-500">{b.amount > 0 ? formatCurrency(b.amount, currency) : 'Var'}</span>
+                   <button onClick={() => setBills(bills.filter(x => x.id !== b.id))} className="text-slate-300 hover:text-rose-500 p-1"><X className="w-4 h-4" /></button>
+                 </div>
+              </div>
+            ))}
+          </div>
+
+          {/* WITH LOGO LOCK ENABLED */}
+          <div className="flex gap-2 items-start relative overflow-visible z-50">
+             <div className="flex-1">
+               <BrandSearchInput
+                  placeholder="Search (e.g. Spotify)"
+                  value={newBillName}
+                  onChange={setNewBillName}
+                  onSelectBrand={(name, logo) => { setNewBillName(name); setNewBillLogo(logo); }}
+                  selectedLogo={newBillLogo}
+                  onClearLogo={() => setNewBillLogo(null)}
+                  className="w-full p-3.5 rounded-xl border border-slate-200 bg-white text-sm font-bold outline-none focus:ring-2 focus:ring-slate-200 shadow-sm"
+               />
+             </div>
+             <div className="relative w-24">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">£</span>
+                <input type="number" className="w-full pl-6 pr-2 py-3.5 rounded-xl border border-slate-200 bg-white text-sm font-bold outline-none focus:ring-2 focus:ring-slate-200 shadow-sm" placeholder="0.00" value={newBillAmount} onChange={e => setNewBillAmount(e.target.value)} />
+             </div>
+             <button onClick={addBill} className="bg-slate-900 text-white p-3.5 rounded-xl shadow-md active:scale-95 transition"><Plus className="w-5 h-5" /></button>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+              <button onClick={() => handleNext(8)} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition active:scale-95">Back</button>
+              <button onClick={() => handleNext(10)} className="w-2/3 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Continue</button>
+          </div>
+        </OnboardingSlide>
 
         {/* STEP 10: PACE TARGETS */}
-        {step === 10 && (
-          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Your Speed Limit</h2>
-              <p className="text-slate-500 text-sm mt-2 leading-relaxed">
-                We calculate your "Daily Pace" by dividing your <strong>Safe-to-Spend</strong> money by the days left until payday. <br/><br/>Set your warning targets below so the Dashboard can alert you if you are spending too fast!
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider px-2">
-                   <span>Panic Zone</span>
-                   <span>Healthy Zone</span>
-                </div>
-                <div className="h-4 bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
-                   <div className="h-full bg-rose-400" style={{ width: '30%' }}></div>
-                   <div className="h-full bg-slate-200" style={{ width: '30%' }}></div>
-                   <div className="h-full bg-emerald-400" style={{ width: '40%' }}></div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                   <div>
-                      <label className="flex items-center gap-2 text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-2"><TrendingDown className="w-3 h-3" /> Warn me below:</label>
-                      <div className="relative">
-                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
-                         <input type="number" value={paceTargets.low} onChange={(e) => setPaceTargets({...paceTargets, low: parseFloat(e.target.value)})} className="w-full pl-8 p-3 bg-rose-50 border border-rose-200 rounded-xl font-bold text-rose-600 outline-none focus:ring-2 focus:ring-rose-200 transition" />
-                      </div>
-                   </div>
-                   <div>
-                      <label className="flex items-center gap-2 text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2"><TrendingUp className="w-3 h-3" /> Target above:</label>
-                      <div className="relative">
-                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
-                         <input type="number" value={paceTargets.high} onChange={(e) => setPaceTargets({...paceTargets, high: parseFloat(e.target.value)})} className="w-full pl-8 p-3 bg-emerald-50 border border-emerald-200 rounded-xl font-bold text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-200 transition" />
-                      </div>
-                   </div>
-                </div>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-                <button onClick={() => handleNext(9)} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
-                <button onClick={handleFinish} className="w-2/3 bg-emerald-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-600 transition active:scale-95 flex items-center justify-center gap-2">
-                  <CheckCircle2 className="w-5 h-5" /> Finish Setup
-                </button>
-            </div>
+        <OnboardingSlide isActive={step === 10}>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-800">Your Speed Limit</h2>
+            <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+              We calculate your "Daily Pace" by dividing your <strong>Safe-to-Spend</strong> money by the days left until payday. <br/><br/>Set your warning targets below so the Dashboard can alert you if you are spending too fast!
+            </p>
           </div>
-        )}
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider px-2">
+                 <span>Panic Zone</span>
+                 <span>Healthy Zone</span>
+              </div>
+              <div className="h-4 bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
+                 <div className="h-full bg-rose-400" style={{ width: '30%' }}></div>
+                 <div className="h-full bg-slate-200" style={{ width: '30%' }}></div>
+                 <div className="h-full bg-emerald-400" style={{ width: '40%' }}></div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                 <div>
+                    <label className="flex items-center gap-2 text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-2"><TrendingDown className="w-3 h-3" /> Warn me below:</label>
+                    <div className="relative">
+                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : 'EUR'}</span>
+                       <input type="number" value={paceTargets.low} onChange={(e) => setPaceTargets({...paceTargets, low: parseFloat(e.target.value)})} className="w-full pl-8 p-3 bg-rose-50 border border-rose-200 rounded-xl font-bold text-rose-600 outline-none focus:ring-2 focus:ring-rose-200 transition" />
+                    </div>
+                 </div>
+                 <div>
+                    <label className="flex items-center gap-2 text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2"><TrendingUp className="w-3 h-3" /> Target above:</label>
+                    <div className="relative">
+                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : 'EUR'}</span>
+                       <input type="number" value={paceTargets.high} onChange={(e) => setPaceTargets({...paceTargets, high: parseFloat(e.target.value)})} className="w-full pl-8 p-3 bg-emerald-50 border border-emerald-200 rounded-xl font-bold text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-200 transition" />
+                    </div>
+                 </div>
+              </div>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+              <button onClick={() => handleNext(9)} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition active:scale-95">Back</button>
+              <button onClick={handleFinish} className="w-2/3 bg-emerald-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-600 transition active:scale-95 flex items-center justify-center gap-2">
+                <CheckCircle2 className="w-5 h-5" /> Finish Setup
+              </button>
+          </div>
+        </OnboardingSlide>
 
       </div>
     </div>
