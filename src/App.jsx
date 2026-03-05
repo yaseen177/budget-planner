@@ -5121,11 +5121,48 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
+    
+    // THE RESCUE MISSION: Checks if you have old budget data to prove you aren't a new user
+    const checkRescue = async (isMissingDoc) => {
+        const budgetDataRef = collection(db, 'artifacts', appId, 'users', user.uid, 'budgetData');
+        const q = query(budgetDataRef, limit(1));
+        const budgetSnap = await getDocs(q);
+        const hasData = !budgetSnap.empty; // True if you have ANY old entries
+
+        if (hasData) {
+           // You are an existing user! Rescue you from the wizard!
+           setOnboardingComplete(true);
+           const fixData = { onboardingComplete: true };
+           if (isMissingDoc) {
+              fixData.displayName = user.displayName || '';
+              fixData.currency = 'GBP';
+              fixData.allocationRules = DEFAULT_ALLOCATIONS;
+              fixData.defaultFixedExpenses = DEFAULT_FIXED_EXPENSES;
+              fixData.creditCards = [];
+              fixData.mortgages = [];
+           }
+           await setDoc(settingsRef, fixData, { merge: true }); // Permanently fix your DB
+           if (isMissingDoc) setUserSettings(fixData);
+        } else {
+           // You are genuinely a brand new user. Show the wizard.
+           setOnboardingComplete(false);
+           if (isMissingDoc) {
+              setUserSettings({
+                displayName: user.displayName || '',
+                currency: 'GBP',
+                allocationRules: [], 
+                defaultFixedExpenses: [],
+                creditCards: [],
+                mortgages: []
+              });
+           }
+        }
+    };
+
     const unsub = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         
-        // 1. Gracefully add missing new arrays so old accounts don't get trapped
         const safeData = {
           ...data,
           creditCards: data.creditCards || [],
@@ -5133,32 +5170,18 @@ export default function App() {
         };
         setUserSettings(safeData);
         
-        // 2. Check if they are mid-way through the new Carousel Onboarding draft
+        // If the DB thinks you are mid-way through a draft, trigger the rescue check just in case!
         if (data.onboardingComplete === false) {
-           setOnboardingComplete(false);
-           setIsLegacyUser(false);
-           setShowSettings(false);
+           checkRescue(false);
         } else {
-           // 3. Only force Legacy Setup if they are missing absolute CORE components
-           if (!data.bankDetails || !data.payDay) {
-             setIsLegacyUser(true);
-             setShowSettings(true); 
-           } else {
-             setIsLegacyUser(false);
-           }
+           // Normal, established user
            setOnboardingComplete(true);
+           setIsLegacyUser(false);
+           setShowSettings(false); 
         }
       } else {
-        // User has NO settings at all. Brand new.
-        setOnboardingComplete(false);
-        setUserSettings({
-          displayName: user.displayName || '',
-          currency: 'GBP',
-          allocationRules: [], 
-          defaultFixedExpenses: [],
-          creditCards: [],
-          mortgages: []
-        });
+        // Document missing entirely. Trigger rescue check.
+        checkRescue(true);
       }
     });
     return () => unsub();
@@ -5538,24 +5561,23 @@ export default function App() {
        return;
     }
 
-    // ---------------------------------------------------------
     // FIX: BLOCK DATABASE WRITES IN SANDBOX MODE
-    // ---------------------------------------------------------
     if (isSandbox) {
        showToast("Sandbox: Settings updated temporarily.");
-       setSandboxSettings(newSettings); // Update UI so you can see the simulation
-       return; // STOP HERE - Do not save to Firebase
+       setSandboxSettings(newSettings); 
+       return; 
     }
-    // ---------------------------------------------------------
     
     if (!user) return;
     triggerHaptic(); 
     logSystemEvent('Settings & Pots Configuration Saved', 'config');
     const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
-    await setDoc(settingsRef, newSettings);
     
-    // Update local state immediately so the UI reflects changes
-    setUserSettings(newSettings); 
+    // FIX: Enforce the complete flag and safely merge data!
+    const finalDataToSave = { ...newSettings, onboardingComplete: true };
+    await setDoc(settingsRef, finalDataToSave, { merge: true });
+    
+    setUserSettings(finalDataToSave); 
     showToast("Settings saved!");
   };
 
@@ -6036,36 +6058,25 @@ export default function App() {
       {!loading && !effectiveOnboardingComplete && user && ( 
         <OnboardingWizard 
           user={user}
-          
-          // 1. Pass current settings so it knows where you left off
           currentSettings={userSettings || {}} 
-          
-          // 2. Pass banking data to show the green "Connected" checkmarks
           bankingData={bankingData} 
-          
-          // 3. Pass the function to trigger the TrueLayer popup
           onConnectBank={startBankConnection} 
-          
-          // 4. Save draft progress before leaving to connect a bank
           onSaveDraft={async (draftSettings) => {
-             if (activeDemoId) return; // Do nothing in demo mode
-             
+             if (activeDemoId) return; 
              const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
              await setDoc(settingsRef, draftSettings, { merge: true });
              setUserSettings(draftSettings);
           }}
-          
           onComplete={async (newSettings) => {
-             // GUARD: If in Demo Mode, DO NOT SAVE. Just exit the demo.
              if (activeDemoId) {
                 showToast("Demo Completed! No data was saved.");
-                setActiveDemoId(null); // Exit demo mode
+                setActiveDemoId(null); 
                 return;
              }
 
-             // Real Save Logic
              const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config');
-             await setDoc(settingsRef, newSettings);
+             // ADDED MERGE TRUE HERE:
+             await setDoc(settingsRef, newSettings, { merge: true });
              setUserSettings(newSettings);
              setOnboardingComplete(true);
              setShowHelp(true); 
