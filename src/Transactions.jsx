@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2, Utensils, Tv, ShoppingCart, TrendingUp, Activity, PieChart, ChevronDown, ChevronUp, List } from 'lucide-react';
+import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2, Utensils, Tv, ShoppingCart, TrendingUp, Activity, PieChart, ChevronDown, ChevronUp, List, ArrowRightLeft } from 'lucide-react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 const TRUELAYER_PROVIDERS = {
@@ -25,6 +25,24 @@ const TRUELAYER_PROVIDERS = {
   'mock': 'mock'
 };
 
+// --- NEW: SKELETON LOADER COMPONENT ---
+const SkeletonLoader = () => (
+  <div className="space-y-4 animate-pulse w-full">
+    {[1, 2, 3, 4].map((i) => (
+      <div key={i} className="flex justify-between items-center p-5 bg-white rounded-[2rem] border border-slate-100 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-slate-200 rounded-2xl"></div>
+          <div className="space-y-2">
+            <div className="w-32 h-4 bg-slate-200 rounded-full"></div>
+            <div className="w-20 h-3 bg-slate-100 rounded-full"></div>
+          </div>
+        </div>
+        <div className="w-16 h-6 bg-slate-200 rounded-full"></div>
+      </div>
+    ))}
+  </div>
+);
+
 const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP', bankDetails, additionalBanks = [], expenses = [] }) => {
   const [loading, setLoading] = useState(true);
   const [bankingData, setBankingData] = useState(null);
@@ -34,10 +52,9 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null); 
   
-  // NEW STATE
-  const [activeTab, setActiveTab] = useState('feed'); // 'feed' or 'analytics'
-  const [dateFilter, setDateFilter] = useState('30'); // '30', '90', 'thisMonth', 'lastMonth'
-  const [expandedBanks, setExpandedBanks] = useState({}); // Tracks which banks are expanded
+  const [activeTab, setActiveTab] = useState('feed'); 
+  const [dateFilter, setDateFilter] = useState('30'); 
+  const [expandedBanks, setExpandedBanks] = useState({});
 
   const toggleBankExpansion = (providerId) => {
       setExpandedBanks(prev => ({ ...prev, [providerId]: !prev[providerId] }));
@@ -46,25 +63,21 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   const userBanks = useMemo(() => {
     const banks = [];
     
-    // 1. The Main Salary Account
     if (bankDetails?.name) {
       banks.push({ id: 'current', name: bankDetails.name, type: 'Salary Account', fallbackLogo: bankDetails.logo });
     }
 
-    // 2. Any Additional Current Accounts
     if (additionalBanks && additionalBanks.length > 0) {
         additionalBanks.forEach((b, i) => {
             banks.push({ id: `extra-${i}`, name: b.name, type: 'Current Account', fallbackLogo: b.logo });
         });
     }
 
-    // 3. Credit Cards (from expenses)
     const creditCards = expenses.filter(e => e.type === 'credit_card');
     creditCards.forEach(cc => {
        banks.push({ id: cc.id, name: cc.name, type: 'Credit Card', fallbackLogo: cc.logo });
     });
 
-    // Map them to TrueLayer statuses
     return banks.map(bank => {
       const searchName = bank.name.toLowerCase().trim();
       const matchedKey = Object.keys(TRUELAYER_PROVIDERS).find(key => searchName.includes(key));
@@ -94,6 +107,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
         case 'Shopping': return <ShoppingCart className="w-5 h-5 text-pink-500" />;
         case 'Health': return <Activity className="w-5 h-5 text-rose-500" />;
         case 'Income': return <TrendingUp className="w-5 h-5 text-emerald-600" />;
+        case 'Transfer': return <ArrowRightLeft className="w-5 h-5 text-slate-400" />; // NEW ICON
         default: return <CreditCard className="w-5 h-5 text-slate-400" />;
     }
   };
@@ -124,7 +138,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
     if (forceRefresh) setIsRefreshing(true);
     setError(null);
 
-    // Calculate dates based on the selected filter
     let fromDate = new Date();
     let toDate = new Date();
     
@@ -234,14 +247,13 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
     }
   };
 
-  // Re-fetch whenever the date filter changes
   useEffect(() => {
     setLoading(true);
     fetchTransactions();
   }, [user, appId, dateFilter]);
 
-  // --- ANALYTICS CALCULATIONS ---
-  const outgoings = transactions.filter(tx => tx.category !== 'Income' && tx.amount !== 0);
+  // --- NEW: ANALYTICS CALCULATIONS EXCLUDING TRANSFERS ---
+  const outgoings = transactions.filter(tx => tx.category !== 'Income' && tx.category !== 'Transfer' && tx.amount !== 0);
   const totalSpent = outgoings.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
   
   const categoryTotals = outgoings.reduce((acc, tx) => {
@@ -254,36 +266,38 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   return (
     <div className="fixed inset-0 z-[200] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full duration-500">
       
-      <div className="bg-white px-6 pt-12 pb-4 shadow-sm flex items-center justify-between sticky top-0 z-10">
+      {/* NEW: MODERN GLASSMORPHIC HEADER */}
+      <div className="bg-white/80 backdrop-blur-md px-6 pt-12 pb-4 shadow-sm flex items-center justify-between sticky top-0 z-30 border-b border-slate-200/50">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
             <Landmark className="w-6 h-6 text-indigo-600" /> Bank Connections
           </h2>
           <p className="text-sm font-medium text-slate-500">Manage your connected accounts</p>
         </div>
-        <button onClick={onClose} className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition">
+        <button onClick={onClose} className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition active:scale-95">
           <X className="w-5 h-5" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 no-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 no-scrollbar pb-32">
         <div className="max-w-3xl mx-auto space-y-8">
           
+          {/* NEW: SKELETON LOADER */}
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-32 space-y-4">
-              <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-              <p className="text-slate-500 font-medium animate-pulse">Synchronising financial data...</p>
+            <div className="flex flex-col items-center justify-center py-20 space-y-6">
+              <SkeletonLoader />
+              <p className="text-slate-400 font-bold text-sm uppercase tracking-widest animate-pulse">Synchronising your data...</p>
             </div>
           ) : (
             <>
               {error && (
-                <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-2xl font-medium text-sm flex items-center gap-2">
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-2xl font-medium text-sm flex items-center gap-2 animate-in slide-in-from-top-2">
                   <AlertCircle className="w-5 h-5 shrink-0" /> {error}
                 </div>
               )}
 
               {/* SECTION 1: MY BANKS LIST */}
-              <div className="bg-white rounded-[2.5rem] p-6 sm:p-8 shadow-sm border border-slate-200">
+              <div className="bg-white rounded-[2rem] p-6 sm:p-8 shadow-sm border border-slate-200">
                  <div className="flex justify-between items-center mb-6">
                      <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <Shield className="w-5 h-5 text-emerald-500" /> Your Accounts
@@ -292,7 +306,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                         <button 
                             onClick={() => fetchTransactions(true)}
                             disabled={isRefreshing}
-                            className="text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 py-1.5 px-3 rounded-full transition flex items-center gap-1.5 disabled:opacity-50"
+                            className="text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 py-1.5 px-3 rounded-full transition flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
                         >
                             <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} /> Sync All
                         </button>
@@ -304,10 +318,10 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                        <p className="text-slate-500 text-sm text-center py-4">No banks or credit cards added to your budget yet.</p>
                     ) : (
                        userBanks.map((bank, index) => {
-                         const isExpanded = expandedBanks[bank.providerId] !== false; // Default to expanded
+                         const isExpanded = expandedBanks[bank.providerId] !== false; 
 
                          return (
-                         <div key={index} className="flex flex-col p-4 rounded-2xl border border-slate-100 bg-slate-50/50">
+                         <div key={index} className="flex flex-col p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:border-slate-200 transition">
                             
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 cursor-pointer" onClick={() => {
                                 if (bank.status === 'Connected') toggleBankExpansion(bank.providerId);
@@ -343,7 +357,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                    {bank.status === 'Inactive' && (
                                       <button 
                                          onClick={(e) => { e.stopPropagation(); onConnectBank(bank.providerId); }}
-                                         className="bg-indigo-600 text-white text-sm font-bold py-2 px-4 rounded-xl hover:bg-indigo-700 transition shadow-md whitespace-nowrap"
+                                         className="bg-indigo-600 text-white text-sm font-bold py-2 px-4 rounded-xl hover:bg-indigo-700 transition shadow-md whitespace-nowrap active:scale-95"
                                       >
                                          Connect
                                       </button>
@@ -351,8 +365,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
                                    {bank.status === 'Connected' && (
                                       <div className="flex items-center gap-2">
-                                         
-                                         {/* Dropdown Toggle */}
                                          <button className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition">
                                             {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                                          </button>
@@ -391,11 +403,10 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                 </div>
                             </div>
 
-                            {/* COLLAPSIBLE BALANCES SECTION */}
                             {bank.status === 'Connected' && bankingData?.connections?.[bank.providerId]?.accounts && isExpanded && (
                                 <div className="mt-4 pt-4 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-2 animate-in slide-in-from-top-2 fade-in duration-200">
                                     {bankingData.connections[bank.providerId].accounts.map(acc => (
-                                        <div key={acc.account_id} className="flex justify-between items-center p-2.5 bg-white rounded-xl shadow-sm border border-slate-100">
+                                        <div key={acc.account_id} className="flex justify-between items-center p-2.5 bg-white rounded-xl shadow-sm border border-slate-100 hover:border-slate-200 transition">
                                             <span className="text-xs font-bold text-slate-600 truncate mr-3">{acc.name}</span>
                                             
                                             <span className={`text-sm font-black whitespace-nowrap ${
@@ -423,20 +434,20 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                  </div>
               </div>
 
-              {/* TABS & FILTERS */}
+              {/* NEW: STICKY TABS & FILTERS */}
               {bankingData && Object.keys(bankingData.connections).length > 0 && transactions.length > 0 && (
-                <div>
-                   <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4 mt-8">
-                       <div className="flex bg-slate-200/60 p-1 rounded-2xl">
+                <div className="space-y-6 mt-8">
+                   <div className="flex flex-col sm:flex-row justify-between items-center gap-4 sticky top-[72px] z-20 bg-slate-50/90 backdrop-blur-md py-4 -mx-4 px-4 sm:mx-0 sm:px-0">
+                       <div className="flex bg-slate-200/60 p-1.5 rounded-2xl w-full sm:w-auto shadow-inner">
                           <button 
                              onClick={() => setActiveTab('feed')}
-                             className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition ${activeTab === 'feed' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                             className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeTab === 'feed' ? 'bg-white text-slate-800 shadow-sm scale-100' : 'text-slate-500 hover:text-slate-700 scale-95'}`}
                           >
                              <List className="w-4 h-4" /> Feed
                           </button>
                           <button 
                              onClick={() => setActiveTab('analytics')}
-                             className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition ${activeTab === 'analytics' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                             className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeTab === 'analytics' ? 'bg-white text-slate-800 shadow-sm scale-100' : 'text-slate-500 hover:text-slate-700 scale-95'}`}
                           >
                              <PieChart className="w-4 h-4" /> Analytics
                           </button>
@@ -445,7 +456,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                        <select 
                           value={dateFilter}
                           onChange={(e) => setDateFilter(e.target.value)}
-                          className="bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-2xl px-4 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                          className="bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-2xl px-5 py-3 outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm w-full sm:w-auto cursor-pointer"
                        >
                           <option value="30">Last 30 Days</option>
                           <option value="90">Last 90 Days</option>
@@ -456,17 +467,20 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
                    {/* TAB: FEED */}
                    {activeTab === 'feed' && (
-                       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden animate-in fade-in">
+                       <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
                          <div className="divide-y divide-slate-50">
                            {transactions.map((tx, idx) => {
                              const relatedBank = userBanks.find(b => b.providerId === tx.providerId);
                              const displayLogo = relatedBank?.fallbackLogo || tx.providerLogo || relatedBank?.logoUrl;
+                             
+                             // NEW: Subtly style Internal Transfers
+                             const isTransfer = tx.category === 'Transfer';
 
                              return (
-                             <div key={`${tx.id}-${idx}`} className="p-4 sm:p-5 flex justify-between items-center hover:bg-slate-50 transition group">
+                             <div key={`${tx.id}-${idx}`} className={`p-4 sm:p-5 flex justify-between items-center transition group ${isTransfer ? 'opacity-70 grayscale-[20%] hover:bg-slate-100' : 'hover:bg-slate-50'}`}>
                                  <div className="flex items-center gap-4">
                                    <div className="relative">
-                                       <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 group-hover:bg-white group-hover:shadow-sm transition">
+                                       <div className={`p-3 rounded-2xl border transition group-hover:shadow-sm ${isTransfer ? 'bg-slate-100 border-slate-200' : 'bg-slate-50 border-slate-100 group-hover:bg-white'}`}>
                                            {getCategoryIcon(tx.category)}
                                        </div>
                                        {displayLogo && (
@@ -476,10 +490,10 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                        )}
                                    </div>
                                    <div>
-                                       <p className="font-bold text-slate-800 text-sm sm:text-base">
+                                       <p className={`font-bold text-sm sm:text-base ${isTransfer ? 'text-slate-600' : 'text-slate-800'}`}>
                                          {tx.merchant && tx.merchant !== 'Unknown' ? tx.merchant : tx.description}
                                        </p>
-                                       <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                                       <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5 font-medium">
                                          <span className="capitalize">{tx.category || 'Miscellaneous'}</span>
                                          <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                                          <span>{new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
@@ -488,7 +502,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                  </div>
                                  
                                  <div className="text-right flex flex-col items-end">
-                                   <span className={`font-black text-sm sm:text-lg ${tx.category !== 'Income' ? 'text-slate-800' : 'text-emerald-600'}`}>
+                                   <span className={`font-black text-sm sm:text-lg ${tx.category === 'Income' ? 'text-emerald-600' : isTransfer ? 'text-slate-500' : 'text-slate-900'}`}>
                                        {tx.category === 'Income' ? '+' : ''}
                                        {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}
                                        {Math.abs(tx.amount).toFixed(2)}
@@ -501,32 +515,38 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                        </div>
                    )}
 
-                   {/* TAB: ANALYTICS */}
+                   {/* TAB: ANALYTICS (EXCLUDING TRANSFERS) */}
                    {activeTab === 'analytics' && (
-                       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 p-6 sm:p-8 animate-in fade-in">
+                       <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-6 sm:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                           <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                             <PieChart className="w-5 h-5 text-indigo-500" /> Spending Breakdown
+                             <PieChart className="w-5 h-5 text-indigo-500" /> True Spending Breakdown
                           </h3>
                           
-                          <div className="mb-10 text-center sm:text-left">
-                             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Total Outgoings</p>
-                             <p className="text-5xl font-black text-slate-800 tracking-tight">
+                          <div className="mb-10 text-center sm:text-left bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100/50">
+                             <p className="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-1">Total Outgoings</p>
+                             <p className="text-5xl font-black text-indigo-950 tracking-tight">
                                 {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}
                                 {totalSpent.toFixed(2)}
+                             </p>
+                             <p className="text-xs font-medium text-slate-500 mt-3 flex items-center justify-center sm:justify-start gap-1">
+                                <ArrowRightLeft className="w-3 h-3" /> Excludes internal transfers
                              </p>
                           </div>
 
                           <div className="space-y-6">
                              {sortedCategories.length === 0 ? (
-                                <p className="text-slate-500 text-center py-4 text-sm">No spending data to analyse in this period.</p>
+                                <div className="text-center py-10">
+                                   <PieChart className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                                   <p className="text-slate-500 text-sm font-medium">No spending data to analyse in this period.</p>
+                                </div>
                              ) : (
                                 sortedCategories.map(([cat, amount]) => {
                                    const percentage = ((amount / totalSpent) * 100).toFixed(0);
                                    return (
-                                   <div key={cat}>
+                                   <div key={cat} className="group">
                                       <div className="flex justify-between items-center mb-2">
                                          <div className="flex items-center gap-3">
-                                            <div className="p-1.5 bg-slate-50 rounded-lg border border-slate-100">
+                                            <div className="p-2 bg-slate-50 rounded-xl border border-slate-100 group-hover:scale-110 transition-transform">
                                                {getCategoryIcon(cat)}
                                             </div>
                                             <span className="font-bold text-slate-700">{cat}</span>
@@ -538,11 +558,13 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                             <span className="text-xs font-bold text-slate-400 w-8 inline-block">{percentage}%</span>
                                          </div>
                                       </div>
-                                      <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                                      <div className="w-full bg-slate-100 h-3.5 rounded-full overflow-hidden shadow-inner">
                                          <div 
-                                            className="bg-indigo-500 h-full rounded-full transition-all duration-1000 ease-out" 
+                                            className="bg-indigo-500 h-full rounded-full transition-all duration-1000 ease-out relative overflow-hidden" 
                                             style={{ width: `${percentage}%` }}
-                                         ></div>
+                                         >
+                                            <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite]" style={{ backgroundImage: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)', transform: 'skewX(-20deg)' }}></div>
+                                         </div>
                                       </div>
                                    </div>
                                 )})

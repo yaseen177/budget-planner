@@ -12,8 +12,17 @@ const categoriseTransaction = (merchant, description, tlCategory, amount, accoun
         isIncome = amount > 0; 
     }
 
+    // 1. CATCH TRANSFERS & CREDIT CARD PAYMENTS FIRST
+    if (tlCategory) {
+        const cat = tlCategory.toUpperCase();
+        if (cat.includes('TRANSFER') || cat.includes('CREDIT_CARD_PAYMENT')) return 'Transfer';
+    }
+    if (text.match(/transfer|saving|pot|vault|credit card|amex payment|barclaycard|monzo|starling|revolut/)) return 'Transfer';
+
+    // 2. Then Income
     if (isIncome) return 'Income';
 
+    // 3. Then standard categories
     if (text.match(/tesco|sainsbury|asda|morrison|aldi|lidl|waitrose|coop|iceland|costco|ocado|farmfoods/)) return 'Groceries';
     if (text.match(/mcdonald|kfc|burger king|burgerking|nando|costa|starbucks|greggs|deliveroo|ubereats|uber eats|justeat|just eat|domino|pret|pizza hut|subway|wetherspoon|kebab/)) return 'Eating Out';
     if (text.match(/uber|trainline|tfl|rail|petrol|shell|bp|esso|texaco|parking|bus|coach|ryanair|easyjet|ba |britishairways|national express|applegreen/)) return 'Transport';
@@ -41,7 +50,6 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json();
-    // NOW ACCEPTING CUSTOM DATES
     const { refreshToken, clientId, accounts, from, to } = body; 
 
     if (!refreshToken || !accounts || !clientId) {
@@ -65,7 +73,6 @@ export async function onRequestPost(context) {
     const accessToken = tokenData.access_token;
     const newRefreshToken = tokenData.refresh_token || refreshToken; 
 
-    // USE PROVIDED DATES, OR FALLBACK TO 30 DAYS
     let fromStr = from;
     let toStr = to;
     if (!fromStr || !toStr) {
