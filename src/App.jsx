@@ -5124,17 +5124,23 @@ export default function App() {
     const unsub = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setUserSettings(data);
         
-        // --- FIX: Respect 'onboardingComplete' flag for drafts & new setups ---
+        // 1. Gracefully add missing new arrays so old accounts don't get trapped
+        const safeData = {
+          ...data,
+          creditCards: data.creditCards || [],
+          mortgages: data.mortgages || []
+        };
+        setUserSettings(safeData);
+        
+        // 2. Check if they are mid-way through the new Carousel Onboarding draft
         if (data.onboardingComplete === false) {
-           // User is mid-way through the new wizard. Keep showing it!
            setOnboardingComplete(false);
            setIsLegacyUser(false);
            setShowSettings(false);
         } else {
-           // Check for Legacy Users who finished the old version of the app but miss fields
-           if (!data.bankDetails || !data.payDay || data.creditCards === undefined || data.mortgages === undefined) {
+           // 3. Only force Legacy Setup if they are missing absolute CORE components
+           if (!data.bankDetails || !data.payDay) {
              setIsLegacyUser(true);
              setShowSettings(true); 
            } else {
@@ -5148,8 +5154,10 @@ export default function App() {
         setUserSettings({
           displayName: user.displayName || '',
           currency: 'GBP',
-          allocationRules: [], // Start empty
-          defaultFixedExpenses: [] // Start empty
+          allocationRules: [], 
+          defaultFixedExpenses: [],
+          creditCards: [],
+          mortgages: []
         });
       }
     });
