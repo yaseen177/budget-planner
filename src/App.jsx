@@ -5097,16 +5097,24 @@ export default function App() {
         const data = docSnap.data();
         setUserSettings(data);
         
-        // CHECK IF LEGACY: Missing Bank or Payday OR Credit Cards Config OR Mortgages
-        if (!data.bankDetails || !data.payDay || data.creditCards === undefined || data.mortgages === undefined) {
-          setIsLegacyUser(true);
-          setShowSettings(true); 
+        // --- FIX: Respect 'onboardingComplete' flag for drafts & new setups ---
+        if (data.onboardingComplete === false) {
+           // User is mid-way through the new wizard. Keep showing it!
+           setOnboardingComplete(false);
+           setIsLegacyUser(false);
+           setShowSettings(false);
         } else {
-          setIsLegacyUser(false);
+           // Check for Legacy Users who finished the old version of the app but miss fields
+           if (!data.bankDetails || !data.payDay || data.creditCards === undefined || data.mortgages === undefined) {
+             setIsLegacyUser(true);
+             setShowSettings(true); 
+           } else {
+             setIsLegacyUser(false);
+           }
+           setOnboardingComplete(true);
         }
-        setOnboardingComplete(true);
       } else {
-        // User has NO settings. Do NOT save defaults yet.
+        // User has NO settings at all. Brand new.
         setOnboardingComplete(false);
         setUserSettings({
           displayName: user.displayName || '',
