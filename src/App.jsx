@@ -1430,7 +1430,7 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Bill Name</label>
             <div id="input-expense-name">
               <BrandSearchInput 
-                autoFocus={false} // False on mobile to prevent keyboard jumping immediately
+                autoFocus={false}
                 placeholder="e.g. Netflix, Tesco..." 
                 className="w-full p-4 rounded-2xl bg-slate-50 border-none text-xl font-medium text-slate-800 placeholder-slate-300 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all focus:bg-white"
                 value={name}
@@ -1439,6 +1439,10 @@ const AddExpenseModal = ({ isOpen, onClose, onSave }) => {
                   setName(brandName);
                   setLogo(brandLogo);
                 }}
+
+                // ADD THESE TWO LINES:
+                selectedLogo={logo}
+                onClearLogo={() => setLogo(null)}
               />
             </div>
           </div>
@@ -1512,83 +1516,86 @@ const SandboxInfoModal = ({ onClose, onConfirm }) => (
   </div>
 );
 
-const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, className, autoFocus }) => {
+// --- FIND THIS COMPONENT AND REPLACE IT ---
+const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, className, autoFocus, selectedLogo, onClearLogo }) => {
   const [results, setResults] = useState([]);
-  const [isFocused, setIsFocused] = useState(false); // NEW: Track focus to prevent "spazzing"
+  const [isFocused, setIsFocused] = useState(false); 
   
-  // Use the keys provided
   const SECRET_KEY = import.meta.env.VITE_LOGO_DEV_SECRET_KEY;
   const PUBLIC_KEY = import.meta.env.VITE_LOGO_DEV_PUBLIC_KEY;
 
   useEffect(() => {
-    // Debounce search to save API calls
     const timeoutId = setTimeout(async () => {
-      if (value.length < 2) {
+      // STOP SEARCHING IF A LOGO IS ALREADY LOCKED IN
+      if (selectedLogo || value.length < 2) {
         setResults([]);
         return;
       }
       
       try {
         const response = await fetch(`https://api.logo.dev/search?q=${encodeURIComponent(value)}`, {
-          headers: {
-            'Authorization': `Bearer ${SECRET_KEY}`
-          }
+          headers: { 'Authorization': `Bearer ${SECRET_KEY}` }
         });
         const data = await response.json();
         setResults(data.slice(0, 5)); 
-        // FIXED: Removed setShowDropdown(true) here. 
-        // We rely on isFocused now, so it won't pop up randomly while you're editing the amount.
       } catch (e) {
         console.error("Logo search failed", e);
       }
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [value]);
+  }, [value, selectedLogo]);
 
-  // NEW: Handle Enter Key to auto-select the best match (Fixes Bug 1)
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      // 1. Try to select the first API result
-      if (results.length > 0) {
+      if (results.length > 0 && !selectedLogo) {
          const brand = results[0];
          const logoUrl = `https://img.logo.dev/${brand.domain}?token=${PUBLIC_KEY}`;
          onSelectBrand(brand.name, logoUrl);
-      } 
-      // 2. Fallback to manual entry if no results but text exists
-      else if (value.length > 0) {
-         onSelectBrand(value, null);
+      } else if (value.length > 0) {
+         onSelectBrand(value, selectedLogo || null);
       }
-      // Close dropdown by blurring (or relying on parent state updates)
       e.currentTarget.blur();
     }
   };
 
   return (
     <div className="relative">
+      {/* THE LOGO LOCK PILL */}
+      {selectedLogo && (
+         <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center bg-white border border-slate-200 rounded-lg p-1 pr-1.5 shadow-sm z-10 animate-in zoom-in-95">
+            <img src={selectedLogo} alt="Locked Logo" className="w-5 h-5 object-contain rounded bg-white" />
+            <button 
+              type="button" 
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); if(onClearLogo) onClearLogo(); }}
+              className="ml-1 text-slate-400 hover:text-rose-500 transition"
+            >
+               <X className="w-3 h-3" />
+            </button>
+         </div>
+      )}
+
       <input 
         autoFocus={autoFocus}
         type="text" 
         placeholder={placeholder} 
-        className={className}
+        // Force left padding to make room for the logo pill if it exists
+        className={`${className} ${selectedLogo ? '!pl-[4.5rem]' : ''}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => setIsFocused(true)}
-        onBlur={() => setTimeout(() => setIsFocused(false), 200)} // Delay to allow clicks
+        onBlur={() => setTimeout(() => setIsFocused(false), 200)} 
         onKeyDown={handleKeyDown}
       />
       
-      {/* FIXED: Only show if user is FOCUSED on this input. Prevents blocking other buttons. */}
-      {isFocused && value.length > 0 && (
+      {/* ONLY SHOW DROPDOWN IF FOCUSED AND NO LOGO IS LOCKED */}
+      {isFocused && !selectedLogo && value.length > 0 && (
         <div className="absolute top-full left-0 right-0 bg-white shadow-xl rounded-xl border border-slate-100 mt-1 z-50 overflow-hidden max-h-60 overflow-y-auto">
           
-          {/* Add Manually Option */}
           <button
             className="w-full text-left p-3 hover:bg-emerald-50 flex items-center gap-3 transition border-b border-slate-50 group"
-            onClick={() => {
-              onSelectBrand(value, null);
-            }}
+            onClick={() => onSelectBrand(value, null)}
           >
             <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 p-1 flex items-center justify-center text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition">
                 <Plus className="w-4 h-4" />
@@ -1599,7 +1606,6 @@ const BrandSearchInput = ({ value, onChange, onSelectBrand, placeholder, classNa
             </div>
           </button>
 
-          {/* API Results */}
           {results.map((brand, i) => (
             <button
               key={i}
@@ -3030,12 +3036,17 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
                  ))}
 
                  <div className="flex gap-2 items-start pt-2">
-                     <div className="flex-1">
+                 <div className="flex-1">
                        <BrandSearchInput
                           placeholder="New Bill Name"
                           value={newDefExpName}
                           onChange={setNewDefExpName}
                           onSelectBrand={(name, logo) => { setNewDefExpName(name); setNewDefExpLogo(logo); }}
+                          
+                          // ADD THESE TWO LINES:
+                          selectedLogo={newDefExpLogo}
+                          onClearLogo={() => setNewDefExpLogo(null)}
+                          
                           className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold"
                        />
                      </div>
