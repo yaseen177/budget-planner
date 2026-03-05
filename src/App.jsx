@@ -3489,123 +3489,119 @@ const calculateDaysUntilPayday = (payDayStr, salaryInputted) => {
 
 // --- NEW COMPONENT: ONBOARDING WIZARD ---
 
-const OnboardingWizard = ({ user, onComplete }) => {
-  const [step, setStep] = useState(0); 
-  // Steps: 0:Intro, 1:Bank, 2:Payday, 3:CreditCards, 4:Currency, 5:Pots, 6:Bills, 7:Pace
-
-  const [paceTargets, setPaceTargets] = useState({ low: 10, high: 30 });
+// --- FULLY REVAMPED 10-STEP ONBOARDING WIZARD ---
+const OnboardingWizard = ({ user, currentSettings, onComplete, onSaveDraft, onConnectBank, bankingData }) => {
+  const [step, setStep] = useState(currentSettings.onboardingStep || 0); 
   
-  const [currency, setCurrency] = useState('GBP');
-  const [bank, setBank] = useState(null);
-  const [payDay, setPayDay] = useState(''); // Stores string '1' to '31'
+  // States
+  const [name, setName] = useState(currentSettings.displayName || user.displayName || '');
+  const [currency, setCurrency] = useState(currentSettings.currency || 'GBP');
+  const [bank, setBank] = useState(currentSettings.bankDetails || null);
+  const [additionalBanks, setAdditionalBanks] = useState(currentSettings.additionalBanks || []);
+  const [payDay, setPayDay] = useState(currentSettings.payDay || '');
   
-  // --- NEW: Credit Cards State ---
-  const [creditCards, setCreditCards] = useState([]);
-
-  // --- NEW: Mortgages State ---
-  const [mortgages, setMortgages] = useState([]);
+  const [hasAdditional, setHasAdditional] = useState(currentSettings.additionalBanks?.length > 0 ? 'yes' : null);
+  const [hasCreditCards, setHasCreditCards] = useState(currentSettings.creditCards?.length > 0 ? 'yes' : null);
+  const [creditCards, setCreditCards] = useState(currentSettings.creditCards || []);
+  const [hasMortgages, setHasMortgages] = useState(currentSettings.mortgages?.length > 0 ? 'yes' : null);
+  const [mortgages, setMortgages] = useState(currentSettings.mortgages || []);
   
-  // Pots State (User defined pots only - Current Account is calculated automatically)
-  const [pots, setPots] = useState([
-    { id: '1', name: 'Savings', percentage: 20, color: 'bg-emerald-100 text-emerald-700 bar-emerald' },
-    { id: '2', name: 'Holidays', percentage: 10, color: 'bg-sky-100 text-sky-700 bar-sky' }
-  ]);
+  const [pots, setPots] = useState(currentSettings.allocationRules || DEFAULT_ALLOCATIONS);
   const [newPotName, setNewPotName] = useState('');
   const [newPotPercent, setNewPotPercent] = useState('');
-
-  // Bills State
-  const [bills, setBills] = useState([]);
+  
+  const [bills, setBills] = useState(currentSettings.defaultFixedExpenses || []);
   const [newBillName, setNewBillName] = useState('');
   const [newBillAmount, setNewBillAmount] = useState('');
   const [newBillLogo, setNewBillLogo] = useState(null);
 
+  const [paceTargets, setPaceTargets] = useState(currentSettings.dailyPaceTargets || { low: 10, high: 30 });
+
   const totalPercent = pots.reduce((sum, p) => sum + p.percentage, 0);
+
+  // Sync step if it changes (e.g., returning from TrueLayer redirect)
+  useEffect(() => {
+     if (currentSettings.onboardingStep !== undefined && currentSettings.onboardingStep > step) {
+         setStep(currentSettings.onboardingStep);
+     }
+  }, [currentSettings.onboardingStep]);
+
+  // Checks TrueLayer status
+  const checkConnection = (bankName) => {
+      if (!bankName) return false;
+      const searchName = bankName.toLowerCase().trim();
+      const matchedKey = Object.keys(TRUELAYER_PROVIDERS).find(key => searchName.includes(key));
+      const providerId = matchedKey ? TRUELAYER_PROVIDERS[matchedKey] : null;
+      return providerId && bankingData?.connections?.[providerId] ? true : false;
+  };
+
+  const getProviderId = (bankName) => {
+      if (!bankName) return null;
+      const searchName = bankName.toLowerCase().trim();
+      const matchedKey = Object.keys(TRUELAYER_PROVIDERS).find(key => searchName.includes(key));
+      return matchedKey ? TRUELAYER_PROVIDERS[matchedKey] : null;
+  };
+
+  const handleNext = async (nextStep) => {
+      setStep(nextStep);
+      const draft = {
+          displayName: name, currency, bankDetails: bank, additionalBanks, payDay, creditCards, mortgages, allocationRules: pots, defaultFixedExpenses: bills, dailyPaceTargets: paceTargets, onboardingStep: nextStep, onboardingComplete: false
+      };
+      await onSaveDraft(draft);
+  };
+
+  const handleConnect = async (providerId, currentStep) => {
+      if (!providerId) {
+          alert("Automatic connection is not available for this specific bank yet. You can still track it manually!");
+          return;
+      }
+      // Save draft BEFORE leaving the page so we return exactly here
+      const draft = {
+          displayName: name, currency, bankDetails: bank, additionalBanks, payDay, creditCards, mortgages, allocationRules: pots, defaultFixedExpenses: bills, dailyPaceTargets: paceTargets, onboardingStep: currentStep, onboardingComplete: false
+      };
+      await onSaveDraft(draft);
+      onConnectBank(providerId);
+  };
+
+  const handleFinish = () => {
+    const finalSettings = {
+      displayName: name, currency, bankDetails: bank, additionalBanks, payDay, creditCards, mortgages, allocationRules: pots, defaultFixedExpenses: bills, dailyPaceTargets: paceTargets, onboardingStep: 10, onboardingComplete: true 
+    };
+    onComplete(finalSettings);
+  };
 
   const addPot = () => {
     if (!newPotName || !newPotPercent) return;
-    
-    // Assign a random color style for new pots
-    const colors = [
-      'bg-indigo-100 text-indigo-700 bar-indigo',
-      'bg-amber-100 text-amber-700 bar-amber',
-      'bg-purple-100 text-purple-700 bar-purple',
-      'bg-rose-100 text-rose-700 bar-rose',
-      'bg-cyan-100 text-cyan-700 bar-cyan'
-    ];
+    const colors = ['bg-indigo-100 text-indigo-700 bar-indigo', 'bg-amber-100 text-amber-700 bar-amber', 'bg-purple-100 text-purple-700 bar-purple', 'bg-rose-100 text-rose-700 bar-rose', 'bg-cyan-100 text-cyan-700 bar-cyan'];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
-    setPots([...pots, { 
-      id: Date.now().toString(), 
-      name: newPotName, 
-      percentage: parseFloat(newPotPercent), 
-      color: randomColor 
-    }]);
-    setNewPotName('');
-    setNewPotPercent('');
+    setPots([...pots, { id: Date.now().toString(), name: newPotName, percentage: parseFloat(newPotPercent), color: randomColor }]);
+    setNewPotName(''); setNewPotPercent('');
   };
 
   const addBill = () => {
     if (!newBillName) return;
-    setBills([...bills, {
-      id: Date.now().toString(),
-      name: newBillName,
-      amount: parseFloat(newBillAmount) || 0,
-      type: 'fixed',
-      logo: newBillLogo
-    }]);
-    setNewBillName('');
-    setNewBillAmount('');
-    setNewBillLogo(null);
+    setBills([...bills, { id: Date.now().toString(), name: newBillName, amount: parseFloat(newBillAmount) || 0, type: 'fixed', logo: newBillLogo }]);
+    setNewBillName(''); setNewBillAmount(''); setNewBillLogo(null);
   };
 
-  const handleFinish = () => {
-    const settings = {
-      displayName: user.displayName || 'Friend',
-      currency,
-      bankDetails: bank, 
-      payDay: payDay,
-      creditCards: creditCards,
-      mortgages: mortgages,
-      allocationRules: pots,
-      defaultFixedExpenses: bills,
-      dailyPaceTargets: paceTargets 
-    };
-    onComplete(settings);
-  };
-
-  const toggleCard = (card) => {
-    if (creditCards.some(c => c.name === card.name)) {
-       setCreditCards(creditCards.filter(c => c.name !== card.name));
-    } else {
-       setCreditCards([...creditCards, card]);
-    }
- };
-
- const toggleMortgage = (lender) => {
-  if (mortgages.some(m => m.name === lender.name)) {
-     setMortgages(mortgages.filter(m => m.name !== lender.name));
-  } else {
-     setMortgages([...mortgages, { ...lender, amount: '' }]);
-  }};
-
-
-  const updateMortgageAmount = (name, amount) => {
-    setMortgages(mortgages.map(m => m.name === name ? { ...m, amount: parseFloat(amount) || 0 } : m));
- };
-
+  const toggleCard = (card) => setCreditCards(prev => prev.some(c => c.name === card.name) ? prev.filter(c => c.name !== card.name) : [...prev, card]);
+  const toggleMortgage = (lender) => setMortgages(prev => prev.some(m => m.name === lender.name) ? prev.filter(m => m.name !== lender.name) : [...prev, { ...lender, amount: '' }]);
+  const updateMortgageAmount = (lenderName, amt) => setMortgages(prev => prev.map(m => m.name === lenderName ? { ...m, amount: parseFloat(amt) || 0 } : m));
 
   return (
-    <div className="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 overflow-y-auto">
-      <div className="max-w-md w-full space-y-8 py-10">
+    <div className="fixed inset-0 bg-slate-50 z-[200] flex flex-col items-center justify-start p-6 animate-in fade-in duration-500 overflow-y-auto">
+      <div className="max-w-md w-full space-y-8 py-10 pb-32">
         
-        {/* Progress Dots - 9 Steps total */}
-        <div className="flex justify-center gap-2 mb-8">
-          {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-            <div key={i} className={`w-3 h-3 rounded-full transition-all ${step === i ? 'bg-slate-900 scale-125' : 'bg-slate-200'}`} />
-          ))}
-        </div>
+        {/* SLEEK PROGRESS BAR */}
+        {step > 0 && (
+            <div className="flex justify-center gap-1.5 mb-8 flex-wrap">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
+                <div key={i} className={`h-2 rounded-full transition-all duration-500 ${step === i ? 'w-8 bg-slate-900' : step > i ? 'w-2 bg-emerald-500' : 'w-2 bg-slate-200'}`} />
+            ))}
+            </div>
+        )}
 
-        {/* STEP 0: WELCOME */}
+        {/* STEP 0: INTRO */}
         {step === 0 && (
           <div className="text-center space-y-6 animate-in slide-in-from-bottom-8">
             <div className="bg-emerald-100 w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl rotate-3">
@@ -3613,320 +3609,415 @@ const OnboardingWizard = ({ user, onComplete }) => {
             </div>
             <h1 className="text-4xl font-bold text-slate-800">Welcome to<br/>Budget Planner</h1>
             <p className="text-slate-500 text-lg">Let's build a financial system that works for you, not against you.</p>
-            <button onClick={() => setStep(1)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition">
-              Get Started
+            <button onClick={() => handleNext(1)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition active:scale-95">
+              Let's Begin
             </button>
           </div>
         )}
 
-        {/* STEP 1: BANK SELECTION */}
+        {/* STEP 1: NAME */}
         {step === 1 && (
-           <div className="space-y-6 animate-in slide-in-from-right-8">
+          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
              <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Where does your salary go?</h2>
-              <p className="text-slate-500">Select your main Current Account.</p>
+              <h2 className="text-2xl font-bold text-slate-800">What's your name?</h2>
+              <p className="text-slate-500">So we know what to call you.</p>
             </div>
-            
-            <BankSelector 
-               selectedBank={bank}
-               onSelect={(b) => setBank(b)}
+            <input 
+                autoFocus
+                type="text" 
+                value={name} 
+                onChange={(e) => setName(e.target.value)} 
+                className="w-full p-4 rounded-2xl bg-white border border-slate-200 text-xl font-bold text-slate-800 text-center outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm transition"
+                placeholder="e.g. Yaseen"
             />
-
-            <button disabled={!bank} onClick={() => setStep(2)} className="w-full bg-slate-900 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
+            <button disabled={!name} onClick={() => handleNext(2)} className="w-full bg-slate-900 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition active:scale-95">
               Next
             </button>
-           </div>
+          </div>
         )}
 
-        {/* STEP 2: PAYDAY */}
+        {/* STEP 2: CURRENCY */}
         {step === 2 && (
-           <div className="space-y-6 animate-in slide-in-from-right-8">
-             <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">When is Payday?</h2>
-              <p className="text-slate-500">We use this to track your monthly cycle.</p>
-            </div>
-
-            <div className="grid grid-cols-7 gap-2 max-h-64 overflow-y-auto p-1">
-               {Array.from({length: 31}, (_, i) => i + 1).map(day => (
-                  <button 
-                    key={day}
-                    onClick={() => setPayDay(String(day))}
-                    className={`aspect-square rounded-lg font-bold border flex items-center justify-center transition ${payDay === String(day) ? 'bg-slate-900 text-white border-slate-900 scale-110 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}
-                  >
-                    {day}
-                  </button>
-               ))}
-            </div>
-            {payDay && (
-              <p className="text-center font-bold text-emerald-600 animate-in fade-in">
-                Payday is on the {payDay}{['1','21','31'].includes(payDay)?'st':['2','22'].includes(payDay)?'nd':['3','23'].includes(payDay)?'rd':'th'}
-              </p>
-            )}
-
-            <button disabled={!payDay} onClick={() => setStep(3)} className="w-full bg-slate-900 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
-              Next
-            </button>
-           </div>
-        )}
-
-        {/* --- UPDATED STEP 3: MORTGAGES --- */}
-        {step === 3 && (
-          <div className="space-y-6 animate-in slide-in-from-right-8">
+          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Mortgages</h2>
-              <p className="text-slate-500">Select lender & enter <strong>monthly repayment</strong>.</p>
-            </div>
-
-            {/* List of Selected Mortgages with Inputs */}
-            <div className="space-y-2">
-                 {mortgages.map(m => (
-                    <div key={m.name} className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-200 animate-in zoom-in">
-                       <span className="text-xs font-bold bg-slate-900 text-white px-2 py-1 rounded">{m.name}</span>
-                       <div className="relative w-28">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">£</span>
-                          <input 
-                             type="number"
-                             placeholder="Amount"
-                             value={m.amount}
-                             onChange={(e) => updateMortgageAmount(m.name, e.target.value)}
-                             className="w-full pl-6 pr-2 py-2 rounded-lg border border-slate-200 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-200"
-                          />
-                       </div>
-                    </div>
-                 ))}
-            </div>
-
-            <MortgageSelector 
-                selectedLenders={mortgages}
-                onToggle={toggleMortgage}
-            />
-
-            <button onClick={() => setStep(4)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
-              {mortgages.length === 0 ? 'No Mortgage' : 'Next'}
-            </button>
-          </div>
-        )}
-
-        {/* STEP 4: CREDIT CARDS */}
-        {step === 4 && (
-          <div className="space-y-6 animate-in slide-in-from-right-8">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Credit Cards</h2>
-              <p className="text-slate-500">Do you have any credit cards you pay off monthly?</p>
-            </div>
-
-            <div className="flex flex-wrap gap-2 justify-center">
-                 {creditCards.map(c => (
-                    <span key={c.name} className="text-xs font-bold bg-slate-900 text-white px-2 py-1 rounded animate-in zoom-in">{c.name}</span>
-                 ))}
-            </div>
-
-            <CreditCardSelector 
-                selectedCards={creditCards}
-                onToggle={toggleCard}
-            />
-
-            <button onClick={() => setStep(5)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
-              {creditCards.length === 0 ? 'I don\'t have any cards' : 'Next'}
-            </button>
-          </div>
-        )}
-
-        {/* STEP 5: CURRENCY */}
-        {step === 5 && (
-          <div className="space-y-6 animate-in slide-in-from-right-8">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Your Currency</h2>
+              <h2 className="text-2xl font-bold text-slate-800">Choose Currency</h2>
               <p className="text-slate-500">Select your primary currency.</p>
             </div>
             <div className="grid grid-cols-3 gap-4">
               {['GBP', 'USD', 'EUR'].map(c => (
                 <button 
-                  key={c}
-                  onClick={() => setCurrency(c)}
-                  className={`py-6 rounded-2xl font-bold text-xl border-2 transition ${currency === c ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-100 hover:border-slate-200 text-slate-600'}`}
+                  key={c} onClick={() => setCurrency(c)}
+                  className={`py-6 rounded-2xl font-bold text-xl border-2 transition active:scale-95 ${currency === c ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-md' : 'border-slate-200 bg-white hover:border-slate-300 text-slate-600'}`}
                 >
                   {c}
                 </button>
               ))}
             </div>
-            {/* FIXED: Was setStep(4), changed to setStep(5) */}
-            <button onClick={() => setStep(6)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
-              Next Step
-            </button>
+            <div className="flex gap-3 mt-4">
+                <button onClick={() => handleNext(1)} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
+                <button onClick={() => handleNext(3)} className="w-2/3 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Continue</button>
+            </div>
           </div>
         )}
 
-        {/* STEP 6: POTS & CURRENT ACCOUNT */}
-        {step === 6 && (
-          <div className="space-y-6 animate-in slide-in-from-right-8">
+        {/* STEP 3: SALARY BANK */}
+        {step === 3 && (
+          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Savings & Pots</h2>
-              <p className="text-slate-500">Create your pots. <strong>Anything remaining</strong> stays in your {bank?.name || 'Current'} Account.</p>
+              <h2 className="text-2xl font-bold text-slate-800">Salary Bank</h2>
+              <p className="text-slate-500">Which bank is your salary paid into?</p>
+            </div>
+            
+            {!bank ? (
+               <BankSelector selectedBank={null} onSelect={setBank} />
+            ) : (
+               <div className="bg-white border border-slate-200 p-6 rounded-2xl text-center space-y-4 shadow-sm animate-in zoom-in-95">
+                  <img src={bank.logo} className="w-16 h-16 mx-auto rounded-full object-contain bg-white border border-slate-100 p-1 shadow-sm" />
+                  <h3 className="font-bold text-xl text-slate-800">{bank.name}</h3>
+                  
+                  {checkConnection(bank.name) ? (
+                      <div className="bg-emerald-100 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl font-bold flex items-center justify-center gap-2 animate-in zoom-in-95">
+                         <CheckCircle2 className="w-6 h-6 animate-pulse" /> Connected Successfully!
+                      </div>
+                  ) : (
+                      <div className="space-y-3">
+                         <p className="text-sm text-slate-500">Connect securely via Open Banking to automatically sync your live balances.</p>
+                         <button onClick={() => handleConnect(getProviderId(bank.name), 3)} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl transition shadow-lg active:scale-95">
+                            Connect {bank.name} Securely
+                         </button>
+                         <button onClick={() => setBank(null)} className="text-sm text-slate-400 font-bold hover:text-slate-600 transition">Choose a different bank</button>
+                      </div>
+                  )}
+               </div>
+            )}
+
+            <div className="flex gap-3 pt-4">
+                <button onClick={() => { setBank(null); handleNext(2); }} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
+                <button disabled={!bank} onClick={() => handleNext(4)} className="w-2/3 bg-slate-900 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">
+                  {bank && !checkConnection(bank.name) ? 'Skip Connection' : 'Next Step'}
+                </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4: ADDITIONAL ACCOUNTS */}
+        {step === 4 && (
+          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-800">Other Accounts</h2>
+              <p className="text-slate-500">Do you have any other current accounts?</p>
             </div>
 
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 max-h-60 overflow-y-auto">
+            {hasAdditional === null ? (
+                <div className="grid grid-cols-2 gap-4">
+                    <button onClick={() => setHasAdditional('yes')} className="bg-white border-2 border-slate-200 hover:border-indigo-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">Yes</button>
+                    <button onClick={() => { setHasAdditional('no'); handleNext(5); }} className="bg-white border-2 border-slate-200 hover:border-emerald-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">No</button>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {additionalBanks.map(b => (
+                        <div key={b.id || b.name} className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-xl shadow-sm animate-in zoom-in-95">
+                            <div className="flex items-center gap-3">
+                                {b.logo && <img src={b.logo} className="w-8 h-8 rounded-full object-contain bg-white border border-slate-100 p-0.5" />}
+                                <span className="font-bold text-slate-700">{b.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {checkConnection(b.name) ? (
+                                    <span className="text-emerald-600 font-bold text-xs flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100"><CheckCircle2 className="w-4 h-4"/> Connected</span>
+                                ) : (
+                                    <button onClick={() => handleConnect(getProviderId(b.name), 4)} className="text-xs font-bold bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition shadow-sm">Connect</button>
+                                )}
+                                <button onClick={() => setAdditionalBanks(additionalBanks.filter(x => x.id !== b.id))} className="text-slate-300 hover:text-rose-500 p-1"><X className="w-4 h-4"/></button>
+                            </div>
+                        </div>
+                    ))}
+                    <div className="pt-2">
+                        <BankSelector selectedBank={null} onSelect={(b) => setAdditionalBanks([...additionalBanks, {...b, id: Date.now().toString()}])} />
+                    </div>
+                </div>
+            )}
+
+            <div className="flex gap-3 pt-4">
+                <button onClick={() => { setHasAdditional(null); handleNext(3); }} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
+                <button onClick={() => handleNext(5)} className="w-2/3 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Continue</button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 5: PAYDAY */}
+        {step === 5 && (
+           <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
+             <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-800">When is Payday?</h2>
+              <p className="text-slate-500">We use this to track your monthly cycle.</p>
+            </div>
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div className="grid grid-cols-7 gap-2">
+                {Array.from({length: 31}, (_, i) => i + 1).map(day => (
+                    <button 
+                        key={day} onClick={() => setPayDay(String(day))}
+                        className={`aspect-square rounded-lg font-bold flex items-center justify-center transition active:scale-95 ${payDay === String(day) ? 'bg-slate-900 text-white shadow-md scale-110' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-100'}`}
+                    >
+                        {day}
+                    </button>
+                ))}
+                </div>
+            </div>
+            {payDay && (
+              <div className="text-center font-bold text-emerald-600 bg-emerald-50 p-3 rounded-xl border border-emerald-100 animate-in zoom-in-95">
+                Payday is on the {payDay}{['1','21','31'].includes(payDay)?'st':['2','22'].includes(payDay)?'nd':['3','23'].includes(payDay)?'rd':'th'}
+              </div>
+            )}
+            <div className="flex gap-3 pt-4">
+                <button onClick={() => handleNext(4)} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
+                <button disabled={!payDay} onClick={() => handleNext(6)} className="w-2/3 bg-slate-900 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Next</button>
+            </div>
+           </div>
+        )}
+
+        {/* STEP 6: CREDIT CARDS */}
+        {step === 6 && (
+          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-800">Credit Cards</h2>
+              <p className="text-slate-500">Do you have any credit cards you pay off monthly?</p>
+            </div>
+
+            {hasCreditCards === null ? (
+                <div className="grid grid-cols-2 gap-4">
+                    <button onClick={() => setHasCreditCards('yes')} className="bg-white border-2 border-slate-200 hover:border-indigo-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">Yes</button>
+                    <button onClick={() => { setHasCreditCards('no'); handleNext(7); }} className="bg-white border-2 border-slate-200 hover:border-emerald-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">No</button>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {creditCards.map(c => (
+                        <div key={c.name} className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-xl shadow-sm animate-in zoom-in-95">
+                            <div className="flex items-center gap-3">
+                                {c.logo && <img src={c.logo} className="w-8 h-8 rounded-full object-contain bg-white border border-slate-100 p-0.5" />}
+                                <span className="font-bold text-slate-700">{c.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {checkConnection(c.name) ? (
+                                    <span className="text-emerald-600 font-bold text-xs flex items-center gap-1 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-lg"><CheckCircle2 className="w-4 h-4"/> Connected</span>
+                                ) : (
+                                    <button onClick={() => handleConnect(getProviderId(c.name), 6)} className="text-xs font-bold bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition shadow-sm">Connect</button>
+                                )}
+                                <button onClick={() => toggleCard(c)} className="text-slate-300 hover:text-rose-500 p-1"><X className="w-4 h-4"/></button>
+                            </div>
+                        </div>
+                    ))}
+                    <CreditCardSelector selectedCards={creditCards} onToggle={toggleCard} />
+                </div>
+            )}
+
+            <div className="flex gap-3 pt-4">
+                <button onClick={() => { setHasCreditCards(null); handleNext(5); }} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
+                <button onClick={() => handleNext(7)} className="w-2/3 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Continue</button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 7: MORTGAGE */}
+        {step === 7 && (
+          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-800">Mortgages</h2>
+              <p className="text-slate-500">Do you have a mortgage?</p>
+            </div>
+
+            {hasMortgages === null ? (
+                <div className="grid grid-cols-2 gap-4">
+                    <button onClick={() => setHasMortgages('yes')} className="bg-white border-2 border-slate-200 hover:border-indigo-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">Yes</button>
+                    <button onClick={() => { setHasMortgages('no'); handleNext(8); }} className="bg-white border-2 border-slate-200 hover:border-emerald-400 py-8 rounded-2xl font-bold text-lg text-slate-700 transition shadow-sm active:scale-95">No</button>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {mortgages.map(m => (
+                        <div key={m.name} className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-xl shadow-sm animate-in zoom-in-95">
+                            <div className="flex items-center gap-3">
+                                {m.logo && <img src={m.logo} className="w-8 h-8 rounded-full object-contain bg-white border border-slate-100 p-0.5" />}
+                                <span className="font-bold text-slate-700 text-sm">{m.name}</span>
+                            </div>
+                            <div className="relative w-28">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">£</span>
+                                <input 
+                                    type="number" placeholder="Amount" value={m.amount} onChange={(e) => updateMortgageAmount(m.name, e.target.value)}
+                                    className="w-full pl-6 pr-2 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-200"
+                                />
+                            </div>
+                        </div>
+                    ))}
+                    <MortgageSelector selectedLenders={mortgages} onToggle={toggleMortgage} />
+                </div>
+            )}
+
+            <div className="flex gap-3 pt-4">
+                <button onClick={() => { setHasMortgages(null); handleNext(6); }} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
+                <button onClick={() => handleNext(8)} className="w-2/3 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Continue</button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 8: SPENDING POTS */}
+        {step === 8 && (
+          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-800">Spending Pots</h2>
+              
+              {/* BEAUTIFUL EXPLANATION CARD */}
+              <div className="mt-4 bg-indigo-50 border border-indigo-100 p-5 rounded-2xl text-left shadow-sm">
+                  <h3 className="font-bold text-indigo-900 flex items-center gap-2 mb-2">
+                     <Target className="w-5 h-5 text-indigo-600" /> The Secret: Disposable Income
+                  </h3>
+                  <p className="text-indigo-800 text-sm leading-relaxed">
+                     Once your Salary comes in and your Fixed Bills go out, you are left with your <strong>Disposable Income</strong>. 
+                     <br/><br/>
+                     Split this remaining money into percentage "Pots" (e.g. Holidays, Savings) so you know exactly where every penny goes. Any unassigned percentage simply stays in your main account!
+                  </p>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3 max-h-60 overflow-y-auto">
               {pots.map(p => (
-                <div key={p.id} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm">
-                  <span className="font-bold text-slate-700">{p.name}</span>
+                <div key={p.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <span className="font-bold text-slate-700 flex items-center gap-2">
+                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color ? p.color.split(' ')[0] : p.hex }}></span>
+                     {p.name}
+                  </span>
                   <div className="flex items-center gap-3">
-                    <span className="bg-slate-100 px-2 py-1 rounded text-sm font-bold">{p.percentage}%</span>
-                    <button onClick={() => setPots(pots.filter(x => x.id !== p.id))}><X className="w-4 h-4 text-slate-300 hover:text-red-500" /></button>
+                    <span className="bg-white border border-slate-200 px-2 py-1 rounded text-sm font-bold shadow-sm">{p.percentage}%</span>
+                    <button onClick={() => setPots(pots.filter(x => x.id !== p.id))}><X className="w-4 h-4 text-slate-300 hover:text-red-500 transition" /></button>
                   </div>
                 </div>
               ))}
             </div>
 
             <div className="flex gap-2">
-               <input 
-                 className="flex-1 p-3 rounded-xl border border-slate-200 bg-white" 
-                 placeholder="New Pot (e.g. Holiday)" 
-                 value={newPotName} 
-                 onChange={e => setNewPotName(e.target.value)} 
-               />
-               <input 
-                 type="number" 
-                 className="w-20 p-3 rounded-xl border border-slate-200 bg-white" 
-                 placeholder="%" 
-                 value={newPotPercent} 
-                 onChange={e => setNewPotPercent(e.target.value)} 
-               />
-               <button onClick={addPot} className="bg-slate-900 text-white p-3 rounded-xl"><Plus className="w-5 h-5" /></button>
+               <input className="flex-1 p-3 rounded-xl border border-slate-200 bg-white shadow-sm outline-none focus:ring-2 focus:ring-slate-200" placeholder="e.g. Holiday Fund" value={newPotName} onChange={e => setNewPotName(e.target.value)} />
+               <input type="number" className="w-20 p-3 rounded-xl border border-slate-200 bg-white shadow-sm outline-none focus:ring-2 focus:ring-slate-200 text-center" placeholder="%" value={newPotPercent} onChange={e => setNewPotPercent(e.target.value)} />
+               <button onClick={addPot} className="bg-slate-900 text-white p-3 rounded-xl shadow-md active:scale-95 transition"><Plus className="w-5 h-5" /></button>
             </div>
 
-            {/* MANDATORY CURRENT ACCOUNT CARD */}
-            <div className={`p-4 rounded-xl flex justify-between items-center border ${totalPercent > 100 ? 'bg-red-50 border-red-200' : 'bg-indigo-50 border-indigo-100'}`}>
+            <div className={`p-4 rounded-xl flex justify-between items-center border shadow-sm transition-colors ${totalPercent > 100 ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
                 <div className="flex items-center gap-3">
                    {bank?.logo ? (
-                     <img src={bank.logo} className="w-8 h-8 rounded-full shadow-sm bg-white object-contain"/> 
+                     <img src={bank.logo} className="w-8 h-8 rounded-full shadow-sm bg-white object-contain p-0.5 border border-slate-200"/> 
                    ) : (
-                     <div className="bg-white p-1.5 rounded-full"><Wallet className="w-5 h-5 text-indigo-500"/></div>
+                     <div className="bg-white p-1.5 rounded-full shadow-sm border border-slate-200"><Wallet className="w-5 h-5 text-slate-500"/></div>
                    )}
                    <div>
-                     <p className={`text-xs font-bold uppercase ${totalPercent > 100 ? 'text-red-500' : 'text-indigo-400'}`}>Remains in {bank?.name}</p>
-                     <p className={`font-black text-xl ${totalPercent > 100 ? 'text-red-700' : 'text-indigo-900'}`}>{Math.max(0, 100 - totalPercent)}%</p>
+                     <p className={`text-[10px] font-bold uppercase tracking-wider ${totalPercent > 100 ? 'text-red-500' : 'text-slate-500'}`}>Remains in {bank?.name || 'Account'}</p>
+                     <p className={`font-black text-xl ${totalPercent > 100 ? 'text-red-700' : 'text-slate-800'}`}>{Math.max(0, 100 - totalPercent)}%</p>
                    </div>
                 </div>
                 {totalPercent > 100 && <AlertCircle className="w-6 h-6 text-red-500" />}
             </div>
 
-            {/* FIXED: Was setStep(5), changed to setStep(6) */}
-            <button 
-              disabled={totalPercent > 100}
-              onClick={() => setStep(7)} 
-              className="w-full bg-slate-900 disabled:bg-slate-300 disabled:text-slate-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition"
-            >
-              {totalPercent > 100 ? 'Total cannot exceed 100%' : 'Continue'}
-            </button>
+            <div className="flex gap-3 pt-4">
+                <button onClick={() => handleNext(7)} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
+                <button disabled={totalPercent > 100} onClick={() => handleNext(9)} className="w-2/3 bg-slate-900 disabled:bg-slate-300 disabled:text-slate-500 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">
+                  {totalPercent > 100 ? 'Exceeds 100%' : 'Next Step'}
+                </button>
+            </div>
           </div>
         )}
 
-        {/* STEP 7: FIXED EXPENSES */}
-        {step === 7 && (
-          <div className="space-y-6 animate-in slide-in-from-right-8">
+        {/* STEP 9: RECURRING BILLS (WITH LOGO LOCK) */}
+        {step === 9 && (
+          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Monthly Commitments</h2>
-              <p className="text-slate-500">Add bills that stay the same every month (Rent, Netflix, Gym).</p>
+              <h2 className="text-2xl font-bold text-slate-800">Recurring Bills</h2>
+              <p className="text-slate-500">Add bills that stay the same every month (Netflix, Gym, Spotify). You can easily change these later!</p>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 max-h-60 overflow-y-auto">
-              {bills.length === 0 && <p className="text-center text-sm text-slate-400 py-4">No bills added yet.</p>}
+              {bills.length === 0 && <p className="text-center text-sm text-slate-400 py-4 font-medium">No bills added yet.</p>}
               {bills.map(b => (
-                <div key={b.id} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm">
-                   <div className="flex items-center gap-2">
-                     {b.logo && <img src={b.logo} className="w-6 h-6 object-contain" alt="" />}
+                <div key={b.id} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-slate-100 animate-in zoom-in-95">
+                   <div className="flex items-center gap-3">
+                     {b.logo ? <img src={b.logo} className="w-8 h-8 object-contain rounded-full border border-slate-100 bg-white p-0.5" alt="" /> : <div className="w-8 h-8 bg-slate-100 border border-slate-200 rounded-full flex items-center justify-center"><Zap className="w-4 h-4 text-slate-400" /></div>}
                      <span className="font-bold text-slate-700">{b.name}</span>
                    </div>
                    <div className="flex items-center gap-3">
-                     <span className="text-sm font-bold text-slate-500">{b.amount > 0 ? b.amount : 'Var'}</span>
-                     <button onClick={() => setBills(bills.filter(x => x.id !== b.id))}><X className="w-4 h-4 text-slate-300 hover:text-red-500" /></button>
+                     <span className="text-sm font-bold text-slate-500">{b.amount > 0 ? formatCurrency(b.amount, currency) : 'Var'}</span>
+                     <button onClick={() => setBills(bills.filter(x => x.id !== b.id))} className="text-slate-300 hover:text-rose-500 p-1"><X className="w-4 h-4" /></button>
                    </div>
                 </div>
               ))}
             </div>
 
-            <div className="flex gap-2 items-start">
+            {/* WITH LOGO LOCK ENABLED */}
+            <div className="flex gap-2 items-start relative overflow-visible z-50">
                <div className="flex-1">
                  <BrandSearchInput
                     placeholder="Search (e.g. Spotify)"
                     value={newBillName}
                     onChange={setNewBillName}
-                    onSelectBrand={(name, logo) => {
-                       setNewBillName(name);
-                       setNewBillLogo(logo);
-                    }}
-                    className="w-full p-3 rounded-xl border border-slate-200 bg-white"
+                    onSelectBrand={(name, logo) => { setNewBillName(name); setNewBillLogo(logo); }}
+                    selectedLogo={newBillLogo}
+                    onClearLogo={() => setNewBillLogo(null)}
+                    className="w-full p-3.5 rounded-xl border border-slate-200 bg-white text-sm font-bold outline-none focus:ring-2 focus:ring-slate-200 shadow-sm"
                  />
                </div>
-               <input 
-                 type="number"
-                 className="w-20 p-3 rounded-xl border border-slate-200 bg-white" 
-                 placeholder="0.00" 
-                 value={newBillAmount} 
-                 onChange={e => setNewBillAmount(e.target.value)} 
-               />
-               <button onClick={addBill} className="bg-slate-900 text-white p-3 rounded-xl"><Plus className="w-5 h-5" /></button>
+               <div className="relative w-24">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">£</span>
+                  <input type="number" className="w-full pl-6 pr-2 py-3.5 rounded-xl border border-slate-200 bg-white text-sm font-bold outline-none focus:ring-2 focus:ring-slate-200 shadow-sm" placeholder="0.00" value={newBillAmount} onChange={e => setNewBillAmount(e.target.value)} />
+               </div>
+               <button onClick={addBill} className="bg-slate-900 text-white p-3.5 rounded-xl shadow-md active:scale-95 transition"><Plus className="w-5 h-5" /></button>
             </div>
 
-            {/* FIXED: Was setStep(6), changed to setStep(7) */}
-            <button onClick={() => setStep(8)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition mt-4">
-              Next
-            </button>
+            <div className="flex gap-3 pt-4">
+                <button onClick={() => handleNext(8)} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
+                <button onClick={() => handleNext(10)} className="w-2/3 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition active:scale-95">Continue</button>
+            </div>
           </div>
         )}
 
-        {/* STEP 8: DAILY PACE GOALS */}
-        {step === 8 && (
-          <div className="space-y-6 animate-in slide-in-from-right-8">
+        {/* STEP 10: PACE TARGETS */}
+        {step === 10 && (
+          <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-slate-800">Your Speed Limit</h2>
-              <p className="text-slate-500 text-sm">
-                We calculate your "Daily Pace" by dividing your <strong>Safe-to-Spend</strong> by the days left until payday.
+              <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+                We calculate your "Daily Pace" by dividing your <strong>Safe-to-Spend</strong> money by the days left until payday. <br/><br/>Set your warning targets below so the Dashboard can alert you if you are spending too fast!
               </p>
             </div>
 
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-6">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider px-2">
                    <span>Panic Zone</span>
                    <span>Healthy Zone</span>
                 </div>
-                <div className="h-4 bg-slate-200 rounded-full overflow-hidden flex shadow-inner">
+                <div className="h-4 bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
                    <div className="h-full bg-rose-400" style={{ width: '30%' }}></div>
-                   <div className="h-full bg-slate-300" style={{ width: '30%' }}></div>
+                   <div className="h-full bg-slate-200" style={{ width: '30%' }}></div>
                    <div className="h-full bg-emerald-400" style={{ width: '40%' }}></div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-2">Warn me below:</label>
+                      <label className="flex items-center gap-2 text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-2"><TrendingDown className="w-3 h-3" /> Warn me below:</label>
                       <div className="relative">
                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
-                         <input 
-                           type="number" 
-                           value={paceTargets.low}
-                           onChange={(e) => setPaceTargets({...paceTargets, low: parseFloat(e.target.value)})}
-                           className="w-full pl-8 p-3 bg-white border border-rose-200 rounded-xl font-bold text-rose-600 outline-none focus:ring-2 focus:ring-rose-100"
-                         />
+                         <input type="number" value={paceTargets.low} onChange={(e) => setPaceTargets({...paceTargets, low: parseFloat(e.target.value)})} className="w-full pl-8 p-3 bg-rose-50 border border-rose-200 rounded-xl font-bold text-rose-600 outline-none focus:ring-2 focus:ring-rose-200 transition" />
                       </div>
                    </div>
                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-2">Target above:</label>
+                      <label className="flex items-center gap-2 text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2"><TrendingUp className="w-3 h-3" /> Target above:</label>
                       <div className="relative">
                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}</span>
-                         <input 
-                           type="number" 
-                           value={paceTargets.high}
-                           onChange={(e) => setPaceTargets({...paceTargets, high: parseFloat(e.target.value)})}
-                           className="w-full pl-8 p-3 bg-white border border-emerald-200 rounded-xl font-bold text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-100"
-                         />
+                         <input type="number" value={paceTargets.high} onChange={(e) => setPaceTargets({...paceTargets, high: parseFloat(e.target.value)})} className="w-full pl-8 p-3 bg-emerald-50 border border-emerald-200 rounded-xl font-bold text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-200 transition" />
                       </div>
                    </div>
                 </div>
             </div>
 
-            <button onClick={handleFinish} className="w-full bg-emerald-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-600 transition mt-4">
-              Finish Setup
-            </button>
+            <div className="flex gap-3 pt-4">
+                <button onClick={() => handleNext(9)} className="w-1/3 py-4 rounded-xl font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 transition">Back</button>
+                <button onClick={handleFinish} className="w-2/3 bg-emerald-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-600 transition active:scale-95 flex items-center justify-center gap-2">
+                  <CheckCircle2 className="w-5 h-5" /> Finish Setup
+                </button>
+            </div>
           </div>
         )}
 
