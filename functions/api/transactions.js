@@ -12,13 +12,11 @@ const categoriseTransaction = (merchant, description, tlCategory, amount, accoun
         isIncome = amount > 0; 
     }
 
-    // 1. CATCH EXPLICIT TRANSFERS & CREDIT CARD PAYMENTS
     if (tlCategory) {
         const cat = tlCategory.toUpperCase();
         if (cat.includes('TRANSFER') || cat.includes('CREDIT_CARD_PAYMENT')) return 'Transfer';
     }
 
-    // 2. DYNAMIC NAME MATCHING (Identifies Internal Transfers to self)
     if (accountHolderNames && accountHolderNames.length > 0) {
         const upperRaw = rawText.toUpperCase();
         for (const name of accountHolderNames) {
@@ -40,7 +38,6 @@ const categoriseTransaction = (merchant, description, tlCategory, amount, accoun
     if (text.match(/transfer|saving|pot|vault|credit card|amex payment|barclaycard|monzo|starling|revolut/)) return 'Transfer';
     if (isIncome) return 'Income';
 
-    // 4. Then standard categories
     if (text.match(/tesco|sainsbury|asda|morrison|aldi|lidl|waitrose|coop|iceland|costco|ocado|farmfoods/)) return 'Groceries';
     if (text.match(/mcdonald|kfc|burger king|burgerking|nando|costa|starbucks|greggs|deliveroo|ubereats|uber eats|justeat|just eat|domino|pret|pizza hut|subway|wetherspoon|kebab/)) return 'Eating Out';
     if (text.match(/uber|trainline|tfl|rail|petrol|shell|bp|esso|texaco|parking|bus|coach|ryanair|easyjet|ba |britishairways|national express|applegreen/)) return 'Transport';
@@ -103,7 +100,7 @@ export async function onRequestPost(context) {
             }
         }
     } catch (e) {
-        console.error("Failed to fetch info for transfer matching");
+        console.error("Failed to fetch info");
     }
 
     let fromStr = from;
@@ -118,38 +115,39 @@ export async function onRequestPost(context) {
 
     const fetchPromises = accounts.map(async (acc) => {
         const endpointType = acc.endpoint_type || 'accounts';
+        const headers = { 'Authorization': `Bearer ${accessToken}` };
         
-        // 1. Fetch Settled Transactions
-        const txPromise = fetch(`https://api.truelayer.com/data/v1/${endpointType}/${acc.account_id}/transactions?from=${fromStr}&to=${toStr}`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        
-        // 2. Fetch Pending Transactions
-        const pendingTxPromise = fetch(`https://api.truelayer.com/data/v1/${endpointType}/${acc.account_id}/transactions/pending`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
+        // BULLETPROOF FETCH WRAPPER: Never crashes the Promise.all
+        const fetchSafely = async (url) => {
+            try {
+                const res = await fetch(url, { headers });
+                if (!res.ok) return { error: true, status: res.status };
+                const text = await res.text();
+                return text ? JSON.parse(text) : { results: [] };
+            } catch (e) {
+                return { error: true, message: e.message };
+            }
+        };
 
-        // 3. Fetch Balance
-        const balancePromise = fetch(`https://api.truelayer.com/data/v1/${endpointType}/${acc.account_id}/balance`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
+        const txUrl = `https://api.truelayer.com/data/v1/${endpointType}/${acc.account_id}/transactions?from=${fromStr}&to=${toStr}`;
+        const pendingUrl = `https://api.truelayer.com/data/v1/${endpointType}/${acc.account_id}/transactions/pending`;
+        const balUrl = `https://api.truelayer.com/data/v1/${endpointType}/${acc.account_id}/balance`;
 
-        // Wait for all three simultaneously
-        const [txResponse, pendingTxResponse, balanceResponse] = await Promise.all([txPromise, pendingTxPromise, balancePromise]);
-        
-        const txData = await txResponse.json();
-        const pendingTxData = await pendingTxResponse.json();
-        const balanceData = await balanceResponse.json();
+        const [txData, pendingTxData, balanceData] = await Promise.all([
+            fetchSafely(txUrl),
+            fetchSafely(pendingUrl),
+            fetchSafely(balUrl)
+        ]);
 
         let currentBalance = 0;
-        if (!balanceData.error && balanceData.results && balanceData.results.length > 0) {
-            currentBalance = balanceData.results[0].current || 0;
+        if (balanceData && !balanceData.error && balanceData.results && balanceData.results.length > 0) {
+            const bal = balanceData.results[0].current;
+            currentBalance = (bal !== undefined && bal !== null) ? bal : (balanceData.results[0].available || 0);
         }
 
-        const settledTx = txData.error ? [] : (txData.results || []);
-        const pendingTx = pendingTxData.error ? [] : (pendingTxData.results || []);
+        const settledTx = Array.isArray(txData.results) ? txData.results : [];
+        const pendingTx = Array.isArray(pendingTxData.results) ? pendingTxData.results : [];
 
-        // Combine them and tag pending ones
         const allRawTx = [
             ...pendingTx.map(tx => ({ ...tx, is_pending: true })),
             ...settledTx.map(tx => ({ ...tx, is_pending: false }))
@@ -157,13 +155,13 @@ export async function onRequestPost(context) {
 
         const cleanedTx = allRawTx.map(tx => ({
             id: tx.transaction_id,
-            date: tx.timestamp.split('T')[0],
+            date: (tx.timestamp || '').split('T')[0] || new Date().toISOString().split('T')[0],
             description: tx.description,
             amount: tx.amount,
             category: categoriseTransaction(tx.merchant_name || '', tx.description || '', tx.transaction_category, tx.amount, acc.type, accountHolderNames),
             merchant: tx.merchant_name || 'Unknown',
             account_id: acc.account_id,
-            is_pending: tx.is_pending // Front-end can use this!
+            is_pending: tx.is_pending 
         }));
 
         return {
