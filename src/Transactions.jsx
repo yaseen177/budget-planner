@@ -2,32 +2,44 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2, Utensils, Tv, ShoppingCart, TrendingUp, Activity, PieChart, List, ArrowRightLeft, Wallet, Link as LinkIcon } from 'lucide-react';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 
-const cleanMerchantsWithAI = async (messyNamesArray) => {
+const cleanMerchantsWithAI = async (messyNamesArray, userLocation = "") => {
   const systemPrompt = `
-    You are a UK banking data extraction tool. 
-    I will give you an array of messy, truncated bank transaction strings.
-    Return a raw JSON object mapping the messy string to the official, clean brand name.
-    If it is a person's name or unidentifiable, return the original string.
+    You are an elite UK financial data sanitisation AI. Your exact job is to clean messy, truncated BACS/Faster Payments bank transaction strings into official, highly recognisable consumer brand names.
+
+    THE USER CONTEXT:
+    The user is based in Nuneaton, Warwickshire, United Kingdom. Use this geographical context to decode local acronyms (e.g., "Nbbc Ctax" = "Nuneaton and Bedworth Borough Council", "Uhcw" = "University Hospitals Coventry and Warwickshire").
+
+    CRITICAL RULES:
+    1. STRIP PAYMENT PROCESSORS: Remove all prefixes/suffixes like "CRV*" (Curve), "PP*" or "PayPal *", "SumUp *", "ZTL", "iZettle *", "IZ *", "Stripe", "Gpay", or "Apple Pay".
+    2. STRIP LOCATIONS BUT KEEP SUB-BRANDS: Remove city names, street names, and store numbers (e.g., "TESCO STORES 3241 LONDON" -> "Tesco", "Boots nottingham" -> "Boots"). HOWEVER, you MUST preserve distinct operational sub-brands (e.g., keep "Boots Opticians", "Tesco Express", "Sainsbury's Local", "Tesco Petrol").
+    3. DECODE UK GOVERNMENT & UTILITIES: Expand heavily abbreviated council and government payments. Convert "Ctax" or "C.Tax" to "Council Tax" appended to the local council name.
+    4. STRIP LEGAL & BANKING JUNK: Remove "Ltd", "Limited", "Plc", "LLP", "Direct Debit", "DD", "BACS", "VIS", "POS", "STDO", and random 16-digit reference numbers.
+    5. CLEAN UK TRANSPORT: "TFL GOV UK" or "TFL ROAD CHARGE" -> "Transport for London". "LUL" -> "London Underground". 
+    6. UNIDENTIFIABLE: If it is clearly a private individual's name (e.g., "Mr J Smith") or completely unidentifiable, return the original string neatly formatted in Title Case without guessing.
+    7. STRICT OUTPUT: You MUST return ONLY a valid JSON object mapping the messy strings to the clean strings. No markdown formatting, no conversational text.
     
-    Example Input: ["AMZN PRIME", "Association of Opt", "TESCO STORES 3241"]
+    Example Input: ["CRV*Boots", "Nbbc Ctax", "TESCO STORES 3241", "Boots Opticians", "Sainsburys Supermarkets Ltd"]
     Example Output: {
-       "AMZN PRIME": "Amazon",
-       "Association of Opt": "Association of Optometrists",
-       "TESCO STORES 3241": "Tesco"
+       "CRV*Boots": "Boots",
+       "Nbbc Ctax": "Nuneaton and Bedworth Borough Council",
+       "TESCO STORES 3241": "Tesco",
+       "Boots Opticians": "Boots Opticians",
+       "Sainsburys Supermarkets Ltd": "Sainsbury's"
     }
   `;
 
   try {
-      const response = await fetch('/api/clean-merchants', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: systemPrompt, data: messyNamesArray })
-      });
-      return await response.json(); 
-  } catch (error) {
-      console.error("AI Cleaning failed", error);
-      return null;
-  }
+    const response = await fetch('/api/clean-merchants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Pass the userLocation into the stringified body!
+        body: JSON.stringify({ prompt: systemPrompt, data: messyNamesArray, userLocation })
+    });
+    return await response.json(); 
+} catch (error) {
+    console.error("AI Cleaning failed", error);
+    return null;
+}
 };
 
 const TRUELAYER_PROVIDERS = {
@@ -445,21 +457,24 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 }, [user, appId, db]);
 
 // 2. Trigger AI only for truly unknown names, and save the result to Firebase!
+// Inside your Transactions component...
+
 useEffect(() => {
-  // Prevent the AI from running if Firebase hasn't finished loading our cache yet
   if (!isDictionaryLoaded || unknownNames.length === 0) return;
 
   const runAiCleaner = async () => {
-      const newCleanedNames = await cleanMerchantsWithAI(unknownNames);
+      // IDEALLY: You pull this from their Firebase user profile document
+      // e.g., const city = userProfile?.city || "London";
+      const userCity = "Nuneaton"; // Replace this hardcoded string with their actual saved city!
+
+      // Pass the city to the AI
+      const newCleanedNames = await cleanMerchantsWithAI(unknownNames, userCity);
       
       if (newCleanedNames) {
-          // Update the UI instantly
           setMerchantDictionary(prev => ({ ...prev, ...newCleanedNames }));
           
-          // Save it permanently to Firebase in the background
           if (user) {
               const dictRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'merchantDictionary');
-              // We use { merge: true } so we don't overwrite existing cached names!
               await setDoc(dictRef, newCleanedNames, { merge: true }).catch(e => 
                   console.error("Failed to save AI dictionary to Firebase:", e)
               );
@@ -467,7 +482,6 @@ useEffect(() => {
       }
   };
 
-  // Set a small delay so it doesn't interrupt the initial page load
   const timeoutId = setTimeout(() => runAiCleaner(), 2000);
   return () => clearTimeout(timeoutId);
 }, [unknownNames, isDictionaryLoaded, user, appId, db]);
