@@ -5615,7 +5615,7 @@ export default function App() {
     }
   };
 
-  // --- NEW: AUTO-FIND SALARY MAGIC ---
+  // --- NEW: AUTO-FIND SALARY MAGIC (MONTH AWARE) ---
   const handleFindSalary = async () => {
     // 1. Validate setup
     const salaryBank = effectiveSettings?.bankDetails?.name;
@@ -5636,14 +5636,30 @@ export default function App() {
         return;
     }
 
+    // 4. Identify the SPECIFIC month the user is viewing
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const monthName = currentDate.toLocaleString('default', { month: 'long' }); // e.g., "March"
+    const today = new Date();
+
+    // Guard: If they are looking at a future month, they definitely haven't been paid in it yet!
+    if (year > today.getFullYear() || (year === today.getFullYear() && month > today.getMonth())) {
+        showToast(`Hold tight! You haven't been paid for ${monthName} yet.`);
+        return;
+    }
+
     setIsFindingSalary(true);
     triggerHaptic();
 
     try {
-        // 4. Look back exactly 35 days
-        const toDate = new Date();
-        const fromDate = new Date();
-        fromDate.setDate(toDate.getDate() - 35);
+        // Set search boundaries to the exactly viewed month
+        const fromDate = new Date(Date.UTC(year, month, 1));
+        let toDate = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59));
+        
+        // Cap "to" date to today to prevent API errors for future dates in the current month
+        if (toDate > today) {
+            toDate = today;
+        }
         
         const response = await fetch('/api/transactions', {
             method: 'POST',
@@ -5674,15 +5690,19 @@ export default function App() {
              }, { merge: true });
         }
 
-        // 6. Hunt for the biggest standard income (Ignoring internal pots/transfers)
-        const recentIncomes = (data.transactions || []).filter(tx => 
-            tx.amount > 0 && 
-            tx.category !== 'Transfer' &&
-            !tx.is_pending // Only count settled paychecks
-        );
+        // 6. Hunt for the biggest standard income STRICTLY inside this viewed month
+        const recentIncomes = (data.transactions || []).filter(tx => {
+            const txDate = new Date(tx.date);
+            return tx.amount > 0 && 
+                   tx.category !== 'Transfer' &&
+                   !tx.is_pending &&
+                   txDate.getMonth() === month && 
+                   txDate.getFullYear() === year;
+        });
 
+        // Did we find a salary in this specific month?
         if (recentIncomes.length === 0) {
-            showToast("No recent income found in this account.");
+            showToast(`Hold tight! You haven't been paid for ${monthName} yet.`);
             return;
         }
 
