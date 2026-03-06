@@ -1,7 +1,7 @@
 // --- SMART CATEGORISATION ENGINE ---
 const categoriseTransaction = (merchant, description, tlCategory, amount, accountType, accountHolderNames) => {
-    let rawText = `${merchant} ${description}`.toLowerCase();
-    let text = rawText.replace(/www\.|co\.uk|\.com|\.org/g, '').replace(/[^a-z0-9\s]/g, '');
+    let rawText = `${merchant || ''} ${description || ''}`.toLowerCase();
+    let text = rawText.replace(/www\.|co\.uk|\.com|\.org/g, '').replace(/[^a-z0-9\s]/g, ' ');
 
     const isCreditCard = ['CREDIT', 'CREDIT_CARD', 'CARD', 'CHARGE_CARD'].includes((accountType || '').toUpperCase());
 
@@ -12,12 +12,24 @@ const categoriseTransaction = (merchant, description, tlCategory, amount, accoun
         isIncome = amount > 0; 
     }
 
-    if (tlCategory) {
+    // 1. DIRECT DEBIT GUARD: Stop Direct Debits from being hijacked by the Transfer logic
+    const isDirectDebit = rawText.includes('direct debit') || 
+                          /\bdd\b/.test(text) || 
+                          rawText.includes('standing order') || 
+                          (tlCategory && tlCategory.toUpperCase().includes('DIRECT_DEBIT'));
+
+    let isTransfer = false;
+
+    // 2. CHECK TRUELAYER CATEGORY (Only if it's not a DD)
+    if (tlCategory && !isDirectDebit) {
         const cat = tlCategory.toUpperCase();
-        if (cat.includes('TRANSFER') || cat.includes('CREDIT_CARD_PAYMENT')) return 'Transfer';
+        if (cat.includes('TRANSFER') || cat.includes('CREDIT_CARD_PAYMENT')) {
+            isTransfer = true;
+        }
     }
 
-    if (accountHolderNames && accountHolderNames.length > 0) {
+    // 3. CHECK ACCOUNT HOLDER NAMES (The Ultimate Internal Transfer Check)
+    if (accountHolderNames && accountHolderNames.length > 0 && !isDirectDebit) {
         const upperRaw = rawText.toUpperCase();
         for (const name of accountHolderNames) {
             const parts = name.toUpperCase().split(' ').filter(p => p.trim() !== '');
@@ -27,22 +39,42 @@ const categoriseTransaction = (merchant, description, tlCategory, amount, accoun
                 const initial = first.charAt(0);
 
                 if (upperRaw.includes(last)) {
-                    if (upperRaw.includes(first)) return 'Transfer';
+                    if (upperRaw.includes(first)) isTransfer = true;
                     const initialRegex = new RegExp(`(^|[^A-Z])${initial}([^A-Z]|$)`);
-                    if (initialRegex.test(upperRaw)) return 'Transfer';
+                    if (initialRegex.test(upperRaw)) isTransfer = true;
                 }
             }
         }
     }
 
-    if (text.match(/transfer|saving|pot|vault|credit card|amex payment|barclaycard|monzo|starling|revolut/)) return 'Transfer';
+    // 4. SMART KEYWORD MATCHING (Looking for exact banking pairings, not just loose words)
+    if (!isDirectDebit) {
+        // Catch typical internal pot/vault movements
+        if (rawText.match(/\b(pot|vault|saving|savings)\b/)) isTransfer = true;
+        
+        // Catch explicit credit card payments (Requires the word payment/settlement next to the bank)
+        if (rawText.match(/\b(credit card|amex|barclaycard|mbna|capital one)\s+(payment|pay|settlement|tfr)\b/)) isTransfer = true;
+        
+        // Catch standard UK banking terminology for transfers between own accounts
+        if (rawText.match(/\b(internal transfer|funds transfer|to a\/c|from a\/c|tfr|bank transfer|faster payment|f p)\b/)) isTransfer = true;
+        
+        // Catch moving money to other modern banking apps
+        if (rawText.match(/\b(monzo|starling|revolut|chase)\s+(transfer|top up|topup)\b/)) isTransfer = true;
+    }
+
+    // Assign early exits
+    if (isTransfer) return 'Transfer';
     if (isIncome) return 'Income';
 
+    // ... Standard Retail Categorisation ...
     if (text.match(/tesco|sainsbury|asda|morrison|aldi|lidl|waitrose|coop|iceland|costco|ocado|farmfoods/)) return 'Groceries';
     if (text.match(/mcdonald|kfc|burger king|burgerking|nando|costa|starbucks|greggs|deliveroo|ubereats|uber eats|justeat|just eat|domino|pret|pizza hut|subway|wetherspoon|kebab/)) return 'Eating Out';
     if (text.match(/uber|trainline|tfl|rail|petrol|shell|bp|esso|texaco|parking|bus|coach|ryanair|easyjet|ba |britishairways|national express|applegreen/)) return 'Transport';
     if (text.match(/netflix|spotify|amazon prime|disney|cinema|playstation|xbox|steam|apple|itunes|nintendo/)) return 'Entertainment';
-    if (text.match(/vodafone|o2|ee|three|virgin|sky|bt|water|energy|gas|electric|council tax|tv licence|octopus|british gas|eon|ovo|bulb/)) return 'Bills';
+    
+    // Fallback: If it was flagged as a Direct Debit, guarantee it goes into Bills!
+    if (isDirectDebit || text.match(/vodafone|o2|ee|three|virgin|sky|bt|water|energy|gas|electric|council tax|tv licence|octopus|british gas|eon|ovo|bulb/)) return 'Bills';
+    
     if (text.match(/amazon|amzn|ebay|argos|boots|superdrug|primark|zara|hm|asos|next|ikea|shein|temu|tiktok/)) return 'Shopping';
     if (text.match(/gym|puregym|david lloyd|fitness|pharmacy|nhs|bupa|specsavers/)) return 'Health';
 
