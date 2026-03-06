@@ -3488,7 +3488,7 @@ const calculateDaysUntilPayday = (payDayStr, salaryInputted) => {
       // Standard: It's past payday, next one is next month
       targetDate = new Date(today.getFullYear(), today.getMonth() + 1, payDay);
   }
-  // Else (Today < Payday, no salary input yet): Target is THIS month's payday (Upcoming)
+  // Else (Today < Payday, no salary input yet) Target is THIS month's payday (Upcoming)
 
   const diffTime = Math.abs(targetDate - today);
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
