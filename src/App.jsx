@@ -3515,17 +3515,6 @@ const OnboardingSlide = ({ isActive, children, center = false }) => (
   </div>
 );
 
-// --- FULLY REVAMPED 10-STEP CAROUSEL ONBOARDING WIZARD ---
-
-// Helper component to create the Parallax Slide effect
-const OnboardingSlide = ({ isActive, children, center = false }) => (
-  <div className={`w-full h-full shrink-0 overflow-y-auto px-4 sm:px-6 flex flex-col items-center ${center ? 'justify-center py-6' : 'justify-start pt-28 pb-48'} no-scrollbar`}>
-     <div className={`max-w-md w-full space-y-8 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] transform ${isActive ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-12 scale-[0.95] pointer-events-none'}`}>
-        {children}
-     </div>
-  </div>
-);
-
 const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft, onConnectBank, bankingData, showToast }) => {
   const [step, setStep] = useState(currentSettings?.onboardingStep || 0); 
   
