@@ -6653,9 +6653,8 @@ export default function App() {
                   </div>
                   
                   {/* NEW FLEX WRAPPER FOR INPUT + BUTTON */}
-                  <div className="relative flex items-center gap-3 w-full">
-                      {/* ADDED min-w-0 HERE */}
-                      <div className="relative flex-1 min-w-0">
+                  <div className="relative flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-3 w-full">
+                      <div className="relative flex-1 md:w-full min-w-0">
                         <span className="absolute left-0 top-1/2 -translate-y-1/2 text-3xl font-medium text-slate-300">
                             {effectiveSettings.currency === 'GBP' ? '£' : effectiveSettings.currency === 'USD' ? '$' : '€'}
                         </span>
@@ -6672,28 +6671,29 @@ export default function App() {
                                 if (!isSandbox && finalVal) logSystemEvent(`Salary Updated: ${finalVal}`, 'action');
                             }}
                             placeholder="0.00"
-                            // ADDED min-w-0, pr-4, truncate, and changed sm:text-5xl to lg:text-5xl
                             className="w-full min-w-0 bg-transparent border-none text-4xl lg:text-5xl font-bold text-slate-800 placeholder-slate-200 outline-none pl-8 pr-4 tracking-tight truncate"
                         />
                       </div>
                       
-                      {/* THE MAGIC BUTTON */}
+                      {/* THE RECTANGULAR MAGIC BUTTON */}
                       <button 
                         onClick={handleFindSalary}
                         disabled={isFindingSalary || isSandbox}
                         title="Auto-detect from bank"
-                        className="flex flex-col items-center justify-center w-16 h-14 bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 hover:border-indigo-200 rounded-xl transition-all active:scale-95 shadow-sm group shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center justify-center gap-2 px-4 py-3 md:py-2.5 bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 hover:border-indigo-200 rounded-xl transition-all active:scale-95 shadow-sm group shrink-0 disabled:opacity-50 disabled:cursor-not-allowed w-auto"
                       >
                         {isFindingSalary ? (
-                           <RefreshCw className="w-5 h-5 mb-0.5 animate-spin" />
+                           <RefreshCw className="w-4 h-4 animate-spin" />
                         ) : (
-                           <Search className="w-5 h-5 mb-0.5 group-hover:scale-110 transition-transform" />
+                           <Search className="w-4 h-4 group-hover:scale-110 transition-transform" />
                         )}
-                        <span className="text-[8px] font-bold uppercase tracking-widest">{isFindingSalary ? 'Syncing' : 'Auto-Find'}</span>
+                        <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest">
+                            {isFindingSalary ? 'Syncing...' : 'Auto-Find'}
+                        </span>
                       </button>
                   </div>
                   
-                  <p className="text-sm text-slate-400 font-medium pl-1">
+                  <p className="text-sm text-slate-400 font-medium pl-1 md:mt-1">
                     Tap to edit manually or Auto-Find
                   </p>
               </div>
