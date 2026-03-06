@@ -6653,9 +6653,9 @@ export default function App() {
                   </div>
                   
                   {/* NEW FLEX WRAPPER FOR INPUT + BUTTON */}
-                  <div className="relative flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-3 w-full">
+                  <div className="relative flex flex-row md:flex-col items-center md:items-start gap-2 sm:gap-4 md:gap-3 w-full">
                       <div className="relative flex-1 md:w-full min-w-0">
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 text-3xl font-medium text-slate-300">
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl sm:text-3xl font-medium text-slate-300">
                             {effectiveSettings.currency === 'GBP' ? '£' : effectiveSettings.currency === 'USD' ? '$' : '€'}
                         </span>
                         <input 
@@ -6671,7 +6671,7 @@ export default function App() {
                                 if (!isSandbox && finalVal) logSystemEvent(`Salary Updated: ${finalVal}`, 'action');
                             }}
                             placeholder="0.00"
-                            className="w-full min-w-0 bg-transparent border-none text-4xl lg:text-5xl font-bold text-slate-800 placeholder-slate-200 outline-none pl-8 pr-4 tracking-tight truncate"
+                            className="w-full min-w-0 bg-transparent border-none text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-800 placeholder-slate-200 outline-none pl-6 sm:pl-8 pr-2 sm:pr-4 tracking-tight truncate"
                         />
                       </div>
                       
@@ -6680,12 +6680,12 @@ export default function App() {
                         onClick={handleFindSalary}
                         disabled={isFindingSalary || isSandbox}
                         title="Auto-detect from bank"
-                        className="flex items-center justify-center gap-2 px-4 py-3 md:py-2.5 bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 hover:border-indigo-200 rounded-xl transition-all active:scale-95 shadow-sm group shrink-0 disabled:opacity-50 disabled:cursor-not-allowed w-auto"
+                        className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 hover:border-indigo-200 rounded-xl transition-all active:scale-95 shadow-sm group shrink-0 disabled:opacity-50 disabled:cursor-not-allowed w-auto"
                       >
                         {isFindingSalary ? (
-                           <RefreshCw className="w-4 h-4 animate-spin" />
+                           <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
                         ) : (
-                           <Search className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                           <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform" />
                         )}
                         <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest">
                             {isFindingSalary ? 'Syncing...' : 'Auto-Find'}
