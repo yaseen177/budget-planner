@@ -5740,7 +5740,13 @@ export default function App() {
         
         const viewedMonthSalary = allIncomes.find(tx => {
             const txDate = new Date(tx.date);
-            const isCorrectEmployer = (tx.merchant || tx.description) === employerName;
+            
+            // FIX: Safely parse the transaction name using the exact same logic
+            const txEmployerName = (tx.merchant && tx.merchant !== 'Unknown') 
+                ? tx.merchant 
+                : tx.description;
+                
+            const isCorrectEmployer = txEmployerName === employerName;
             
             // Is this transaction within 7 days of the Payday for the specific month the user is looking at?
             const diffDays = Math.abs(txDate - expectedPaydayForViewedMonth) / (1000 * 60 * 60 * 24);
