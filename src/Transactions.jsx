@@ -18,7 +18,6 @@ const cleanMerchantsWithAI = async (messyNamesArray) => {
   `;
 
   try {
-      // This will call a secure backend function you set up later
       const response = await fetch('/api/clean-merchants', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -39,7 +38,6 @@ const TRUELAYER_PROVIDERS = {
   'virgin money': 'ob-virgin-money', 'chase': 'ob-chase', 'mock bank': 'mock', 'mock': 'mock'
 };
 
-// --- REACT BITS INSPIRED: SPOTLIGHT CARD ---
 const SpotlightCard = ({ children, className = "" }) => {
   const divRef = useRef(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -71,7 +69,6 @@ const SpotlightCard = ({ children, className = "" }) => {
   );
 };
 
-// --- REACT BITS INSPIRED: SHINY BUTTON ---
 const ShinyButton = ({ onClick, disabled, children, className = "" }) => (
   <button
     onClick={onClick}
@@ -113,7 +110,100 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   const [dateFilter, setDateFilter] = useState('30'); 
 
   const [merchantDictionary, setMerchantDictionary] = useState({});
-  const unknownNamesToClean = useMemo(() => [], []);
+
+  const LOGO_PUBLIC_KEY = import.meta.env.VITE_LOGO_DEV_PUBLIC_KEY;
+  const LOGO_SECRET_KEY = import.meta.env.VITE_LOGO_DEV_SECRET_KEY;
+  const [topMerchantsLogos, setTopMerchantsLogos] = useState({});
+
+  // --- GLOBAL DATA CLEANING ENGINE ---
+  const { cleanedTransactions, unknownNames } = useMemo(() => {
+    const cleaned = [];
+    const unknowns = new Set();
+    
+    transactions.forEach(tx => {
+        let rawName = (tx.merchant && tx.merchant !== 'Unknown') ? tx.merchant : tx.description;
+        rawName = rawName.replace(/[0-9]/g, '').split('  ')[0].trim();
+        if (rawName.length < 2) rawName = "Unknown";
+        
+        let cleanName = merchantDictionary[rawName];
+        
+        if (!cleanName) {
+            cleanName = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
+            if (cleanName.length > 3 && cleanName !== 'Unknown') {
+                unknowns.add(rawName);
+            }
+        }
+        
+        cleaned.push({
+            ...tx,
+            displayMerchant: cleanName,
+            rawMerchant: rawName
+        });
+    });
+    
+    return { 
+        cleanedTransactions: cleaned, 
+        unknownNames: Array.from(unknowns) 
+    };
+  }, [transactions, merchantDictionary]);
+
+  const outgoings = cleanedTransactions.filter(tx => tx.category !== 'Income' && tx.category !== 'Transfer' && tx.amount !== 0);
+  const totalSpent = outgoings.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+
+  const categoryTotals = outgoings.reduce((acc, tx) => {
+      acc[tx.category] = (acc[tx.category] || 0) + Math.abs(tx.amount);
+      return acc;
+  }, {});
+  
+  const sortedCategories = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
+
+  const analyticsInsights = useMemo(() => {
+      if (!outgoings || outgoings.length === 0) return { topMerchants: [], daysOfWeek: [], dangerDay: null, dangerPercentage: 0 };
+
+      // 1. Merchant Loyalty ("Wrapped" Breakdown) - Using globally cleaned names
+      const merchantMap = {};
+      
+      outgoings.forEach(tx => {
+          const cleanName = tx.displayMerchant;
+
+          if (!merchantMap[cleanName]) {
+              merchantMap[cleanName] = { name: cleanName, count: 0, total: 0 };
+          }
+          merchantMap[cleanName].count += 1;
+          merchantMap[cleanName].total += Math.abs(tx.amount);
+      });
+
+      const topMerchants = Object.values(merchantMap)
+          .filter(m => m.name !== 'Unknown' && m.name.length > 2) 
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 3);
+
+      // 2. Danger Zone (Days of Week Heatmap)
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayTotals = [0, 0, 0, 0, 0, 0, 0];
+      let totalSpentLocal = 0;
+
+      outgoings.forEach(tx => {
+          const date = new Date(tx.date);
+          const amt = Math.abs(tx.amount);
+          dayTotals[date.getDay()] += amt;
+          totalSpentLocal += amt;
+      });
+
+      const maxSpend = Math.max(...dayTotals);
+      const dangerDayIndex = dayTotals.indexOf(maxSpend);
+      const dangerPercentage = totalSpentLocal > 0 ? ((maxSpend / totalSpentLocal) * 100).toFixed(0) : 0;
+
+      const daysOfWeek = days.map((day, i) => ({
+          day: day.substring(0, 3),
+          fullName: day,
+          total: dayTotals[i],
+          isDanger: i === dangerDayIndex && dayTotals[i] > 0,
+          heightPercent: maxSpend > 0 ? (dayTotals[i] / maxSpend) * 100 : 0
+      }));
+
+      return { topMerchants, daysOfWeek, dangerDay: days[dangerDayIndex], dangerPercentage };
+  }, [outgoings]);
 
   const userBanks = useMemo(() => {
     const banks = [];
@@ -142,7 +232,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
     });
   }, [bankDetails, additionalBanks, expenses, bankingData]);
 
-  // Extract all individual connected accounts for the Digital Wallet
   const activeWalletAccounts = useMemo(() => {
     if (!bankingData?.connections) return [];
     const accountsList = [];
@@ -317,107 +406,21 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
     fetchTransactions();
   }, [user, appId, dateFilter]);
 
-  const outgoings = transactions.filter(tx => tx.category !== 'Income' && tx.category !== 'Transfer' && tx.amount !== 0);
-  const totalSpent = outgoings.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
-  
-  const categoryTotals = outgoings.reduce((acc, tx) => {
-      acc[tx.category] = (acc[tx.category] || 0) + Math.abs(tx.amount);
-      return acc;
-  }, {});
-  
-  const sortedCategories = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
-
-  // --- NEW: ADVANCED ANALYTICS ENGINE WITH SMART LOGOS ---
-  const LOGO_PUBLIC_KEY = import.meta.env.VITE_LOGO_DEV_PUBLIC_KEY;
-  const LOGO_SECRET_KEY = import.meta.env.VITE_LOGO_DEV_SECRET_KEY;
-  const [topMerchantsLogos, setTopMerchantsLogos] = useState({});
-
-  const analyticsInsights = useMemo(() => {
-      if (!outgoings || outgoings.length === 0) return { topMerchants: [], daysOfWeek: [], dangerDay: null, dangerPercentage: 0 };
-
-      // 1. Merchant Loyalty ("Wrapped" Breakdown)
-      const merchantMap = {};
-      
-      outgoings.forEach(tx => {
-          let rawName = (tx.merchant && tx.merchant !== 'Unknown') ? tx.merchant : tx.description;
-          rawName = rawName.replace(/[0-9]/g, '').split('  ')[0].trim();
-          if (rawName.length < 2) rawName = "Unknown";
-          
-          // A. Check if the AI has already cleaned this name for us!
-          let cleanName = merchantDictionary[rawName];
-
-          // B. If not, use the messy name for now, but queue it up for the AI
-          if (!cleanName) {
-              cleanName = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
-              if (cleanName.length > 3 && cleanName !== 'Unknown' && !unknownNamesToClean.includes(rawName)) {
-                  unknownNamesToClean.push(rawName);
-              }
-          }
-
-          if (!merchantMap[cleanName]) {
-              merchantMap[cleanName] = { name: cleanName, count: 0, total: 0 };
-          }
-          merchantMap[cleanName].count += 1;
-          merchantMap[cleanName].total += Math.abs(tx.amount);
-      });
-
-      const topMerchants = Object.values(merchantMap)
-          .filter(m => m.name !== 'Unknown' && m.name.length > 2) 
-          .sort((a, b) => b.total - a.total)
-          .slice(0, 3); // Grab the Top 3
-
-      // 2. Danger Zone (Days of Week Heatmap)
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const dayTotals = [0, 0, 0, 0, 0, 0, 0];
-      let totalSpentLocal = 0;
-
-      outgoings.forEach(tx => {
-          const date = new Date(tx.date);
-          const amt = Math.abs(tx.amount);
-          dayTotals[date.getDay()] += amt;
-          totalSpentLocal += amt;
-      });
-
-      const maxSpend = Math.max(...dayTotals);
-      const dangerDayIndex = dayTotals.indexOf(maxSpend);
-      const dangerPercentage = totalSpentLocal > 0 ? ((maxSpend / totalSpentLocal) * 100).toFixed(0) : 0;
-
-      const daysOfWeek = days.map((day, i) => ({
-          day: day.substring(0, 3),
-          fullName: day,
-          total: dayTotals[i],
-          isDanger: i === dangerDayIndex && dayTotals[i] > 0,
-          heightPercent: maxSpend > 0 ? (dayTotals[i] / maxSpend) * 100 : 0
-      }));
-
-      return { topMerchants, daysOfWeek, dangerDay: days[dangerDayIndex], dangerPercentage };
-  }, [outgoings]);
-
   useEffect(() => {
     const runAiCleaner = async () => {
-        if (unknownNamesToClean.length === 0) return;
+        if (unknownNames.length === 0) return;
 
-        // Send the unknown names to the AI
-        const newCleanedNames = await cleanMerchantsWithAI(unknownNamesToClean);
+        const newCleanedNames = await cleanMerchantsWithAI(unknownNames);
         
         if (newCleanedNames) {
-            // 1. Update the local app state so the UI fixes itself instantly
             setMerchantDictionary(prev => ({ ...prev, ...newCleanedNames }));
-            
-            // 2. Clear the queue
-            unknownNamesToClean.length = 0; 
-            
-            // Note: Once your database is set up, you would also save newCleanedNames 
-            // to Firebase here so it remembers them for next time!
         }
     };
 
-    // Set a small delay so it doesn't interrupt the UI loading
     const timeoutId = setTimeout(() => runAiCleaner(), 2000);
     return () => clearTimeout(timeoutId);
-}, [unknownNamesToClean.length, merchantDictionary]);
+  }, [unknownNames]);
 
-  // Async Fetcher for real logos using the API
   useEffect(() => {
       const fetchLogos = async () => {
           if (!LOGO_SECRET_KEY || !analyticsInsights.topMerchants.length) return;
@@ -426,7 +429,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
           let hasChanges = false;
 
           for (const merchant of analyticsInsights.topMerchants) {
-              if (newLogos[merchant.name]) continue; // Skip if already fetched
+              if (newLogos[merchant.name]) continue; 
               
               try {
                   const res = await fetch(`https://api.logo.dev/search?q=${encodeURIComponent(merchant.name)}`, {
@@ -452,7 +455,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   return (
     <div className="fixed inset-0 z-[200] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full duration-500">
       
-      {/* Modern Glassmorphic Header */}
       <div className="bg-white/80 backdrop-blur-md px-6 pt-12 pb-4 shadow-sm flex items-center justify-between sticky top-0 z-40 border-b border-slate-200/50">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
@@ -481,7 +483,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                 </div>
               )}
 
-              {/* NEW: THE DIGITAL WALLET (Live Balances Grid) */}
               {activeWalletAccounts.length > 0 && (
                 <div>
                   <div className="flex justify-between items-end mb-4 px-1">
@@ -534,7 +535,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                 </div>
               )}
 
-              {/* NEW: LINKED CONNECTIONS (Slimline connection manager) */}
               <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-200">
                  <div className="mb-6">
                      <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -593,7 +593,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                          <MoreVertical className="w-4 h-4" />
                                       </button>
 
-                                      {/* Modern iOS Style Context Menu */}
                                       {activeMenu === bank.providerId && (
                                          <>
                                            <div className="fixed inset-0 z-30" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}></div>
@@ -623,7 +622,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                  </div>
               </div>
 
-              {/* TABS & FILTERS */}
               {bankingData && Object.keys(bankingData.connections).length > 0 && transactions.length > 0 && (
                 <div className="space-y-6 mt-8">
                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 py-2">
@@ -654,38 +652,49 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                        </select>
                    </div>
 
-                   {/* TAB: FEED */}
                    {activeTab === 'feed' && (
                        <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
                          <div className="divide-y divide-slate-50">
-                           {transactions.map((tx, idx) => {
+                           {cleanedTransactions.map((tx, idx) => {
                              const relatedBank = userBanks.find(b => b.providerId === tx.providerId);
-                             const displayLogo = relatedBank?.fallbackLogo || tx.providerLogo || relatedBank?.logoUrl;
                              const isTransfer = tx.category === 'Transfer';
+
+                             const displayLogo = isTransfer 
+                                ? (relatedBank?.fallbackLogo || tx.providerLogo || relatedBank?.logoUrl)
+                                : (LOGO_PUBLIC_KEY ? `https://img.logo.dev/${tx.displayMerchant.toLowerCase().replace(/[^a-z0-9]/g, '')}.com?token=${LOGO_PUBLIC_KEY}` : null);
 
                              return (
                              <div key={`${tx.id}-${idx}`} className={`p-4 sm:p-5 flex justify-between items-center transition group ${isTransfer ? 'opacity-70 grayscale-[20%] hover:bg-slate-100' : 'hover:bg-slate-50'}`}>
                                  <div className="flex items-center gap-4">
                                    <div className="relative">
-                                       <div className={`p-3 rounded-2xl border transition group-hover:shadow-sm ${isTransfer ? 'bg-slate-100 border-slate-200' : 'bg-slate-50 border-slate-100 group-hover:bg-white'}`}>
-                                           {getCategoryIcon(tx.category)}
+                                       <div className={`p-3 rounded-2xl border transition overflow-hidden relative w-12 h-12 flex items-center justify-center group-hover:shadow-sm ${isTransfer ? 'bg-slate-100 border-slate-200' : 'bg-slate-50 border-slate-100 group-hover:bg-white'}`}>
+                                           <div className="absolute inset-0 flex items-center justify-center opacity-30">
+                                              {getCategoryIcon(tx.category)}
+                                           </div>
+                                           {displayLogo && !isTransfer && (
+                                                <img 
+                                                  src={displayLogo} 
+                                                  onError={(e) => { e.target.style.opacity = '0'; }}
+                                                  className="w-full h-full object-contain p-1 relative z-10 transition-opacity" 
+                                                  alt="" 
+                                                />
+                                           )}
                                        </div>
-                                       {displayLogo && (
-                                           <div className="absolute -bottom-1 -right-1 bg-white p-0.5 rounded-full shadow-sm border border-slate-100">
+                                       {isTransfer && displayLogo && (
+                                           <div className="absolute -bottom-1 -right-1 bg-white p-0.5 rounded-full shadow-sm border border-slate-100 z-20">
                                                <img src={displayLogo} className="w-4 h-4 object-contain rounded-full" />
                                            </div>
                                        )}
                                    </div>
                                    <div>
                                        <p className={`font-bold text-sm sm:text-base flex items-center gap-2 ${isTransfer ? 'text-slate-600' : 'text-slate-800'}`}>
-                                         {tx.merchant && tx.merchant !== 'Unknown' ? tx.merchant : tx.description}
+                                         {tx.displayMerchant}
                                        </p>
                                        <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5 font-medium flex-wrap">
                                          <span className="capitalize">{tx.category || 'Miscellaneous'}</span>
                                          <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                                          <span>{new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
                                          
-                                         {/* THE NEW PENDING INDICATOR */}
                                          {tx.is_pending && (
                                             <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest animate-pulse">
                                               Pending
@@ -709,7 +718,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                        </div>
                    )}
 
-                   {/* TAB: ANALYTICS (EXCLUDING TRANSFERS) */}
                    {activeTab === 'analytics' && (
                        <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-6 sm:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                           <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
@@ -765,11 +773,9 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                              )}
                           </div>
 
-                          {/* --- NEW: BRAND ANALYTICS & DANGER ZONE --- */}
                           {sortedCategories.length > 0 && (
                              <div className="mt-12 space-y-12 pt-10 border-t border-slate-100">
                                 
-                                {/* 1. TOP BRANDS WIDGET */}
                                 <div>
                                    <h3 className="text-lg font-bold text-slate-800 mb-5 flex items-center gap-2">
                                       <ShoppingBag className="w-5 h-5 text-pink-500" /> Your Top Brands
@@ -777,17 +783,14 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                       {analyticsInsights.topMerchants.map((merchant, idx) => (
                                          <div key={idx} className="bg-slate-50 p-5 rounded-2xl border border-slate-100 relative overflow-hidden group hover:shadow-md transition">
-                                            {/* Watermark Number */}
                                             <div className="absolute -right-4 -bottom-4 opacity-[0.03] text-7xl font-black">{idx + 1}</div>
                                             
                                             <div className="flex items-center gap-3 mb-3 relative z-10">
-                                               {/* Logo Box with Fallback */}
                                                <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-slate-200 flex items-center justify-center font-bold text-slate-400 overflow-hidden relative shrink-0">
                                                   <span className="absolute inset-0 flex items-center justify-center bg-slate-100 text-slate-500 text-lg z-0">
                                                       {merchant.name.charAt(0)}
                                                   </span>
                                                   
-                                                  {/* CHANGED THIS BLOCK: Using smart state mapping! */}
                                                   {topMerchantsLogos[merchant.name] && (
                                                       <img 
                                                           src={topMerchantsLogos[merchant.name]}
@@ -811,7 +814,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                    </div>
                                 </div>
 
-                                {/* 2. THE DANGER ZONE HEATMAP */}
                                 <div>
                                    <h3 className="text-lg font-bold text-slate-800 mb-5 flex items-center gap-2">
                                       <AlertTriangle className="w-5 h-5 text-rose-500" /> The Danger Zone
@@ -829,7 +831,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                                     className={`w-full max-w-[32px] rounded-t-xl transition-all duration-1000 ease-out relative ${day.isDanger ? 'bg-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.3)]' : 'bg-rose-200/50 hover:bg-rose-300/50'}`}
                                                     style={{ height: `${Math.max(8, day.heightPercent)}%` }}
                                                   >
-                                                     {/* Floating Tooltip */}
                                                      <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 bg-slate-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10 transition left-1/2 -translate-x-1/2 pointer-events-none">
                                                         {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}{day.total.toFixed(0)}
                                                      </div>
@@ -843,7 +844,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
                              </div>
                           )}
-                          {/* ------------------------------------------- */}
                        </div>
                    )}
                 </div>
