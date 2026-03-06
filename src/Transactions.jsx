@@ -2,6 +2,35 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2, Utensils, Tv, ShoppingCart, TrendingUp, Activity, PieChart, List, ArrowRightLeft, Wallet, Link as LinkIcon } from 'lucide-react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
+const cleanMerchantsWithAI = async (messyNamesArray) => {
+  const systemPrompt = `
+    You are a UK banking data extraction tool. 
+    I will give you an array of messy, truncated bank transaction strings.
+    Return a raw JSON object mapping the messy string to the official, clean brand name.
+    If it is a person's name or unidentifiable, return the original string.
+    
+    Example Input: ["AMZN PRIME", "Association of Opt", "TESCO STORES 3241"]
+    Example Output: {
+       "AMZN PRIME": "Amazon",
+       "Association of Opt": "Association of Optometrists",
+       "TESCO STORES 3241": "Tesco"
+    }
+  `;
+
+  try {
+      // This will call a secure backend function you set up later
+      const response = await fetch('/api/clean-merchants', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: systemPrompt, data: messyNamesArray })
+      });
+      return await response.json(); 
+  } catch (error) {
+      console.error("AI Cleaning failed", error);
+      return null;
+  }
+};
+
 const TRUELAYER_PROVIDERS = {
   'monzo': 'ob-monzo', 'barclays': 'ob-barclays', 'natwest': 'ob-natwest', 'lloyds': 'ob-lloyds',
   'halifax': 'ob-halifax', 'santander': 'ob-santander', 'hsbc': 'ob-hsbc', 'starling': 'ob-starling',
@@ -82,6 +111,9 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   
   const [activeTab, setActiveTab] = useState('feed'); 
   const [dateFilter, setDateFilter] = useState('30'); 
+
+  const [merchantDictionary, setMerchantDictionary] = useState({});
+  const unknownNamesToClean = useMemo(() => [], []);
 
   const userBanks = useMemo(() => {
     const banks = [];
@@ -305,17 +337,28 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
       // 1. Merchant Loyalty ("Wrapped" Breakdown)
       const merchantMap = {};
+      
       outgoings.forEach(tx => {
-          let name = (tx.merchant && tx.merchant !== 'Unknown') ? tx.merchant : tx.description;
-          name = name.replace(/[0-9]/g, '').split('  ')[0].trim();
-          if (name.length < 2) name = "Unknown";
-          name = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+          let rawName = (tx.merchant && tx.merchant !== 'Unknown') ? tx.merchant : tx.description;
+          rawName = rawName.replace(/[0-9]/g, '').split('  ')[0].trim();
+          if (rawName.length < 2) rawName = "Unknown";
+          
+          // A. Check if the AI has already cleaned this name for us!
+          let cleanName = merchantDictionary[rawName];
 
-          if (!merchantMap[name]) {
-              merchantMap[name] = { name, count: 0, total: 0 };
+          // B. If not, use the messy name for now, but queue it up for the AI
+          if (!cleanName) {
+              cleanName = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
+              if (cleanName.length > 3 && cleanName !== 'Unknown' && !unknownNamesToClean.includes(rawName)) {
+                  unknownNamesToClean.push(rawName);
+              }
           }
-          merchantMap[name].count += 1;
-          merchantMap[name].total += Math.abs(tx.amount);
+
+          if (!merchantMap[cleanName]) {
+              merchantMap[cleanName] = { name: cleanName, count: 0, total: 0 };
+          }
+          merchantMap[cleanName].count += 1;
+          merchantMap[cleanName].total += Math.abs(tx.amount);
       });
 
       const topMerchants = Object.values(merchantMap)
@@ -349,6 +392,30 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
 
       return { topMerchants, daysOfWeek, dangerDay: days[dangerDayIndex], dangerPercentage };
   }, [outgoings]);
+
+  useEffect(() => {
+    const runAiCleaner = async () => {
+        if (unknownNamesToClean.length === 0) return;
+
+        // Send the unknown names to the AI
+        const newCleanedNames = await cleanMerchantsWithAI(unknownNamesToClean);
+        
+        if (newCleanedNames) {
+            // 1. Update the local app state so the UI fixes itself instantly
+            setMerchantDictionary(prev => ({ ...prev, ...newCleanedNames }));
+            
+            // 2. Clear the queue
+            unknownNamesToClean.length = 0; 
+            
+            // Note: Once your database is set up, you would also save newCleanedNames 
+            // to Firebase here so it remembers them for next time!
+        }
+    };
+
+    // Set a small delay so it doesn't interrupt the UI loading
+    const timeoutId = setTimeout(() => runAiCleaner(), 2000);
+    return () => clearTimeout(timeoutId);
+}, [unknownNamesToClean.length, merchantDictionary]);
 
   // Async Fetcher for real logos using the API
   useEffect(() => {
