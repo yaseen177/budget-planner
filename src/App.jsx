@@ -5615,7 +5615,7 @@ export default function App() {
     }
   };
 
-  // --- NEW: AUTO-FIND SALARY MAGIC (EMPLOYER & DATE AWARE) ---
+  // --- NEW: AUTO-FIND SALARY MAGIC (BULLETPROOF) ---
   const handleFindSalary = async () => {
     // 1. Validate setup
     const salaryBank = effectiveSettings?.bankDetails?.name;
@@ -5646,7 +5646,7 @@ export default function App() {
 
     // 4. Identify the SPECIFIC month the user is viewing
     const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
+    const month = currentDate.getMonth(); // 0-indexed
     const monthName = currentDate.toLocaleString('en-GB', { month: 'long' });
     const today = new Date();
 
@@ -5660,10 +5660,17 @@ export default function App() {
     triggerHaptic();
 
     try {
-        // Fetch the last 65 days to establish a baseline
-        const fromDate = new Date();
-        fromDate.setDate(today.getDate() - 65); 
-        
+        // 5. SMART FETCH WINDOW (Relative to the month you are looking at!)
+        // End date: last day of the viewed month (or today if viewed month is current)
+        let toDate = new Date(year, month + 1, 0, 23, 59, 59);
+        if (toDate > today) {
+            toDate = today;
+        }
+
+        // Start date: 90 days before the end date (plenty of time to establish employer baseline)
+        const fromDate = new Date(toDate);
+        fromDate.setDate(toDate.getDate() - 90);
+
         const response = await fetch('/api/transactions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -5672,7 +5679,7 @@ export default function App() {
                 clientId: import.meta.env.VITE_TL_CLIENT_ID,
                 accounts: connection.accounts,
                 from: fromDate.toISOString(),
-                to: today.toISOString()
+                to: toDate.toISOString()
             })
         });
 
@@ -5692,77 +5699,68 @@ export default function App() {
              }, { merge: true });
         }
 
-        // --- NEW LOGIC: The ±7 Day Payday Window Checker ---
-        const isNearPayday = (dateString, targetDay) => {
-            const txDate = new Date(dateString);
-            const msPerDay = 1000 * 60 * 60 * 24;
-            
-            // We check the payday of the transaction's month, AND the adjacent months.
-            // This safely catches people paid on the 28th for a 1st of the month payday!
-            const pThis = new Date(txDate.getFullYear(), txDate.getMonth(), targetDay);
-            const pNext = new Date(txDate.getFullYear(), txDate.getMonth() + 1, targetDay);
-            const pPrev = new Date(txDate.getFullYear(), txDate.getMonth() - 1, targetDay);
-            
-            const minDiff = Math.min(
-               Math.abs(txDate - pThis) / msPerDay,
-               Math.abs(txDate - pNext) / msPerDay,
-               Math.abs(txDate - pPrev) / msPerDay
-            );
-            
-            return minDiff <= 7; // Gives a 14-day safe window around payday
-        };
-
-        // STEP A: Filter for all valid, settled incoming money THAT FALLS IN THE WINDOW
+        // STEP A: Filter valid incomes
         const allIncomes = (data.transactions || []).filter(tx => 
             tx.amount > 0 && 
             tx.category !== 'Transfer' &&
-            !tx.is_pending &&
-            isNearPayday(tx.date, userPayday)
+            !tx.is_pending
         );
 
         if (allIncomes.length === 0) {
-            showToast("No salary payments found near your payday dates.");
+            showToast(`No income history found leading up to ${monthName}.`);
             return;
         }
 
-        // STEP B: Identify the Employer (The absolute largest income in the 65 day window)
+        // STEP B: Identify the Employer (Largest income in the 90-day window)
         const sortedIncomes = [...allIncomes].sort((a, b) => b.amount - a.amount);
         const trueSalaryTx = sortedIncomes[0];
-        
-        // FIX: Explicitly reject the string 'Unknown' and fall back to the raw description
         const employerName = (trueSalaryTx.merchant && trueSalaryTx.merchant !== 'Unknown') 
             ? trueSalaryTx.merchant 
             : trueSalaryTx.description;
 
-        // STEP C: Strictly check the VIEWED MONTH for this specific employer
-        // (Also checking if it's within the window for the viewed month)
-        const expectedPaydayForViewedMonth = new Date(year, month, userPayday);
+        // STEP C: Strictly isolate the salary for the VIEWED MONTH
+        const expectedPayday = new Date(year, month, userPayday);
         
-        const viewedMonthSalary = allIncomes.find(tx => {
-            const txDate = new Date(tx.date);
-            
-            // FIX: Safely parse the transaction name using the exact same logic
+        const validSalaries = allIncomes.filter(tx => {
             const txEmployerName = (tx.merchant && tx.merchant !== 'Unknown') 
                 ? tx.merchant 
                 : tx.description;
-                
-            const isCorrectEmployer = txEmployerName === employerName;
             
-            // Is this transaction within 7 days of the Payday for the specific month the user is looking at?
-            const diffDays = Math.abs(txDate - expectedPaydayForViewedMonth) / (1000 * 60 * 60 * 24);
-            const isForThisMonth = diffDays <= 7;
+            // Must be the same employer
+            if (txEmployerName !== employerName) return false;
             
-            return isForThisMonth && isCorrectEmployer;
+            const txDate = new Date(tx.date);
+
+            // Rule 1: Must be near the expected payday (±12 days to handle extreme weekends)
+            const diffDays = Math.abs(txDate - expectedPayday) / (1000 * 60 * 60 * 24);
+            
+            // Rule 2: Must actually belong to this month!
+            // It either happened exactly in the viewed month, OR very late in the previous month (early payday)
+            const isSameMonth = txDate.getMonth() === month && txDate.getFullYear() === year;
+            const prevMonth = month === 0 ? 11 : month - 1;
+            const prevYear = month === 0 ? year - 1 : year;
+            const isLatePrevMonth = txDate.getMonth() === prevMonth && txDate.getFullYear() === prevYear && txDate.getDate() >= 20;
+            
+            return diffDays <= 12 && (isSameMonth || isLatePrevMonth);
         });
 
-        // If the employer hasn't paid you for the viewed month yet...
-        if (!viewedMonthSalary) {
+        // If we didn't find anything matching the strict criteria...
+        if (validSalaries.length === 0) {
             const cleanEmployerName = employerName.replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 15).trim();
             showToast(`Hold tight! You haven't been paid by ${cleanEmployerName} for ${monthName} yet.`);
             return;
         }
 
-        // STEP D: The actual salary has arrived! Apply it.
+        // If paid twice in the window, grab the one closest to the exact payday
+        validSalaries.sort((a, b) => {
+             const diffA = Math.abs(new Date(a.date) - expectedPayday);
+             const diffB = Math.abs(new Date(b.date) - expectedPayday);
+             return diffA - diffB;
+        });
+
+        const viewedMonthSalary = validSalaries[0];
+
+        // STEP D: Apply!
         updateSalary(viewedMonthSalary.amount.toString());
         showToast(`Salary synced: £${viewedMonthSalary.amount} from ${employerName}`);
         triggerHaptic();
