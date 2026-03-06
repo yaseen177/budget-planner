@@ -6584,7 +6584,7 @@ export default function App() {
               <ChevronLeft className="w-5 h-5" />
             </button>
             
-            {/* Clickable Label to toggle Menu */}
+            {/* Clickable Label to toggle Menu*/}
             <button 
               onClick={() => {
                 setPickerYear(currentDate.getFullYear()); // Sync year when opening
