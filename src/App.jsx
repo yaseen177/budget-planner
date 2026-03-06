@@ -5615,7 +5615,7 @@ export default function App() {
     }
   };
 
-  // --- NEW: AUTO-FIND SALARY MAGIC (MONTH AWARE) ---
+  // --- NEW: AUTO-FIND SALARY MAGIC (EMPLOYER AWARE) ---
   const handleFindSalary = async () => {
     // 1. Validate setup
     const salaryBank = effectiveSettings?.bankDetails?.name;
@@ -5639,10 +5639,10 @@ export default function App() {
     // 4. Identify the SPECIFIC month the user is viewing
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    const monthName = currentDate.toLocaleString('default', { month: 'long' }); // e.g., "March"
+    const monthName = currentDate.toLocaleString('en-GB', { month: 'long' });
     const today = new Date();
 
-    // Guard: If they are looking at a future month, they definitely haven't been paid in it yet!
+    // Guard: Future months definitely haven't been paid yet!
     if (year > today.getFullYear() || (year === today.getFullYear() && month > today.getMonth())) {
         showToast(`Hold tight! You haven't been paid for ${monthName} yet.`);
         return;
@@ -5652,14 +5652,9 @@ export default function App() {
     triggerHaptic();
 
     try {
-        // Set search boundaries to the exactly viewed month
-        const fromDate = new Date(Date.UTC(year, month, 1));
-        let toDate = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59));
-        
-        // Cap "to" date to today to prevent API errors for future dates in the current month
-        if (toDate > today) {
-            toDate = today;
-        }
+        // Fetch the last 65 days to establish a baseline of who the true employer is
+        const fromDate = new Date();
+        fromDate.setDate(today.getDate() - 65); 
         
         const response = await fetch('/api/transactions', {
             method: 'POST',
@@ -5669,7 +5664,7 @@ export default function App() {
                 clientId: import.meta.env.VITE_TL_CLIENT_ID,
                 accounts: connection.accounts,
                 from: fromDate.toISOString(),
-                to: toDate.toISOString()
+                to: today.toISOString()
             })
         });
 
@@ -5680,7 +5675,6 @@ export default function App() {
             return;
         }
 
-        // 5. Update Refresh Token if it rotated
         if (data.new_refresh_token && data.new_refresh_token !== connection.refreshToken) {
              const bankingRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'openBanking');
              await setDoc(bankingRef, {
@@ -5690,29 +5684,42 @@ export default function App() {
              }, { merge: true });
         }
 
-        // 6. Hunt for the biggest standard income STRICTLY inside this viewed month
-        const recentIncomes = (data.transactions || []).filter(tx => {
-            const txDate = new Date(tx.date);
-            return tx.amount > 0 && 
-                   tx.category !== 'Transfer' &&
-                   !tx.is_pending &&
-                   txDate.getMonth() === month && 
-                   txDate.getFullYear() === year;
-        });
+        // STEP A: Filter for all valid, settled incoming money
+        const allIncomes = (data.transactions || []).filter(tx => 
+            tx.amount > 0 && 
+            tx.category !== 'Transfer' &&
+            !tx.is_pending
+        );
 
-        // Did we find a salary in this specific month?
-        if (recentIncomes.length === 0) {
-            showToast(`Hold tight! You haven't been paid for ${monthName} yet.`);
+        if (allIncomes.length === 0) {
+            showToast("No income history found in this account.");
             return;
         }
 
-        // Sort largest amount to the top
-        recentIncomes.sort((a, b) => b.amount - a.amount);
-        const likelySalary = recentIncomes[0];
+        // STEP B: Identify the Employer (The absolute largest income in the last 65 days)
+        const sortedIncomes = [...allIncomes].sort((a, b) => b.amount - a.amount);
+        const trueSalaryTx = sortedIncomes[0];
+        const employerName = trueSalaryTx.merchant || trueSalaryTx.description;
 
-        // 7. Boom. Apply it.
-        updateSalary(likelySalary.amount.toString());
-        showToast(`Salary synced: £${likelySalary.amount} from ${likelySalary.merchant || likelySalary.description}`);
+        // STEP C: Now strictly check the VIEWED MONTH for this specific employer
+        const viewedMonthSalary = allIncomes.find(tx => {
+            const txDate = new Date(tx.date);
+            const isCorrectMonth = txDate.getMonth() === month && txDate.getFullYear() === year;
+            const isCorrectEmployer = (tx.merchant || tx.description) === employerName;
+            return isCorrectMonth && isCorrectEmployer;
+        });
+
+        // If the employer hasn't paid you in the viewed month yet...
+        if (!viewedMonthSalary) {
+            // Clean up the employer name so the toast looks neat (e.g., removing weird bank reference numbers)
+            const cleanEmployerName = employerName.replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 15).trim();
+            showToast(`Hold tight! You haven't been paid by ${cleanEmployerName} for ${monthName} yet.`);
+            return;
+        }
+
+        // STEP D: The actual salary has arrived! Apply it.
+        updateSalary(viewedMonthSalary.amount.toString());
+        showToast(`Salary synced: £${viewedMonthSalary.amount} from ${employerName}`);
         triggerHaptic();
         if (typeof playJuiceSound === 'function') playJuiceSound('success');
 
