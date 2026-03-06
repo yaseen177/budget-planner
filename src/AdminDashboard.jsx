@@ -9,11 +9,9 @@ import {
   query,
   orderBy,
   limit,
-  where,
   deleteDoc
 } from 'firebase/firestore';
 import { 
-  LayoutDashboard, 
   Users, 
   Activity, 
   Search, 
@@ -21,10 +19,11 @@ import {
   Shield, 
   Key, 
   Eye, 
-  ChevronRight, 
   ArrowLeft,
   MousePointer2,
-  Lock
+  Lock,
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
 
 // --- CONFIG ---
@@ -35,7 +34,6 @@ export default function AdminDashboard({ user, onLogout, onExitAdmin }) {
   const [activeTab, setActiveTab] = useState('users'); // users, logs
   const [users, setUsers] = useState([]);
   const [logs, setLogs] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [stats, setStats] = useState({ totalUsers: 0, activeThisMonth: 0 });
@@ -65,29 +63,23 @@ export default function AdminDashboard({ user, onLogout, onExitAdmin }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch Users (Iterating through the artifacts collection)
-      // Note: In a real prod app, you'd use Firebase Admin SDK for listing users.
-      // Here we assume every user has a document in 'users' collection.
       const usersRef = collection(db, 'artifacts', APP_ID, 'users');
       const snapshot = await getDocs(usersRef);
       
       const userData = [];
       for (const userDoc of snapshot.docs) {
-        // Fetch their settings to get display name
         const settingsRef = doc(db, 'artifacts', APP_ID, 'users', userDoc.id, 'settings', 'config');
         const settingsSnap = await getDoc(settingsRef);
         
         userData.push({
           uid: userDoc.id,
-          lastActive: 'Unknown', // Firestore client doesn't give metadata without custom tracking
+          lastActive: 'Unknown', 
           ...settingsSnap.data()
         });
       }
       setUsers(userData);
       setStats({ ...stats, totalUsers: userData.length });
 
-      // 2. Fetch Logs (If you have a logs collection)
-      // This part assumes you create a 'logs' collection
       try {
         const logsRef = collection(db, 'artifacts', APP_ID, 'system_logs');
         const q = query(logsRef, orderBy('timestamp', 'desc'), limit(50));
@@ -105,51 +97,45 @@ export default function AdminDashboard({ user, onLogout, onExitAdmin }) {
     }
   };
 
+  // --- INDIVIDUAL AI CACHE WIPE ---
   const handleClearAICache = async (targetUserId) => {
-    // Optional: Add a quick confirmation so you don't click it by accident!
     if (!window.confirm("Are you sure you want to wipe this user's AI brand cache? This will cost AI tokens to regenerate.")) {
         return;
     }
 
     try {
-        // Point directly to the user's saved dictionary
-        const dictRef = doc(db, 'artifacts', appId, 'users', targetUserId, 'settings', 'merchantDictionary');
-        
-        // Delete the document completely
+        // FIXED: Changed appId to APP_ID
+        const dictRef = doc(db, 'artifacts', APP_ID, 'users', targetUserId, 'settings', 'merchantDictionary');
         await deleteDoc(dictRef);
-        
         alert("AI brand cache successfully wiped! The AI will regenerate clean names and logos on their next visit.");
     } catch (error) {
         console.error("Failed to clear AI cache:", error);
         alert("Error clearing cache. Check your console for details.");
     }
-};
+  };
 
-const handleGlobalCacheWipe = async () => {
-  // 1. The Safety Lock
-  const confirmMessage = "⚠️ CRITICAL WARNING: You are about to wipe the AI cache for EVERY SINGLE USER. \n\nThis will force the AI to rescan all their transactions from scratch and consume a significant amount of API tokens. \n\nAre you absolutely sure you want to proceed?";
-  
-  if (!window.confirm(confirmMessage)) {
-      return; // Abort if they click Cancel
-  }
+  // --- GLOBAL AI CACHE WIPE ---
+  const handleGlobalCacheWipe = async () => {
+    const confirmMessage = "⚠️ CRITICAL WARNING: You are about to wipe the AI cache for EVERY SINGLE USER. \n\nThis will force the AI to rescan all their transactions from scratch and consume a significant amount of API tokens. \n\nAre you absolutely sure you want to proceed?";
+    
+    if (!window.confirm(confirmMessage)) {
+        return; 
+    }
 
-  try {
-      // 2. Create an array of simultaneous delete instructions
-      // Change 'users' to 'filteredUsers' if you only want to target searched users
-      const deletePromises = users.map(u => {
-          const dictRef = doc(db, 'artifacts', appId, 'users', u.uid, 'settings', 'merchantDictionary');
-          return deleteDoc(dictRef);
-      });
+    try {
+        const deletePromises = users.map(u => {
+            // FIXED: Changed appId to APP_ID
+            const dictRef = doc(db, 'artifacts', APP_ID, 'users', u.uid, 'settings', 'merchantDictionary');
+            return deleteDoc(dictRef);
+        });
 
-      // 3. Execute all deletions in parallel for maximum speed
-      await Promise.all(deletePromises);
-      
-      alert(`Success! Wiped the AI cache for ${deletePromises.length} users globally.`);
-  } catch (error) {
-      console.error("Failed to execute Global Wipe:", error);
-      alert("An error occurred during the global wipe. Check the developer console for details.");
-  }
-};
+        await Promise.all(deletePromises);
+        alert(`Success! Wiped the AI cache for ${deletePromises.length} users globally.`);
+    } catch (error) {
+        console.error("Failed to execute Global Wipe:", error);
+        alert("An error occurred during the global wipe. Check the developer console for details.");
+    }
+  };
 
   const handlePasswordReset = async (email) => {
     if (!email) return alert("No email associated with this user data.");
@@ -217,7 +203,7 @@ const handleGlobalCacheWipe = async () => {
         <header className="flex justify-between items-center mb-8">
           <div>
              <h2 className="text-2xl font-bold text-slate-800">Dashboard Overview</h2>
-             <p className="text-slate-500">Welcome back, Yaseen.</p>
+             <p className="text-slate-500">Welcome back, Admin.</p>
           </div>
           <div className="flex gap-4">
              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 min-w-[200px]">
@@ -295,7 +281,7 @@ const handleGlobalCacheWipe = async () => {
                             <button className="p-2 hover:bg-indigo-50 text-indigo-600 rounded-lg transition" title="View Data">
                                <Eye className="w-4 h-4" />
                             </button>
-                            {/* --- THE NEW AI REFRESH BUTTON --- */}
+                            {/* --- THE NEW INDIVIDUAL AI REFRESH BUTTON --- */}
                             <button 
                               onClick={() => handleClearAICache(u.uid)} 
                               className="p-2 hover:bg-rose-50 text-rose-600 rounded-lg transition" 
