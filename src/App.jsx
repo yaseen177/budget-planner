@@ -5615,22 +5615,15 @@ export default function App() {
     }
   };
 
-  // --- NEW: AUTO-FIND SALARY MAGIC (CLOSEST MATCH ALGORITHM) ---
+  // --- NEW: AUTO-FIND SALARY MAGIC (STRICT MONTH MATCHING) ---
   const handleFindSalary = async () => {
     // 1. Validate setup
     const salaryBank = effectiveSettings?.bankDetails?.name;
-    const userPaydayStr = effectiveSettings?.payDay;
     
     if (!salaryBank) {
         showToast("Please select your Salary Bank in Settings first.");
         return;
     }
-    if (!userPaydayStr) {
-        showToast("Please set your Payday in Settings first.");
-        return;
-    }
-
-    const userPayday = parseInt(userPaydayStr) || 1;
 
     // 2. Map to TrueLayer Provider ID
     const searchName = salaryBank.toLowerCase().trim();
@@ -5650,30 +5643,17 @@ export default function App() {
     const today = new Date();
     today.setHours(0,0,0,0);
 
-    // 4. Calculate the EXACT target Payday for the viewed month
-    const expectedPayday = new Date(year, month, userPayday);
-    expectedPayday.setHours(0,0,0,0);
-
-    // GUARD CLAUSE 1: If looking at a future month
+    // GUARD CLAUSE: If looking at a future month
     if (year > today.getFullYear() || (year === today.getFullYear() && month > today.getMonth())) {
         showToast(`Hold tight! You haven't been paid for ${monthName} yet.`);
         return;
-    }
-
-    // GUARD CLAUSE 2: Snappy UX - If the target payday is still weeks away, stop immediately!
-    if (expectedPayday > today) {
-        const daysUntilPayday = (expectedPayday - today) / (1000 * 60 * 60 * 24);
-        if (daysUntilPayday > 15) {
-            showToast(`Hold tight! You haven't been paid for ${monthName} yet.`);
-            return;
-        }
     }
 
     setIsFindingSalary(true);
     triggerHaptic();
 
     try {
-        // 5. Fetch Window: 100 days back from the end of the viewed month
+        // 4. Fetch Window: 100 days back from the end of the viewed month
         let toDate = new Date(year, month + 1, 0, 23, 59, 59);
         if (toDate > new Date()) toDate = new Date();
 
@@ -5745,39 +5725,30 @@ export default function App() {
         const maxSalaryAmount = Math.max(...employerIncomes.map(t => t.amount));
         const validSalaries = employerIncomes.filter(t => t.amount > (maxSalaryAmount * 0.5));
 
-        // STEP D: Find the absolute closest paycheck to the expected payday
-        let closestTx = null;
-        let minDiff = Infinity;
-
-        validSalaries.forEach(tx => {
+        // STEP D: STRICT MONTH MATCHING (This solves the February/March spillover)
+        // We only look for paychecks that occurred IN the exact calendar month you are viewing.
+        const viewedMonthIncomes = validSalaries.filter(tx => {
             const txDate = new Date(tx.date);
-            txDate.setHours(0,0,0,0);
-            
-            // Calculate absolute distance in days between the transaction and the target payday
-            const diff = Math.abs(txDate - expectedPayday) / (1000 * 60 * 60 * 24);
-            
-            if (diff < minDiff) {
-                minDiff = diff;
-                closestTx = tx;
-            }
+            return txDate.getMonth() === month && txDate.getFullYear() === year;
         });
 
-        // STEP E: The Ultimate Threshold Check
-        // If the closest paycheck we found is more than 15 days away from the expected date,
-        // it means it's actually the previous or next month's paycheck!
-        if (!closestTx || minDiff > 15) {
+        // If no paycheck occurred in that month yet, ask them to wait
+        if (viewedMonthIncomes.length === 0) {
             const cleanName = rawEmployer.substring(0, 15).trim();
             showToast(`Hold tight! You haven't been paid by ${cleanName} for ${monthName} yet.`);
             return;
         }
 
-        // STEP F: Apply it!
-        updateSalary(closestTx.amount.toString());
-        const finalName = (closestTx.merchant && closestTx.merchant !== 'Unknown') 
-            ? closestTx.merchant 
-            : closestTx.description;
+        // STEP E: Apply it! (Grab the largest if paid multiple times in the month)
+        viewedMonthIncomes.sort((a, b) => b.amount - a.amount);
+        const finalSalaryTx = viewedMonthIncomes[0];
+
+        updateSalary(finalSalaryTx.amount.toString());
+        const finalName = (finalSalaryTx.merchant && finalSalaryTx.merchant !== 'Unknown') 
+            ? finalSalaryTx.merchant 
+            : finalSalaryTx.description;
             
-        showToast(`Salary synced: £${closestTx.amount} from ${finalName.substring(0, 15)}`);
+        showToast(`Salary synced: £${finalSalaryTx.amount} from ${finalName.substring(0, 15)}`);
         triggerHaptic();
         if (typeof playJuiceSound === 'function') playJuiceSound('success');
 
