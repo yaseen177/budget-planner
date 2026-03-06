@@ -3515,7 +3515,18 @@ const OnboardingSlide = ({ isActive, children, center = false }) => (
   </div>
 );
 
-const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft, onConnectBank, bankingData }) => {
+// --- FULLY REVAMPED 10-STEP CAROUSEL ONBOARDING WIZARD ---
+
+// Helper component to create the Parallax Slide effect
+const OnboardingSlide = ({ isActive, children, center = false }) => (
+  <div className={`w-full h-full shrink-0 overflow-y-auto px-4 sm:px-6 flex flex-col items-center ${center ? 'justify-center py-6' : 'justify-start pt-28 pb-48'} no-scrollbar`}>
+     <div className={`max-w-md w-full space-y-8 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] transform ${isActive ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-12 scale-[0.95] pointer-events-none'}`}>
+        {children}
+     </div>
+  </div>
+);
+
+const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft, onConnectBank, bankingData, showToast }) => {
   const [step, setStep] = useState(currentSettings?.onboardingStep || 0); 
   
   // States
@@ -3541,6 +3552,10 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
   const [newBillLogo, setNewBillLogo] = useState(null);
 
   const [paceTargets, setPaceTargets] = useState(currentSettings?.dailyPaceTargets || { low: 10, high: 30 });
+
+  // --- NEW STATES FOR AUTO-SCANNING BILLS ---
+  const [isScanningBills, setIsScanningBills] = useState(false);
+  const [editingBillId, setEditingBillId] = useState(null);
 
   const totalPercent = pots.reduce((sum, p) => sum + p.percentage, 0);
 
@@ -3568,8 +3583,10 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
 
   const handleNext = async (nextStep) => {
       setStep(nextStep);
+      // Ensure we only save bills the user hasn't explicitly excluded
+      const validBills = bills.filter(b => b.included !== false);
       const draft = {
-          displayName: name, currency, bankDetails: bank, additionalBanks, payDay, creditCards, mortgages, allocationRules: pots, defaultFixedExpenses: bills, dailyPaceTargets: paceTargets, onboardingStep: nextStep, onboardingComplete: false
+          displayName: name, currency, bankDetails: bank, additionalBanks, payDay, creditCards, mortgages, allocationRules: pots, defaultFixedExpenses: validBills, dailyPaceTargets: paceTargets, onboardingStep: nextStep, onboardingComplete: false
       };
       await onSaveDraft(draft);
   };
@@ -3587,12 +3604,15 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
   };
 
   const handleFinish = () => {
+    // Only save bills the user actually checked
+    const validBills = bills.filter(b => b.included !== false);
     const finalSettings = {
-      displayName: name, currency, bankDetails: bank, additionalBanks, payDay, creditCards, mortgages, allocationRules: pots, defaultFixedExpenses: bills, dailyPaceTargets: paceTargets, onboardingStep: 10, onboardingComplete: true 
+      displayName: name, currency, bankDetails: bank, additionalBanks, payDay, creditCards, mortgages, allocationRules: pots, defaultFixedExpenses: validBills, dailyPaceTargets: paceTargets, onboardingStep: 10, onboardingComplete: true 
     };
     onComplete(finalSettings);
   };
 
+  // --- BILLS MANAGEMENT LOGIC ---
   const addPot = () => {
     if (!newPotName || !newPotPercent) return;
     const colors = ['bg-indigo-100 text-indigo-700 bar-indigo', 'bg-amber-100 text-amber-700 bar-amber', 'bg-purple-100 text-purple-700 bar-purple', 'bg-rose-100 text-rose-700 bar-rose', 'bg-cyan-100 text-cyan-700 bar-cyan'];
@@ -3603,8 +3623,136 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
 
   const addBill = () => {
     if (!newBillName) return;
-    setBills([...bills, { id: Date.now().toString(), name: newBillName, amount: parseFloat(newBillAmount) || 0, type: 'fixed', logo: newBillLogo }]);
+    setBills([...bills, { id: Date.now().toString(), name: newBillName, amount: parseFloat(newBillAmount) || 0, type: 'fixed', logo: newBillLogo, included: true }]);
     setNewBillName(''); setNewBillAmount(''); setNewBillLogo(null);
+  };
+
+  const updateBill = (id, updates) => {
+      setBills(bills.map(b => b.id === id ? { ...b, ...updates } : b));
+  };
+
+  const toggleBillInclude = (id) => {
+      setBills(bills.map(b => b.id === id ? { ...b, included: b.included === false ? true : false } : b));
+  };
+
+  // --- THE MAGIC AUTO-SCAN LOGIC ---
+  const handleScanBills = async () => {
+      setIsScanningBills(true);
+      triggerHaptic();
+      const internalToast = showToast || alert;
+      
+      try {
+          const connections = Object.values(bankingData?.connections || {});
+          if (connections.length === 0) {
+              internalToast("Please connect a bank account in the earlier steps first to auto-detect bills!");
+              setIsScanningBills(false);
+              return;
+          }
+
+          let allTransactions = [];
+          const toDate = new Date();
+          const fromDate = new Date();
+          fromDate.setDate(toDate.getDate() - 90); // Look back 3 months for recurring patterns
+
+          // Fetch from all connected accounts
+          for (const conn of connections) {
+              const response = await fetch('/api/transactions', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      refreshToken: conn.refreshToken,
+                      clientId: import.meta.env.VITE_TL_CLIENT_ID,
+                      accounts: conn.accounts,
+                      from: fromDate.toISOString(),
+                      to: toDate.toISOString()
+                  })
+              });
+              const data = await response.json();
+              if (data.success && data.transactions) {
+                  allTransactions = [...allTransactions, ...data.transactions];
+              }
+          }
+
+          const grouped = {};
+          const LOGO_PUBLIC_KEY = import.meta.env.VITE_LOGO_DEV_PUBLIC_KEY;
+
+          allTransactions.forEach(tx => {
+              if (tx.amount >= 0 || tx.category === 'Transfer') return;
+              
+              const rawName = (tx.merchant && tx.merchant !== 'Unknown') ? tx.merchant : tx.description;
+              const isDD = /direct debit|dd|standing order/i.test(rawName);
+
+              // If it's a known bill category OR explicitly labeled as a Direct Debit
+              if (['Bills', 'Entertainment', 'Health'].includes(tx.category) || isDD) {
+                  let domainForLogo = null;
+                  let cleanName = rawName;
+                  
+                  // Extract domain for logos (e.g. "Netflix.com" -> "netflix.com")
+                  const domainMatch = rawName.match(/\b([a-z0-9\-]+\.[a-z]{2,})\b/i);
+                  if (domainMatch) {
+                      domainForLogo = domainMatch[0].toLowerCase();
+                      const parts = domainForLogo.split('.');
+                      cleanName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1); 
+                  } else {
+                      // Clean up messy bank references
+                      cleanName = cleanName.replace(/direct debit|dd|standing order|visa|mastercard|payment/ig, '')
+                                           .replace(/[0-9]/g, '').trim();
+                      cleanName = cleanName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ').trim();
+                  }
+
+                  if (!cleanName || cleanName.length < 2) cleanName = rawName.substring(0, 15).trim();
+
+                  if (!grouped[cleanName]) {
+                      let logoUrl = null;
+                      if (domainForLogo) {
+                          logoUrl = `https://img.logo.dev/${domainForLogo}?token=${LOGO_PUBLIC_KEY}`;
+                      } else {
+                          const guessDomain = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
+                          logoUrl = `https://img.logo.dev/${guessDomain}?token=${LOGO_PUBLIC_KEY}`;
+                      }
+                      
+                      grouped[cleanName] = { amounts: [], logo: logoUrl };
+                  }
+                  grouped[cleanName].amounts.push(Math.abs(tx.amount));
+              }
+          });
+
+          const detected = [];
+          for (const [name, data] of Object.entries(grouped)) {
+              // Validates it is recurring if it appears at least twice in 90 days
+              if (data.amounts.length >= 2) {
+                  detected.push({
+                      id: 'auto_' + Date.now() + Math.random(),
+                      name: name,
+                      amount: data.amounts[0], // Most recent amount
+                      type: 'fixed',
+                      logo: data.logo,
+                      included: true // Checkbox defaults to ticked
+                  });
+              }
+          }
+
+          if (detected.length === 0) {
+              internalToast("No recurring bills found in the last 90 days.");
+          } else {
+              setBills(prev => {
+                  const newBills = [...prev];
+                  detected.forEach(d => {
+                      if (!newBills.some(b => b.name.toLowerCase() === d.name.toLowerCase())) {
+                          newBills.push(d);
+                      }
+                  });
+                  return newBills;
+              });
+              internalToast(`Auto-detected ${detected.length} recurring bills!`);
+          }
+
+      } catch (error) {
+          console.error(error);
+          internalToast("Error scanning for bills.");
+      } finally {
+          setIsScanningBills(false);
+      }
   };
 
   const toggleCard = (card) => setCreditCards(prev => prev.some(c => c.name === card.name) ? prev.filter(c => c.name !== card.name) : [...prev, card]);
@@ -3759,16 +3907,15 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
                   ))}
                   <div className="pt-2">
                   <BankSelector 
-   selectedBanks={additionalBanks} 
-   onSelect={(b) => {
-      // Toggle logic: If it's already selected, remove it. If not, add it.
-      if (additionalBanks.some(existing => existing.name === b.name)) {
-          setAdditionalBanks(additionalBanks.filter(existing => existing.name !== b.name));
-      } else {
-          setAdditionalBanks([...additionalBanks, {...b, id: Date.now().toString()}]);
-      }
-   }} 
-/>
+                     selectedBanks={additionalBanks} 
+                     onSelect={(b) => {
+                        if (additionalBanks.some(existing => existing.name === b.name)) {
+                            setAdditionalBanks(additionalBanks.filter(existing => existing.name !== b.name));
+                        } else {
+                            setAdditionalBanks([...additionalBanks, {...b, id: Date.now().toString()}]);
+                        }
+                     }} 
+                  />
                   </div>
               </div>
           )}
@@ -3892,7 +4039,6 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
           <div className="text-center">
             <h2 className="text-2xl font-bold text-slate-800">Spending Pots</h2>
             
-            {/* BEAUTIFUL EXPLANATION CARD */}
             <div className="mt-4 bg-indigo-50 border border-indigo-100 p-5 rounded-2xl text-left shadow-sm">
                 <h3 className="font-bold text-indigo-900 flex items-center gap-2 mb-2">
                    <Target className="w-5 h-5 text-indigo-600" /> Disposable Income
@@ -3900,7 +4046,7 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
                 <p className="text-indigo-800 text-sm leading-relaxed">
                    Once your Salary comes in and your Fixed Bills go out, you are left with your <strong>Disposable Income</strong>. 
                    <br/><br/>
-                   Split this remaining money into percentage "Pots" (e.g. Holidays, Savings). Any unassigned percentage safely stays in your main account!
+                   Split this remaining money into percentage "Pots". Any unassigned percentage safely stays in your main account!
                 </p>
             </div>
           </div>
@@ -3949,34 +4095,87 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
           </div>
         </OnboardingSlide>
 
-        {/* STEP 9: RECURRING BILLS */}
+        {/* STEP 9: RECURRING BILLS (UPDATED WITH AUTO-SCAN) */}
         <OnboardingSlide isActive={step === 9}>
           <div className="text-center">
             <h2 className="text-2xl font-bold text-slate-800">Recurring Bills</h2>
-            <p className="text-slate-500 mt-2">Add bills that stay the same every month (Netflix, Gym, Spotify). You can easily change these later!</p>
+            <p className="text-slate-500 mt-2">Add bills that stay the same every month (Netflix, Gym). You can scan your connected bank to detect them instantly!</p>
           </div>
 
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 max-h-60 overflow-y-auto">
+          <button 
+             onClick={handleScanBills}
+             disabled={isScanningBills}
+             className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 py-3.5 rounded-xl font-bold shadow-sm transition active:scale-95 flex items-center justify-center gap-2"
+          >
+             {isScanningBills ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+             {isScanningBills ? 'Scanning your accounts...' : 'Auto-Detect Bills'}
+          </button>
+
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 max-h-[40vh] overflow-y-auto custom-scrollbar">
             {bills.length === 0 && <p className="text-center text-sm text-slate-400 py-4 font-medium">No bills added yet.</p>}
-            {bills.map(b => (
-              <div key={b.id} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-slate-100 animate-in zoom-in-95">
-                 <div className="flex items-center gap-3">
-                   {b.logo ? <img src={b.logo} className="w-8 h-8 object-contain rounded-full border border-slate-100 bg-white p-0.5" alt="" /> : <div className="w-8 h-8 bg-slate-100 border border-slate-200 rounded-full flex items-center justify-center"><Zap className="w-4 h-4 text-slate-400" /></div>}
-                   <span className="font-bold text-slate-700">{b.name}</span>
-                 </div>
-                 <div className="flex items-center gap-3">
-                   <span className="text-sm font-bold text-slate-500">{b.amount > 0 ? formatCurrency(b.amount, currency) : 'Var'}</span>
-                   <button onClick={() => setBills(bills.filter(x => x.id !== b.id))} className="text-slate-300 hover:text-rose-500 p-1"><X className="w-4 h-4" /></button>
-                 </div>
-              </div>
-            ))}
+            
+            {bills.map(b => {
+                const isEditing = editingBillId === b.id;
+                const isIncluded = b.included !== false;
+
+                if (isEditing) {
+                    return (
+                        <div key={b.id} className="bg-white p-3 rounded-xl border border-emerald-300 shadow-sm space-y-3 animate-in zoom-in-95">
+                            <div className="flex justify-between items-center mb-1">
+                               <span className="text-xs font-bold text-slate-400 uppercase">Edit Bill</span>
+                               <button onClick={() => setEditingBillId(null)} className="text-emerald-600 text-xs font-bold bg-emerald-50 px-2 py-1 rounded">Done</button>
+                            </div>
+                            <BrandSearchInput
+                                value={b.name}
+                                onChange={(val) => updateBill(b.id, { name: val })}
+                                onSelectBrand={(name, logo) => updateBill(b.id, { name, logo })}
+                                selectedLogo={b.logo}
+                                onClearLogo={() => updateBill(b.id, { logo: null })}
+                                className="w-full p-2.5 rounded-lg border border-slate-200 text-sm font-bold bg-slate-50 focus:bg-white transition outline-none"
+                                placeholder="Bill Name"
+                            />
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">£</span>
+                                <input 
+                                    type="number" 
+                                    className="w-full pl-7 pr-2 py-2.5 rounded-lg border border-slate-200 text-sm font-bold bg-slate-50 focus:bg-white transition outline-none" 
+                                    value={b.amount} 
+                                    onChange={e => updateBill(b.id, { amount: parseFloat(e.target.value) || 0 })} 
+                                />
+                            </div>
+                        </div>
+                    );
+                }
+
+                return (
+                    <div key={b.id} className={`flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-slate-100 transition-all ${!isIncluded ? 'opacity-50 grayscale bg-slate-50' : 'animate-in zoom-in-95'}`}>
+                        <div className="flex items-center gap-3 overflow-hidden flex-1 cursor-pointer" onClick={() => toggleBillInclude(b.id)}>
+                            <button className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors ${isIncluded ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white'}`}>
+                                {isIncluded && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                            </button>
+
+                            {b.logo ? (
+                                <img src={b.logo} className="w-8 h-8 object-contain rounded-full border border-slate-100 bg-white p-0.5 shrink-0" alt="" />
+                            ) : (
+                                <div className="w-8 h-8 bg-slate-100 border border-slate-200 rounded-full flex items-center justify-center shrink-0"><Zap className="w-4 h-4 text-slate-400" /></div>
+                            )}
+                            <span className={`font-bold truncate ${!isIncluded ? 'line-through text-slate-500' : 'text-slate-700'}`}>{b.name}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 pl-2">
+                            <span className="text-sm font-bold text-slate-600 mr-1">{b.amount > 0 ? formatCurrency(b.amount, currency) : 'Var'}</span>
+                            <button onClick={() => setEditingBillId(b.id)} className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg transition"><Edit2 className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => setBills(bills.filter(x => x.id !== b.id))} className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition"><X className="w-4 h-4" /></button>
+                        </div>
+                    </div>
+                );
+            })}
           </div>
 
-          {/* WITH LOGO LOCK ENABLED */}
-          <div className="flex gap-2 items-start relative overflow-visible z-50">
+          <div className="flex gap-2 items-start relative overflow-visible z-50 pt-2">
              <div className="flex-1">
                <BrandSearchInput
-                  placeholder="Search (e.g. Spotify)"
+                  placeholder="Manually add (e.g. Spotify)"
                   value={newBillName}
                   onChange={setNewBillName}
                   onSelectBrand={(name, logo) => { setNewBillName(name); setNewBillLogo(logo); }}
