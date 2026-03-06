@@ -3397,48 +3397,159 @@ const UK_MORTGAGE_LENDERS = [
   { id: 'skipton', name: 'Skipton BS', domain: 'skipton.co.uk' },
 ];
 
-// --- ADMIN TEST LAB SCENARIOS ---
-// --- ADMIN TEST LAB SCENARIOS ---
-const DEMO_SCENARIOS = {
-  'ONBOARDING_NEW': {
-    label: 'Fresh User (Onboarding)',
-    description: 'Simulates a user who just signed up. No settings, no data.',
-    overrides: {
-      onboardingComplete: false,
-      userSettings: { displayName: '', currency: 'GBP', allocationRules: [], defaultFixedExpenses: [] },
-      salary: '', expenses: [], actualSavings: {}
-    }
-  },
-  // --- MERGED SCENARIO HERE ---
-  'LEGACY_UPDATE': {
-    label: 'Legacy User (Update Required)',
-    description: 'Simulates an existing user who needs to add Bank & Payday to continue.',
-    overrides: {
-      onboardingComplete: true,
-      userSettings: { 
-        displayName: 'Old User', 
-        currency: 'GBP', 
-        allocationRules: DEFAULT_ALLOCATIONS, 
-        defaultFixedExpenses: DEFAULT_FIXED_EXPENSES,
-        // BOTH MISSING: This triggers the "Complete Setup" modal
-        bankDetails: null,
-        payDay: null 
-      },
-      salary: '2500', 
-      expenses: DEFAULT_FIXED_EXPENSES, 
-      actualSavings: {}
-    }
-  },
-  'EMPTY_MONTH': {
-    label: 'Month Reset (No Data)',
-    description: 'User is set up, but has added no data for this month yet.',
-    overrides: {
-      onboardingComplete: true,
-      salary: '', 
-      expenses: [], 
-      actualSavings: {}
-    }
-  }
+// --- UPDATED ADMIN DASHBOARD ---
+const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
+  const [view, setView] = useState('logs'); // 'logs' or 'simulator'
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  const [filterUser, setFilterUser] = useState('');
+  const [filterType, setFilterType] = useState('ALL');
+
+  // --- NEW: CACHE WIPE LOGIC ---
+  const handleClearAICache = async (targetUserId) => {
+    if (!window.confirm("Wipe AI brand cache for this user?")) return;
+    try {
+        const dictRef = doc(db, 'artifacts', appId, 'users', targetUserId, 'settings', 'merchantDictionary');
+        await deleteDoc(dictRef);
+        alert("User cache wiped!");
+    } catch (e) { console.error(e); }
+  };
+
+  const handleGlobalCacheWipe = async () => {
+    const msg = "⚠️ NUCLEAR OPTION: Wipe AI cache for EVERY user?\n\nThis will trigger new AI calls for everyone next time they log in.";
+    if (!window.confirm(msg)) return;
+    
+    try {
+      const usersSnap = await getDocs(collection(db, 'artifacts', appId, 'users'));
+      const wipePromises = usersSnap.docs.map(uDoc => 
+        deleteDoc(doc(db, 'artifacts', appId, 'users', uDoc.id, 'settings', 'merchantDictionary'))
+      );
+      await Promise.all(wipePromises);
+      alert(`Successfully wiped AI cache for ${wipePromises.length} users.`);
+    } catch (e) { console.error(e); alert("Wipe failed."); }
+  };
+
+  useEffect(() => {
+    if (view !== 'logs') return;
+    const fetchLogs = async () => {
+      try {
+        const q = query(
+          collection(db, 'artifacts', appId, 'system_logs'),
+          orderBy('timestamp', 'desc'),
+          limit(50)
+        );
+        const snapshot = await getDocs(q);
+        setLogs(snapshot.docs.map(doc => ({
+            id: doc.id, 
+            ...doc.data(), 
+            timestamp: doc.data().timestamp?.toDate().toLocaleString()
+        })));
+      } catch (e) { console.error(e); } finally { setLoading(false); }
+    };
+    fetchLogs();
+  }, [view]);
+
+  const filteredLogs = logs.filter(log => {
+    const matchUser = log.userEmail?.toLowerCase().includes(filterUser.toLowerCase());
+    const matchType = filterType === 'ALL' || log.type === filterType;
+    return matchUser && matchType;
+  });
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-200 p-4 md:p-6 font-mono">
+      <div className="max-w-6xl mx-auto space-y-6">
+        
+        {/* Header & Tabs */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-emerald-500/20 p-2 rounded-lg text-emerald-400">
+              <Shield className="w-8 h-8" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white tracking-tight">System Admin</h1>
+              <div className="flex gap-4 text-xs font-bold uppercase tracking-wider mt-1">
+                 <button onClick={() => setView('logs')} className={view === 'logs' ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}>System Logs</button>
+                 <button onClick={() => setView('simulator')} className={view === 'simulator' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}>Test Lab</button>
+              </div>
+            </div>
+          </div>
+          <button onClick={onExitAdmin} className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold transition flex items-center gap-2">
+            <LogOut className="w-4 h-4" /> Exit
+          </button>
+        </div>
+
+        {/* VIEW: LOGS */}
+        {view === 'logs' && (
+           <div className="space-y-4 animate-in fade-in">
+              {/* ... (Existing Logs UI) ... */}
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-950 text-slate-400 uppercase font-bold">
+                    <tr><th className="p-4">Time</th><th className="p-4">User</th><th className="p-4">Type</th><th className="p-4">Action</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {filteredLogs.map(log => (
+                      <tr key={log.id} className="hover:bg-white/5">
+                        <td className="p-4 text-slate-500">{log.timestamp}</td>
+                        <td className="p-4 font-bold text-indigo-300">{log.userEmail}</td>
+                        <td className="p-4">{log.type}</td>
+                        <td className="p-4 text-slate-300">{log.action}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+           </div>
+        )}
+
+        {/* VIEW: TEST LAB (Simulator) */}
+        {view === 'simulator' && (
+           <div className="space-y-6 animate-in slide-in-from-right-4">
+              
+              {/* --- NEW SYSTEM TOOLS SECTION --- */}
+              <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800">
+                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">System Tools</h3>
+                 <div className="flex flex-wrap gap-4">
+                    <button 
+                      onClick={handleGlobalCacheWipe}
+                      className="flex items-center gap-2 px-6 py-3 bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 border border-rose-500/30 rounded-xl font-bold transition active:scale-95"
+                    >
+                       <AlertTriangle className="w-4 h-4" /> Global AI Cache Wipe
+                    </button>
+                    <button 
+                      onClick={() => handleClearAICache(user.uid)}
+                      className="flex items-center gap-2 px-6 py-3 bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 border border-indigo-500/30 rounded-xl font-bold transition active:scale-95"
+                    >
+                       <RefreshCw className="w-4 h-4" /> Wipe My Test Cache
+                    </button>
+                 </div>
+              </div>
+
+              {/* Existing Scenarios List */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 {Object.entries(DEMO_SCENARIOS).map(([key, scenario]) => (
+                    <button 
+                      key={key}
+                      onClick={() => onSelectDemo(key)}
+                      className="bg-slate-900 border border-slate-800 hover:border-indigo-500 hover:bg-slate-800 p-6 rounded-2xl text-left transition group relative overflow-hidden"
+                    >
+                       <div className="relative z-10">
+                          <h3 className="font-bold text-white text-lg mb-1 group-hover:text-indigo-400 transition">{scenario.label}</h3>
+                          <p className="text-sm text-slate-400">{scenario.description}</p>
+                       </div>
+                       <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition transform translate-x-4 group-hover:translate-x-0">
+                          <ArrowRight className="w-6 h-6 text-indigo-500" />
+                       </div>
+                    </button>
+                 ))}
+              </div>
+           </div>
+        )}
+
+      </div>
+    </div>
+  );
 };
 
 // --- NEW HELPER: PAYDAY CALCULATOR ---
