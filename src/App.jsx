@@ -5615,7 +5615,7 @@ export default function App() {
     }
   };
 
-  // --- NEW: AUTO-FIND SALARY MAGIC (BULLETPROOF STRING MATCHING) ---
+  // --- NEW: AUTO-FIND SALARY MAGIC (CLOSEST MATCH ALGORITHM) ---
   const handleFindSalary = async () => {
     // 1. Validate setup
     const salaryBank = effectiveSettings?.bankDetails?.name;
@@ -5654,11 +5654,16 @@ export default function App() {
     const expectedPayday = new Date(year, month, userPayday);
     expectedPayday.setHours(0,0,0,0);
 
-    // GUARD CLAUSE: If the target payday is way in the future, stop immediately!
+    // GUARD CLAUSE 1: If looking at a future month
+    if (year > today.getFullYear() || (year === today.getFullYear() && month > today.getMonth())) {
+        showToast(`Hold tight! You haven't been paid for ${monthName} yet.`);
+        return;
+    }
+
+    // GUARD CLAUSE 2: Snappy UX - If the target payday is still weeks away, stop immediately!
     if (expectedPayday > today) {
         const daysUntilPayday = (expectedPayday - today) / (1000 * 60 * 60 * 24);
-        // If it's more than 12 days away, they definitely haven't been paid for this cycle yet.
-        if (daysUntilPayday > 12) {
+        if (daysUntilPayday > 15) {
             showToast(`Hold tight! You haven't been paid for ${monthName} yet.`);
             return;
         }
@@ -5715,8 +5720,7 @@ export default function App() {
             return;
         }
 
-        // STEP B: Base Employer Name Extraction (Solves the "Not Paid Yet" bug for old months)
-        // Banks change descriptions (e.g. "ACME 01" vs "ACME 02"). We extract just the first core word!
+        // STEP B: Base Employer Name Extraction 
         const sortedIncomes = [...allIncomes].sort((a, b) => b.amount - a.amount);
         const absoluteLargestTx = sortedIncomes[0];
         const rawEmployer = (absoluteLargestTx.merchant && absoluteLargestTx.merchant !== 'Unknown') 
@@ -5726,43 +5730,54 @@ export default function App() {
         const employerWords = rawEmployer.replace(/[^a-zA-Z0-9 ]/g, '').split(' ').filter(w => w.length > 2);
         const baseEmployerName = employerWords.length > 0 ? employerWords[0].toLowerCase() : rawEmployer.toLowerCase();
 
-        // STEP C: Isolate transactions meant for the VIEWED MONTH
-        const viewedMonthIncomes = allIncomes.filter(tx => {
+        // STEP C: Isolate transactions meant for the specific employer
+        const employerIncomes = allIncomes.filter(tx => {
+            const name = (tx.merchant && tx.merchant !== 'Unknown') ? tx.merchant : tx.description;
+            return name.toLowerCase().includes(baseEmployerName);
+        });
+
+        if (employerIncomes.length === 0) {
+            showToast(`Could not identify employer.`);
+            return;
+        }
+
+        // Exclude tiny transactions (e.g. expenses reimbursements from the same employer)
+        const maxSalaryAmount = Math.max(...employerIncomes.map(t => t.amount));
+        const validSalaries = employerIncomes.filter(t => t.amount > (maxSalaryAmount * 0.5));
+
+        // STEP D: Find the absolute closest paycheck to the expected payday
+        let closestTx = null;
+        let minDiff = Infinity;
+
+        validSalaries.forEach(tx => {
             const txDate = new Date(tx.date);
             txDate.setHours(0,0,0,0);
             
-            // Must be within 12 days of this month's exact expected payday
-            const diffDays = Math.abs(txDate - expectedPayday) / (1000 * 60 * 60 * 24);
-            return diffDays <= 12; 
+            // Calculate absolute distance in days between the transaction and the target payday
+            const diff = Math.abs(txDate - expectedPayday) / (1000 * 60 * 60 * 24);
+            
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestTx = tx;
+            }
         });
 
-        if (viewedMonthIncomes.length === 0) {
+        // STEP E: The Ultimate Threshold Check
+        // If the closest paycheck we found is more than 15 days away from the expected date,
+        // it means it's actually the previous or next month's paycheck!
+        if (!closestTx || minDiff > 15) {
             const cleanName = rawEmployer.substring(0, 15).trim();
             showToast(`Hold tight! You haven't been paid by ${cleanName} for ${monthName} yet.`);
             return;
         }
 
-        // STEP D: Find the matching salary in that isolated window
-        viewedMonthIncomes.sort((a, b) => b.amount - a.amount);
-        
-        // Prefer a match with the employer base name
-        let finalSalaryTx = viewedMonthIncomes.find(tx => {
-            const name = (tx.merchant && tx.merchant !== 'Unknown') ? tx.merchant : tx.description;
-            return name.toLowerCase().includes(baseEmployerName);
-        });
-
-        // Fallback to the largest incoming transaction if string match fails
-        if (!finalSalaryTx) {
-            finalSalaryTx = viewedMonthIncomes[0]; 
-        }
-
-        // Apply!
-        updateSalary(finalSalaryTx.amount.toString());
-        const finalName = (finalSalaryTx.merchant && finalSalaryTx.merchant !== 'Unknown') 
-            ? finalSalaryTx.merchant 
-            : finalSalaryTx.description;
+        // STEP F: Apply it!
+        updateSalary(closestTx.amount.toString());
+        const finalName = (closestTx.merchant && closestTx.merchant !== 'Unknown') 
+            ? closestTx.merchant 
+            : closestTx.description;
             
-        showToast(`Salary synced: £${finalSalaryTx.amount} from ${finalName.substring(0, 15)}`);
+        showToast(`Salary synced: £${closestTx.amount} from ${finalName.substring(0, 15)}`);
         triggerHaptic();
         if (typeof playJuiceSound === 'function') playJuiceSound('success');
 
