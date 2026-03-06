@@ -672,43 +672,43 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                              )}
                           </div>
 
-                          {/* --- new: brand analytics & danger zone --- */}
-                          {sortedcategories.length > 0 && (
-                             <div classname="mt-12 space-y-12 pt-10 border-t border-slate-100">
+                          {/* --- NEW: BRAND ANALYTICS & DANGER ZONE --- */}
+                          {sortedCategories.length > 0 && (
+                             <div className="mt-12 space-y-12 pt-10 border-t border-slate-100">
                                 
-                                {/* 1. top brands widget */}
+                                {/* 1. TOP BRANDS WIDGET */}
                                 <div>
-                                   <h3 classname="text-lg font-bold text-slate-800 mb-5 flex items-center gap-2">
-                                      <shoppingbag classname="w-5 h-5 text-pink-500" /> your top brands
+                                   <h3 className="text-lg font-bold text-slate-800 mb-5 flex items-center gap-2">
+                                      <ShoppingBag className="w-5 h-5 text-pink-500" /> Your Top Brands
                                    </h3>
-                                   <div classname="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                      {analyticsinsights.topmerchants.map((merchant, idx) => (
-                                         <div key={idx} classname="bg-slate-50 p-5 rounded-2xl border border-slate-100 relative overflow-hidden group hover:shadow-md transition">
-                                            {/* watermark number */}
-                                            <div classname="absolute -right-4 -bottom-4 opacity-[0.03] text-7xl font-black">{idx + 1}</div>
+                                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                      {analyticsInsights.topMerchants.map((merchant, idx) => (
+                                         <div key={idx} className="bg-slate-50 p-5 rounded-2xl border border-slate-100 relative overflow-hidden group hover:shadow-md transition">
+                                            {/* Watermark Number */}
+                                            <div className="absolute -right-4 -bottom-4 opacity-[0.03] text-7xl font-black">{idx + 1}</div>
                                             
-                                            <div classname="flex items-center gap-3 mb-3 relative z-10">
-                                               {/* logo box with fallback */}
-                                               <div classname="w-10 h-10 bg-white rounded-xl shadow-sm border border-slate-200 flex items-center justify-center font-bold text-slate-400 overflow-hidden relative shrink-0">
-                                                  <span classname="absolute inset-0 flex items-center justify-center bg-slate-100 text-slate-500 text-lg z-0">
-                                                      {merchant.name.charat(0)}
+                                            <div className="flex items-center gap-3 mb-3 relative z-10">
+                                               {/* Logo Box with Fallback */}
+                                               <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-slate-200 flex items-center justify-center font-bold text-slate-400 overflow-hidden relative shrink-0">
+                                                  <span className="absolute inset-0 flex items-center justify-center bg-slate-100 text-slate-500 text-lg z-0">
+                                                      {merchant.name.charAt(0)}
                                                   </span>
-                                                  {logo_public_key && (
+                                                  {LOGO_PUBLIC_KEY && (
                                                       <img 
-                                                          src={`https://img.logo.dev/${merchant.name.tolowercase().replace(/[^a-z0-9]/g, '')}.com?token=${logo_public_key}`}
-                                                          onerror={(e) => { e.target.style.opacity = '0'; }}
-                                                          classname="w-full h-full object-contain p-1.5 relative z-10 transition-opacity bg-white"
+                                                          src={`https://img.logo.dev/${merchant.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.com?token=${LOGO_PUBLIC_KEY}`}
+                                                          onError={(e) => { e.target.style.opacity = '0'; }}
+                                                          className="w-full h-full object-contain p-1.5 relative z-10 transition-opacity bg-white"
                                                           alt=""
                                                       />
                                                   )}
                                                </div>
-                                               <h4 classname="font-bold text-slate-800 truncate" title={merchant.name}>{merchant.name}</h4>
+                                               <h4 className="font-bold text-slate-800 truncate" title={merchant.name}>{merchant.name}</h4>
                                             </div>
                                             
-                                            <div classname="relative z-10">
-                                               <p classname="text-xs text-slate-500 mb-1">visited <strong>{merchant.count} times</strong></p>
-                                               <p classname="text-lg font-black text-slate-900 tracking-tight">
-                                                   {currency === 'gbp' ? '£' : currency === 'usd' ? '$' : '€'}{merchant.total.tofixed(2)}
+                                            <div className="relative z-10">
+                                               <p className="text-xs text-slate-500 mb-1">Visited <strong>{merchant.count} times</strong></p>
+                                               <p className="text-lg font-black text-slate-900 tracking-tight">
+                                                   {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}{merchant.total.toFixed(2)}
                                                </p>
                                             </div>
                                          </div>
@@ -716,30 +716,30 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                    </div>
                                 </div>
 
-                                {/* 2. the danger zone heatmap */}
+                                {/* 2. THE DANGER ZONE HEATMAP */}
                                 <div>
-                                   <h3 classname="text-lg font-bold text-slate-800 mb-5 flex items-center gap-2">
-                                      <alerttriangle classname="w-5 h-5 text-rose-500" /> the danger zone
+                                   <h3 className="text-lg font-bold text-slate-800 mb-5 flex items-center gap-2">
+                                      <AlertTriangle className="w-5 h-5 text-rose-500" /> The Danger Zone
                                    </h3>
-                                   <div classname="bg-rose-50/50 border border-rose-100 p-6 rounded-[2rem]">
-                                        <p classname="text-sm text-rose-800 font-medium mb-8 leading-relaxed">
-                                           you spend <strong classname="font-black text-rose-600 text-base">{analyticsinsights.dangerpercentage}%</strong> of your money on <strong classname="text-base">{analyticsinsights.dangerday}s</strong>. 
-                                           keep an eye on this day to protect your weekly pace!
+                                   <div className="bg-rose-50/50 border border-rose-100 p-6 rounded-[2rem]">
+                                        <p className="text-sm text-rose-800 font-medium mb-8 leading-relaxed">
+                                           You spend <strong className="font-black text-rose-600 text-base">{analyticsInsights.dangerPercentage}%</strong> of your money on <strong className="text-base">{analyticsInsights.dangerDay}s</strong>. 
+                                           Keep an eye on this day to protect your weekly pace!
                                         </p>
 
-                                        <div classname="flex items-end justify-between h-36 gap-2">
-                                            {analyticsinsights.daysofweek.map((day, i) => (
-                                               <div key={i} classname="flex flex-col items-center flex-1 h-full justify-end group">
+                                        <div className="flex items-end justify-between h-36 gap-2">
+                                            {analyticsInsights.daysOfWeek.map((day, i) => (
+                                               <div key={i} className="flex flex-col items-center flex-1 h-full justify-end group">
                                                   <div 
-                                                    classname={`w-full max-w-[32px] rounded-t-xl transition-all duration-1000 ease-out relative ${day.isdanger ? 'bg-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.3)]' : 'bg-rose-200/50 hover:bg-rose-300/50'}`}
-                                                    style={{ height: `${math.max(8, day.heightpercent)}%` }}
+                                                    className={`w-full max-w-[32px] rounded-t-xl transition-all duration-1000 ease-out relative ${day.isDanger ? 'bg-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.3)]' : 'bg-rose-200/50 hover:bg-rose-300/50'}`}
+                                                    style={{ height: `${Math.max(8, day.heightPercent)}%` }}
                                                   >
-                                                     {/* floating tooltip */}
-                                                     <div classname="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 bg-slate-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10 transition left-1/2 -translate-x-1/2 pointer-events-none">
-                                                        {currency === 'gbp' ? '£' : currency === 'usd' ? '$' : '€'}{day.total.tofixed(0)}
+                                                     {/* Floating Tooltip */}
+                                                     <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 bg-slate-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10 transition left-1/2 -translate-x-1/2 pointer-events-none">
+                                                        {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}{day.total.toFixed(0)}
                                                      </div>
                                                   </div>
-                                                  <span classname={`text-[10px] sm:text-xs mt-3 font-bold ${day.isdanger ? 'text-rose-600' : 'text-slate-400'}`}>{day.day}</span>
+                                                  <span className={`text-[10px] sm:text-xs mt-3 font-bold ${day.isDanger ? 'text-rose-600' : 'text-slate-400'}`}>{day.day}</span>
                                                </div>
                                             ))}
                                         </div>
