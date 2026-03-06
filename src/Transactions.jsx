@@ -687,19 +687,19 @@ useEffect(() => {
                              <div key={`${tx.id}-${idx}`} className={`p-4 sm:p-5 flex justify-between items-center transition group ${isTransfer ? 'opacity-70 grayscale-[20%] hover:bg-slate-100' : 'hover:bg-slate-50'}`}>
                                  <div className="flex items-center gap-4">
                                    <div className="relative">
-                                       <div className={`p-3 rounded-2xl border transition overflow-hidden relative w-12 h-12 flex items-center justify-center group-hover:shadow-sm ${isTransfer ? 'bg-slate-100 border-slate-200' : 'bg-slate-50 border-slate-100 group-hover:bg-white'}`}>
-                                           <div className="absolute inset-0 flex items-center justify-center opacity-30">
-                                              {getCategoryIcon(tx.category)}
-                                           </div>
-                                           {displayLogo && !isTransfer && (
-                                                <img 
-                                                src={displayLogo} 
-                                                onError={(e) => { e.target.style.opacity = '0'; }}
-                                                className="w-full h-full object-cover relative z-10 transition-opacity rounded-2xl"
-                                                alt="" 
-                                              />
-                                           )}
-                                       </div>
+                                   <div className={`rounded-2xl border transition overflow-hidden relative w-12 h-12 flex items-center justify-center group-hover:shadow-sm ${isTransfer ? 'bg-slate-100 border-slate-200' : 'bg-slate-50 border-slate-100 group-hover:bg-white'}`}>
+    <div className="absolute inset-0 flex items-center justify-center opacity-30">
+       {getCategoryIcon(tx.category)}
+    </div>
+    {displayLogo && !isTransfer && (
+         <img 
+         src={displayLogo} 
+         onError={(e) => { e.target.style.opacity = '0'; }}
+         className="absolute inset-0 w-full h-full object-cover z-10 transition-opacity" 
+         alt="" 
+       />
+    )}
+</div>
                                        {isTransfer && displayLogo && (
                                            <div className="absolute -bottom-1 -right-1 bg-white p-0.5 rounded-full shadow-sm border border-slate-100 z-20">
                                                <img src={displayLogo} className="w-4 h-4 object-contain rounded-full" />
