@@ -3364,6 +3364,7 @@ const UK_BANKS = [
   { id: 'halifax', name: 'Halifax', domain: 'halifax.co.uk', color: '#005EB8' },
   { id: 'revolut', name: 'Revolut', domain: 'revolut.com', color: '#0075EB' },
   { id: 'nationwide', name: 'Nationwide', domain: 'nationwide.co.uk', color: '#D2112C' },
+  { id: 'natwest-biz', name: 'NatWest Business', domain: 'natwest.com', color: '#42145F' },
 ];
 
 // --- NEW: UK CREDIT CARDS ---
@@ -3496,7 +3497,7 @@ const calculateDaysUntilPayday = (payDayStr, salaryInputted) => {
 // --- NEW COMPONENT: ONBOARDING WIZARD ---
 
 const TRUELAYER_PROVIDERS = {
-  'monzo': 'ob-monzo', 'barclays': 'ob-barclays', 'natwest': 'ob-natwest', 'lloyds': 'ob-lloyds',
+  'monzo': 'ob-monzo', 'barclays': 'ob-barclays', 'natwest': 'ob-natwest', 'natwest business': 'ob-natwest-business', 'lloyds': 'ob-lloyds',
   'halifax': 'ob-halifax', 'santander': 'ob-santander', 'hsbc': 'ob-hsbc', 'starling': 'ob-starling',
   'revolut': 'ob-revolut', 'nationwide': 'ob-nationwide', 'first direct': 'ob-first-direct', 'tsb': 'ob-tsb',
   'amex': 'ob-amex', 'american express': 'ob-amex', 'capital one': 'ob-capital-one', 'mbna': 'ob-mbna',
