@@ -5615,7 +5615,7 @@ export default function App() {
     }
   };
 
-  // --- NEW: AUTO-FIND SALARY MAGIC (EMPLOYER & DATE AWARE) ---
+  // --- NEW: AUTO-FIND SALARY MAGIC (EMPLOYER & VIEWPORT AWARE) ---
   const handleFindSalary = async () => {
     // 1. Validate setup
     const salaryBank = effectiveSettings?.bankDetails?.name;
@@ -5646,7 +5646,7 @@ export default function App() {
 
     // 4. Identify the SPECIFIC month the user is viewing
     const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
+    const month = currentDate.getMonth(); // 0-indexed
     const monthName = currentDate.toLocaleString('en-GB', { month: 'long' });
     const today = new Date();
 
@@ -5660,9 +5660,16 @@ export default function App() {
     triggerHaptic();
 
     try {
-        // Fetch the last 65 days to establish a baseline
-        const fromDate = new Date();
-        fromDate.setDate(today.getDate() - 65); 
+        // 5. SMART FETCH WINDOW (Anchored to the VIEWED month, not 'today')
+        // End date: last day of the viewed month, OR today if the viewed month is the current month
+        let toDate = new Date(year, month + 1, 0, 23, 59, 59);
+        if (toDate > today) {
+            toDate = today;
+        }
+
+        // Start date: 90 days before the end date (ensures we see historical paychecks to identify the employer)
+        const fromDate = new Date(toDate);
+        fromDate.setDate(toDate.getDate() - 90); 
         
         const response = await fetch('/api/transactions', {
             method: 'POST',
@@ -5672,7 +5679,7 @@ export default function App() {
                 clientId: import.meta.env.VITE_TL_CLIENT_ID,
                 accounts: connection.accounts,
                 from: fromDate.toISOString(),
-                to: today.toISOString()
+                to: toDate.toISOString()
             })
         });
 
@@ -5692,70 +5699,55 @@ export default function App() {
              }, { merge: true });
         }
 
-        // --- NEW LOGIC: The ±7 Day Payday Window Checker ---
-        const isNearPayday = (dateString, targetDay) => {
-            const txDate = new Date(dateString);
-            const msPerDay = 1000 * 60 * 60 * 24;
-            
-            // We check the payday of the transaction's month, AND the adjacent months.
-            // This safely catches people paid on the 28th for a 1st of the month payday!
-            const pThis = new Date(txDate.getFullYear(), txDate.getMonth(), targetDay);
-            const pNext = new Date(txDate.getFullYear(), txDate.getMonth() + 1, targetDay);
-            const pPrev = new Date(txDate.getFullYear(), txDate.getMonth() - 1, targetDay);
-            
-            const minDiff = Math.min(
-               Math.abs(txDate - pThis) / msPerDay,
-               Math.abs(txDate - pNext) / msPerDay,
-               Math.abs(txDate - pPrev) / msPerDay
-            );
-            
-            return minDiff <= 7; // Gives a 14-day safe window around payday
-        };
-
-        // STEP A: Filter for all valid, settled incoming money THAT FALLS IN THE WINDOW
+        // STEP A: Filter for all valid, settled incoming money
         const allIncomes = (data.transactions || []).filter(tx => 
             tx.amount > 0 && 
             tx.category !== 'Transfer' &&
-            !tx.is_pending &&
-            isNearPayday(tx.date, userPayday)
+            !tx.is_pending
         );
 
         if (allIncomes.length === 0) {
-            showToast("No salary payments found near your payday dates.");
+            showToast(`No income history found for ${monthName} or prior.`);
             return;
         }
 
-        // STEP B: Identify the Employer (The absolute largest income in the 65 day window)
+        // STEP B: Identify the Employer (Largest income in the 90 day window)
         const sortedIncomes = [...allIncomes].sort((a, b) => b.amount - a.amount);
         const trueSalaryTx = sortedIncomes[0];
         
-        // FIX: Explicitly reject the string 'Unknown' and fall back to the raw description
+        // FIX: Safely parse and reject the string 'Unknown'
         const employerName = (trueSalaryTx.merchant && trueSalaryTx.merchant !== 'Unknown') 
             ? trueSalaryTx.merchant 
             : trueSalaryTx.description;
 
-        // STEP C: Strictly check the VIEWED MONTH for this specific employer
-        // (Also checking if it's within the window for the viewed month)
-        const expectedPaydayForViewedMonth = new Date(year, month, userPayday);
+        // STEP C: Locate the Salary FOR THIS SPECIFIC MONTH
+        // We calculate the exact date you SHOULD have been paid for the month you are looking at
+        const expectedPayday = new Date(year, month, userPayday);
         
-        const viewedMonthSalary = allIncomes.find(tx => {
-            const txDate = new Date(tx.date);
-            
-            // FIX: Safely parse the transaction name using the exact same logic
+        let viewedMonthSalary = null;
+        let minDiff = Infinity;
+        
+        allIncomes.forEach(tx => {
             const txEmployerName = (tx.merchant && tx.merchant !== 'Unknown') 
                 ? tx.merchant 
                 : tx.description;
                 
-            const isCorrectEmployer = txEmployerName === employerName;
-            
-            // Is this transaction within 7 days of the Payday for the specific month the user is looking at?
-            const diffDays = Math.abs(txDate - expectedPaydayForViewedMonth) / (1000 * 60 * 60 * 24);
-            const isForThisMonth = diffDays <= 7;
-            
-            return isForThisMonth && isCorrectEmployer;
+            // Only consider transactions from the true employer
+            if (txEmployerName === employerName) {
+                const txDate = new Date(tx.date);
+                
+                // How far away is this transaction from the TARGET payday of the viewed month?
+                const diffDays = Math.abs(txDate - expectedPayday) / (1000 * 60 * 60 * 24);
+                
+                // Must be within 12 days of the expected payday for THIS month (handles weekends/bank holidays)
+                if (diffDays <= 12 && diffDays < minDiff) {
+                    minDiff = diffDays;
+                    viewedMonthSalary = tx;
+                }
+            }
         });
 
-        // If the employer hasn't paid you for the viewed month yet...
+        // If we didn't find anything close to the expected payday...
         if (!viewedMonthSalary) {
             const cleanEmployerName = employerName.replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 15).trim();
             showToast(`Hold tight! You haven't been paid by ${cleanEmployerName} for ${monthName} yet.`);
