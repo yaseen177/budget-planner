@@ -9,7 +9,8 @@ import {
   query,
   orderBy,
   limit,
-  where
+  where,
+  deleteDoc
 } from 'firebase/firestore';
 import { 
   LayoutDashboard, 
@@ -104,6 +105,52 @@ export default function AdminDashboard({ user, onLogout, onExitAdmin }) {
     }
   };
 
+  const handleClearAICache = async (targetUserId) => {
+    // Optional: Add a quick confirmation so you don't click it by accident!
+    if (!window.confirm("Are you sure you want to wipe this user's AI brand cache? This will cost AI tokens to regenerate.")) {
+        return;
+    }
+
+    try {
+        // Point directly to the user's saved dictionary
+        const dictRef = doc(db, 'artifacts', appId, 'users', targetUserId, 'settings', 'merchantDictionary');
+        
+        // Delete the document completely
+        await deleteDoc(dictRef);
+        
+        alert("AI brand cache successfully wiped! The AI will regenerate clean names and logos on their next visit.");
+    } catch (error) {
+        console.error("Failed to clear AI cache:", error);
+        alert("Error clearing cache. Check your console for details.");
+    }
+};
+
+const handleGlobalCacheWipe = async () => {
+  // 1. The Safety Lock
+  const confirmMessage = "⚠️ CRITICAL WARNING: You are about to wipe the AI cache for EVERY SINGLE USER. \n\nThis will force the AI to rescan all their transactions from scratch and consume a significant amount of API tokens. \n\nAre you absolutely sure you want to proceed?";
+  
+  if (!window.confirm(confirmMessage)) {
+      return; // Abort if they click Cancel
+  }
+
+  try {
+      // 2. Create an array of simultaneous delete instructions
+      // Change 'users' to 'filteredUsers' if you only want to target searched users
+      const deletePromises = users.map(u => {
+          const dictRef = doc(db, 'artifacts', appId, 'users', u.uid, 'settings', 'merchantDictionary');
+          return deleteDoc(dictRef);
+      });
+
+      // 3. Execute all deletions in parallel for maximum speed
+      await Promise.all(deletePromises);
+      
+      alert(`Success! Wiped the AI cache for ${deletePromises.length} users globally.`);
+  } catch (error) {
+      console.error("Failed to execute Global Wipe:", error);
+      alert("An error occurred during the global wipe. Check the developer console for details.");
+  }
+};
+
   const handlePasswordReset = async (email) => {
     if (!email) return alert("No email associated with this user data.");
     if (confirm(`Send password reset email to ${email}?`)) {
@@ -191,15 +238,28 @@ export default function AdminDashboard({ user, onLogout, onExitAdmin }) {
              <div className="p-6">
                <div className="flex justify-between items-center mb-6">
                  <h3 className="font-bold text-lg text-slate-700">User Management</h3>
-                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input 
-                      type="text" 
-                      placeholder="Search users..." 
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
+                 
+                 <div className="flex items-center gap-4">
+                     {/* The Nuclear Button */}
+                     <button 
+                        onClick={handleGlobalCacheWipe}
+                        className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm rounded-lg shadow-sm transition-all active:scale-95"
+                     >
+                        <AlertTriangle className="w-4 h-4" />
+                        Global AI Wipe
+                     </button>
+
+                     {/* The Existing Search Bar */}
+                     <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input 
+                          type="text" 
+                          placeholder="Search users..." 
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                     </div>
                  </div>
                </div>
 
@@ -234,6 +294,14 @@ export default function AdminDashboard({ user, onLogout, onExitAdmin }) {
                             </button>
                             <button className="p-2 hover:bg-indigo-50 text-indigo-600 rounded-lg transition" title="View Data">
                                <Eye className="w-4 h-4" />
+                            </button>
+                            {/* --- THE NEW AI REFRESH BUTTON --- */}
+                            <button 
+                              onClick={() => handleClearAICache(u.uid)} 
+                              className="p-2 hover:bg-rose-50 text-rose-600 rounded-lg transition" 
+                              title="Force Refresh AI Cache"
+                            >
+                               <RefreshCw className="w-4 h-4" />
                             </button>
                          </td>
                        </tr>
