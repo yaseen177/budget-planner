@@ -3405,6 +3405,8 @@ const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
   
   const [filterUser, setFilterUser] = useState('');
   const [filterType, setFilterType] = useState('ALL');
+  const [isRefreshingCache, setIsRefreshingCache] = useState(false);
+  const [cacheRefreshStatus, setCacheRefreshStatus] = useState(null); // null | 'success' | 'error'
 
   // --- NEW: CACHE WIPE LOGIC ---
   const handleClearAICache = async (targetUserId) => {
@@ -3419,15 +3421,39 @@ const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
   const handleGlobalCacheWipe = async () => {
     const msg = "⚠️ NUCLEAR OPTION: Wipe AI cache for EVERY user?\n\nThis will trigger new AI calls for everyone next time they log in.";
     if (!window.confirm(msg)) return;
-    
+
     try {
       const usersSnap = await getDocs(collection(db, 'artifacts', appId, 'users'));
-      const wipePromises = usersSnap.docs.map(uDoc => 
+      const wipePromises = usersSnap.docs.map(uDoc =>
         deleteDoc(doc(db, 'artifacts', appId, 'users', uDoc.id, 'settings', 'merchantDictionary'))
       );
       await Promise.all(wipePromises);
       alert(`Successfully wiped AI cache for ${wipePromises.length} users.`);
     } catch (e) { console.error(e); alert("Wipe failed."); }
+  };
+
+  // --- REFRESH GEMINI AI CACHE ---
+  const handleRefreshAICache = async () => {
+    if (!window.confirm("Refresh Gemini AI Cache?\n\nThis will clear all cached AI merchant data for every user. When they next open Transactions, the AI will regenerate fresh merchant names and logo prompts.")) return;
+
+    setIsRefreshingCache(true);
+    setCacheRefreshStatus(null);
+
+    try {
+      const usersSnap = await getDocs(collection(db, 'artifacts', appId, 'users'));
+      const refreshPromises = usersSnap.docs.map(uDoc =>
+        deleteDoc(doc(db, 'artifacts', appId, 'users', uDoc.id, 'settings', 'merchantDictionary'))
+      );
+      await Promise.all(refreshPromises);
+      setCacheRefreshStatus('success');
+      setTimeout(() => setCacheRefreshStatus(null), 4000);
+    } catch (e) {
+      console.error("AI Cache refresh failed:", e);
+      setCacheRefreshStatus('error');
+      setTimeout(() => setCacheRefreshStatus(null), 4000);
+    } finally {
+      setIsRefreshingCache(false);
+    }
   };
 
   useEffect(() => {
@@ -3507,17 +3533,45 @@ const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
         {view === 'simulator' && (
            <div className="space-y-6 animate-in slide-in-from-right-4">
               
-              {/* --- NEW SYSTEM TOOLS SECTION --- */}
+              {/* --- SYSTEM TOOLS SECTION --- */}
               <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800">
                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">System Tools</h3>
+
+                 {/* Refresh Gemini AI Cache - Primary Action */}
+                 <div className="mb-4 p-4 bg-emerald-600/10 border border-emerald-500/20 rounded-2xl">
+                    <div className="flex items-start justify-between gap-4">
+                       <div className="flex-1">
+                          <h4 className="text-sm font-bold text-emerald-400 mb-1">Refresh Gemini AI Cache</h4>
+                          <p className="text-xs text-slate-400 leading-relaxed">Clears all cached AI merchant data from Firebase. When any user next opens Transactions, the Gemini AI will regenerate fresh merchant names and logo prompts from scratch.</p>
+                       </div>
+                       <button
+                         onClick={handleRefreshAICache}
+                         disabled={isRefreshingCache}
+                         className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition active:scale-95 shrink-0 ${
+                           cacheRefreshStatus === 'success'
+                             ? 'bg-emerald-600 text-white'
+                             : cacheRefreshStatus === 'error'
+                             ? 'bg-rose-600 text-white'
+                             : 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-500/30'
+                         } disabled:opacity-60`}
+                       >
+                          <RefreshCw className={`w-4 h-4 ${isRefreshingCache ? 'animate-spin' : ''}`} />
+                          {isRefreshingCache ? 'Refreshing...' : cacheRefreshStatus === 'success' ? 'Cache Cleared!' : cacheRefreshStatus === 'error' ? 'Failed' : 'Refresh Cache'}
+                       </button>
+                    </div>
+                    {cacheRefreshStatus === 'success' && (
+                       <p className="text-xs text-emerald-400/80 mt-2">All users will get fresh AI-generated merchant names and logos on their next visit.</p>
+                    )}
+                 </div>
+
                  <div className="flex flex-wrap gap-4">
-                    <button 
+                    <button
                       onClick={handleGlobalCacheWipe}
                       className="flex items-center gap-2 px-6 py-3 bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 border border-rose-500/30 rounded-xl font-bold transition active:scale-95"
                     >
                        <AlertTriangle className="w-4 h-4" /> Global AI Cache Wipe
                     </button>
-                    <button 
+                    <button
                       onClick={() => handleClearAICache(user.uid)}
                       className="flex items-center gap-2 px-6 py-3 bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 border border-indigo-500/30 rounded-xl font-bold transition active:scale-95"
                     >
@@ -4714,10 +4768,36 @@ const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
   const [view, setView] = useState('logs'); // 'logs' or 'simulator'
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Filters
   const [filterUser, setFilterUser] = useState('');
   const [filterType, setFilterType] = useState('ALL');
+  const [isRefreshingCache, setIsRefreshingCache] = useState(false);
+  const [cacheRefreshStatus, setCacheRefreshStatus] = useState(null); // null | 'success' | 'error'
+
+  // --- REFRESH GEMINI AI CACHE ---
+  const handleRefreshAICache = async () => {
+    if (!window.confirm("Refresh Gemini AI Cache?\n\nThis will clear all cached AI merchant data for every user. When they next open Transactions, the AI will regenerate fresh merchant names and logo prompts.")) return;
+
+    setIsRefreshingCache(true);
+    setCacheRefreshStatus(null);
+
+    try {
+      const usersSnap = await getDocs(collection(db, 'artifacts', appId, 'users'));
+      const refreshPromises = usersSnap.docs.map(uDoc =>
+        deleteDoc(doc(db, 'artifacts', appId, 'users', uDoc.id, 'settings', 'merchantDictionary'))
+      );
+      await Promise.all(refreshPromises);
+      setCacheRefreshStatus('success');
+      setTimeout(() => setCacheRefreshStatus(null), 4000);
+    } catch (e) {
+      console.error("AI Cache refresh failed:", e);
+      setCacheRefreshStatus('error');
+      setTimeout(() => setCacheRefreshStatus(null), 4000);
+    } finally {
+      setIsRefreshingCache(false);
+    }
+  };
 
   useEffect(() => {
     if (view !== 'logs') return;
@@ -4730,8 +4810,8 @@ const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
         );
         const snapshot = await getDocs(q);
         setLogs(snapshot.docs.map(doc => ({
-            id: doc.id, 
-            ...doc.data(), 
+            id: doc.id,
+            ...doc.data(),
             timestamp: doc.data().timestamp?.toDate().toLocaleString()
         })));
       } catch (e) { console.error(e); } finally { setLoading(false); }
@@ -4749,7 +4829,7 @@ const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 p-4 md:p-6 font-mono">
       <div className="max-w-6xl mx-auto space-y-6">
-        
+
         {/* Header & Tabs */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
           <div className="flex items-center gap-3">
@@ -4811,9 +4891,44 @@ const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
 
         {/* VIEW: SIMULATOR */}
         {view === 'simulator' && (
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-right-4">
+           <div className="space-y-6 animate-in slide-in-from-right-4">
+
+              {/* --- SYSTEM TOOLS SECTION --- */}
+              <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800">
+                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">System Tools</h3>
+
+                 {/* Refresh Gemini AI Cache - Primary Action */}
+                 <div className="p-4 bg-emerald-600/10 border border-emerald-500/20 rounded-2xl">
+                    <div className="flex items-start justify-between gap-4">
+                       <div className="flex-1">
+                          <h4 className="text-sm font-bold text-emerald-400 mb-1">Refresh Gemini AI Cache</h4>
+                          <p className="text-xs text-slate-400 leading-relaxed">Clears all cached AI merchant data from Firebase. When any user next opens Transactions, the Gemini AI will regenerate fresh merchant names and logo prompts from scratch.</p>
+                       </div>
+                       <button
+                         onClick={handleRefreshAICache}
+                         disabled={isRefreshingCache}
+                         className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition active:scale-95 shrink-0 ${
+                           cacheRefreshStatus === 'success'
+                             ? 'bg-emerald-600 text-white'
+                             : cacheRefreshStatus === 'error'
+                             ? 'bg-rose-600 text-white'
+                             : 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-500/30'
+                         } disabled:opacity-60`}
+                       >
+                          <RefreshCw className={`w-4 h-4 ${isRefreshingCache ? 'animate-spin' : ''}`} />
+                          {isRefreshingCache ? 'Refreshing...' : cacheRefreshStatus === 'success' ? 'Cache Cleared!' : cacheRefreshStatus === 'error' ? 'Failed' : 'Refresh Cache'}
+                       </button>
+                    </div>
+                    {cacheRefreshStatus === 'success' && (
+                       <p className="text-xs text-emerald-400/80 mt-2">All users will get fresh AI-generated merchant names and logos on their next visit.</p>
+                    )}
+                 </div>
+              </div>
+
+              {/* Scenarios List */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {Object.entries(DEMO_SCENARIOS).map(([key, scenario]) => (
-                 <button 
+                 <button
                    key={key}
                    onClick={() => onSelectDemo(key)}
                    className="bg-slate-900 border border-slate-800 hover:border-indigo-500 hover:bg-slate-800 p-6 rounded-2xl text-left transition group relative overflow-hidden"
@@ -4827,6 +4942,7 @@ const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
                     </div>
                  </button>
               ))}
+              </div>
            </div>
         )}
 
