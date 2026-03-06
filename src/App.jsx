@@ -6677,7 +6677,7 @@ export default function App() {
                         />
                       </div>
                       
-                      {/* THE MAGICBUTTON */}
+                      {/* THE MAGIC BUTTON */}
                       <button 
                         onClick={handleFindSalary}
                         disabled={isFindingSalary || isSandbox}
