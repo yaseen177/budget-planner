@@ -5615,7 +5615,7 @@ export default function App() {
     }
   };
 
-  // --- NEW: AUTO-FIND SALARY MAGIC (EMPLOYER & VIEWPORT AWARE) ---
+  // --- NEW: AUTO-FIND SALARY MAGIC (BULLETPROOF STRING MATCHING) ---
   const handleFindSalary = async () => {
     // 1. Validate setup
     const salaryBank = effectiveSettings?.bankDetails?.name;
@@ -5637,39 +5637,43 @@ export default function App() {
     const matchedKey = Object.keys(TRUELAYER_PROVIDERS).find(key => searchName.includes(key));
     const providerId = matchedKey ? TRUELAYER_PROVIDERS[matchedKey] : null;
 
-    // 3. Verify Connection exists
-    const connection = providerId ? bankingData?.connections?.[providerId] : null;
-    if (!connection || !connection.refreshToken) {
+    if (!providerId || !bankingData?.connections?.[providerId]) {
         showToast("⚠️ Please go to Transactions to connect or re-connect this bank.");
         return;
     }
+    const connection = bankingData.connections[providerId];
 
-    // 4. Identify the SPECIFIC month the user is viewing
+    // 3. Identify the SPECIFIC month the user is viewing
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth(); // 0-indexed
     const monthName = currentDate.toLocaleString('en-GB', { month: 'long' });
     const today = new Date();
+    today.setHours(0,0,0,0);
 
-    // Guard: Future months definitely haven't been paid yet!
-    if (year > today.getFullYear() || (year === today.getFullYear() && month > today.getMonth())) {
-        showToast(`Hold tight! You haven't been paid for ${monthName} yet.`);
-        return;
+    // 4. Calculate the EXACT target Payday for the viewed month
+    const expectedPayday = new Date(year, month, userPayday);
+    expectedPayday.setHours(0,0,0,0);
+
+    // GUARD CLAUSE: If the target payday is way in the future, stop immediately!
+    if (expectedPayday > today) {
+        const daysUntilPayday = (expectedPayday - today) / (1000 * 60 * 60 * 24);
+        // If it's more than 12 days away, they definitely haven't been paid for this cycle yet.
+        if (daysUntilPayday > 12) {
+            showToast(`Hold tight! You haven't been paid for ${monthName} yet.`);
+            return;
+        }
     }
 
     setIsFindingSalary(true);
     triggerHaptic();
 
     try {
-        // 5. SMART FETCH WINDOW (Anchored to the VIEWED month, not 'today')
-        // End date: last day of the viewed month, OR today if the viewed month is the current month
+        // 5. Fetch Window: 100 days back from the end of the viewed month
         let toDate = new Date(year, month + 1, 0, 23, 59, 59);
-        if (toDate > today) {
-            toDate = today;
-        }
+        if (toDate > new Date()) toDate = new Date();
 
-        // Start date: 90 days before the end date (ensures we see historical paychecks to identify the employer)
         const fromDate = new Date(toDate);
-        fromDate.setDate(toDate.getDate() - 90); 
+        fromDate.setDate(toDate.getDate() - 100); 
         
         const response = await fetch('/api/transactions', {
             method: 'POST',
@@ -5686,7 +5690,7 @@ export default function App() {
         const data = await response.json();
         
         if (data.error || !data.success) {
-            showToast("⚠️ Bank connection expired. Please reconnect in Transactions.");
+            showToast("⚠️ Bank connection expired. Please reconnect.");
             return;
         }
 
@@ -5699,7 +5703,7 @@ export default function App() {
              }, { merge: true });
         }
 
-        // STEP A: Filter for all valid, settled incoming money
+        // STEP A: Filter valid incoming money
         const allIncomes = (data.transactions || []).filter(tx => 
             tx.amount > 0 && 
             tx.category !== 'Transfer' &&
@@ -5707,56 +5711,58 @@ export default function App() {
         );
 
         if (allIncomes.length === 0) {
-            showToast(`No income history found for ${monthName} or prior.`);
+            showToast(`No income history found.`);
             return;
         }
 
-        // STEP B: Identify the Employer (Largest income in the 90 day window)
+        // STEP B: Base Employer Name Extraction (Solves the "Not Paid Yet" bug for old months)
+        // Banks change descriptions (e.g. "ACME 01" vs "ACME 02"). We extract just the first core word!
         const sortedIncomes = [...allIncomes].sort((a, b) => b.amount - a.amount);
-        const trueSalaryTx = sortedIncomes[0];
+        const absoluteLargestTx = sortedIncomes[0];
+        const rawEmployer = (absoluteLargestTx.merchant && absoluteLargestTx.merchant !== 'Unknown') 
+            ? absoluteLargestTx.merchant 
+            : absoluteLargestTx.description;
         
-        // FIX: Safely parse and reject the string 'Unknown'
-        const employerName = (trueSalaryTx.merchant && trueSalaryTx.merchant !== 'Unknown') 
-            ? trueSalaryTx.merchant 
-            : trueSalaryTx.description;
+        const employerWords = rawEmployer.replace(/[^a-zA-Z0-9 ]/g, '').split(' ').filter(w => w.length > 2);
+        const baseEmployerName = employerWords.length > 0 ? employerWords[0].toLowerCase() : rawEmployer.toLowerCase();
 
-        // STEP C: Locate the Salary FOR THIS SPECIFIC MONTH
-        // We calculate the exact date you SHOULD have been paid for the month you are looking at
-        const expectedPayday = new Date(year, month, userPayday);
-        
-        let viewedMonthSalary = null;
-        let minDiff = Infinity;
-        
-        allIncomes.forEach(tx => {
-            const txEmployerName = (tx.merchant && tx.merchant !== 'Unknown') 
-                ? tx.merchant 
-                : tx.description;
-                
-            // Only consider transactions from the true employer
-            if (txEmployerName === employerName) {
-                const txDate = new Date(tx.date);
-                
-                // How far away is this transaction from the TARGET payday of the viewed month?
-                const diffDays = Math.abs(txDate - expectedPayday) / (1000 * 60 * 60 * 24);
-                
-                // Must be within 12 days of the expected payday for THIS month (handles weekends/bank holidays)
-                if (diffDays <= 12 && diffDays < minDiff) {
-                    minDiff = diffDays;
-                    viewedMonthSalary = tx;
-                }
-            }
+        // STEP C: Isolate transactions meant for the VIEWED MONTH
+        const viewedMonthIncomes = allIncomes.filter(tx => {
+            const txDate = new Date(tx.date);
+            txDate.setHours(0,0,0,0);
+            
+            // Must be within 12 days of this month's exact expected payday
+            const diffDays = Math.abs(txDate - expectedPayday) / (1000 * 60 * 60 * 24);
+            return diffDays <= 12; 
         });
 
-        // If we didn't find anything close to the expected payday...
-        if (!viewedMonthSalary) {
-            const cleanEmployerName = employerName.replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 15).trim();
-            showToast(`Hold tight! You haven't been paid by ${cleanEmployerName} for ${monthName} yet.`);
+        if (viewedMonthIncomes.length === 0) {
+            const cleanName = rawEmployer.substring(0, 15).trim();
+            showToast(`Hold tight! You haven't been paid by ${cleanName} for ${monthName} yet.`);
             return;
         }
 
-        // STEP D: The actual salary has arrived! Apply it.
-        updateSalary(viewedMonthSalary.amount.toString());
-        showToast(`Salary synced: £${viewedMonthSalary.amount} from ${employerName}`);
+        // STEP D: Find the matching salary in that isolated window
+        viewedMonthIncomes.sort((a, b) => b.amount - a.amount);
+        
+        // Prefer a match with the employer base name
+        let finalSalaryTx = viewedMonthIncomes.find(tx => {
+            const name = (tx.merchant && tx.merchant !== 'Unknown') ? tx.merchant : tx.description;
+            return name.toLowerCase().includes(baseEmployerName);
+        });
+
+        // Fallback to the largest incoming transaction if string match fails
+        if (!finalSalaryTx) {
+            finalSalaryTx = viewedMonthIncomes[0]; 
+        }
+
+        // Apply!
+        updateSalary(finalSalaryTx.amount.toString());
+        const finalName = (finalSalaryTx.merchant && finalSalaryTx.merchant !== 'Unknown') 
+            ? finalSalaryTx.merchant 
+            : finalSalaryTx.description;
+            
+        showToast(`Salary synced: £${finalSalaryTx.amount} from ${finalName.substring(0, 15)}`);
         triggerHaptic();
         if (typeof playJuiceSound === 'function') playJuiceSound('success');
 
