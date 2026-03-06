@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2, Utensils, Tv, ShoppingCart, TrendingUp, Activity, PieChart, List, ArrowRightLeft, Wallet, Link as LinkIcon } from 'lucide-react';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 
 const cleanMerchantsWithAI = async (messyNamesArray) => {
   const systemPrompt = `
@@ -110,6 +110,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   const [dateFilter, setDateFilter] = useState('30'); 
 
   const [merchantDictionary, setMerchantDictionary] = useState({});
+  const [isDictionaryLoaded, setIsDictionaryLoaded] = useState(false);
 
   const LOGO_PUBLIC_KEY = import.meta.env.VITE_LOGO_DEV_PUBLIC_KEY;
   const LOGO_SECRET_KEY = import.meta.env.VITE_LOGO_DEV_SECRET_KEY;
@@ -421,36 +422,55 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
     return () => clearTimeout(timeoutId);
   }, [unknownNames]);
 
+  // 1. Fetch the user's permanent dictionary from Firebase on load
   useEffect(() => {
-      const fetchLogos = async () => {
-          if (!LOGO_SECRET_KEY || !analyticsInsights.topMerchants.length) return;
+    if (!user) return;
+    
+    const fetchDictionary = async () => {
+        try {
+            const dictRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'merchantDictionary');
+            const snap = await getDoc(dictRef);
+            
+            if (snap.exists() && snap.data()) {
+                setMerchantDictionary(snap.data());
+            }
+        } catch (err) {
+            console.error("Failed to load AI dictionary cache:", err);
+        } finally {
+            setIsDictionaryLoaded(true); // Tell the app it is safe to check for unknown names now!
+        }
+    };
+    
+    fetchDictionary();
+}, [user, appId, db]);
 
-          const newLogos = { ...topMerchantsLogos };
-          let hasChanges = false;
+// 2. Trigger AI only for truly unknown names, and save the result to Firebase!
+useEffect(() => {
+  // Prevent the AI from running if Firebase hasn't finished loading our cache yet
+  if (!isDictionaryLoaded || unknownNames.length === 0) return;
 
-          for (const merchant of analyticsInsights.topMerchants) {
-              if (newLogos[merchant.name]) continue; 
-              
-              try {
-                  const res = await fetch(`https://api.logo.dev/search?q=${encodeURIComponent(merchant.name)}`, {
-                      headers: { 'Authorization': `Bearer ${LOGO_SECRET_KEY}` }
-                  });
-                  const data = await res.json();
-                  
-                  if (data && data.length > 0) {
-                      newLogos[merchant.name] = `https://img.logo.dev/${data[0].domain}?token=${LOGO_PUBLIC_KEY}`;
-                      hasChanges = true;
-                  }
-              } catch (e) {
-                  console.warn("Logo fetch failed for", merchant.name);
-              }
+  const runAiCleaner = async () => {
+      const newCleanedNames = await cleanMerchantsWithAI(unknownNames);
+      
+      if (newCleanedNames) {
+          // Update the UI instantly
+          setMerchantDictionary(prev => ({ ...prev, ...newCleanedNames }));
+          
+          // Save it permanently to Firebase in the background
+          if (user) {
+              const dictRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'merchantDictionary');
+              // We use { merge: true } so we don't overwrite existing cached names!
+              await setDoc(dictRef, newCleanedNames, { merge: true }).catch(e => 
+                  console.error("Failed to save AI dictionary to Firebase:", e)
+              );
           }
+      }
+  };
 
-          if (hasChanges) setTopMerchantsLogos(newLogos);
-      };
-
-      fetchLogos();
-  }, [analyticsInsights.topMerchants, LOGO_SECRET_KEY, LOGO_PUBLIC_KEY]);
+  // Set a small delay so it doesn't interrupt the initial page load
+  const timeoutId = setTimeout(() => runAiCleaner(), 2000);
+  return () => clearTimeout(timeoutId);
+}, [unknownNames, isDictionaryLoaded, user, appId, db]);
 
   return (
     <div className="fixed inset-0 z-[200] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full duration-500">
@@ -504,13 +524,13 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                      {activeWalletAccounts.map(acc => (
                          <SpotlightCard key={acc.account_id} className="flex flex-col justify-between p-5 min-h-[140px]">
                             <div className="flex justify-between items-start">
-                                <div className="p-2 bg-slate-50 rounded-xl border border-slate-100 shadow-sm flex items-center justify-center w-10 h-10">
-                                   {acc.displayLogo ? (
-                                       <img src={acc.displayLogo} alt={acc.name} className="w-6 h-6 object-contain" />
-                                   ) : (
-                                       <CreditCard className="w-5 h-5 text-slate-400" />
-                                   )}
-                                </div>
+                            <div className="bg-slate-50 rounded-xl border border-slate-100 shadow-sm flex items-center justify-center w-10 h-10 overflow-hidden">
+   {acc.displayLogo ? (
+       <img src={acc.displayLogo} alt={acc.name} className="w-full h-full object-cover" />
+   ) : (
+       <CreditCard className="w-5 h-5 text-slate-400" />
+   )}
+</div>
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
                                    {acc.parentBankName}
                                </span>
@@ -673,11 +693,11 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                            </div>
                                            {displayLogo && !isTransfer && (
                                                 <img 
-                                                  src={displayLogo} 
-                                                  onError={(e) => { e.target.style.opacity = '0'; }}
-                                                  className="w-full h-full object-contain p-1 relative z-10 transition-opacity" 
-                                                  alt="" 
-                                                />
+                                                src={displayLogo} 
+                                                onError={(e) => { e.target.style.opacity = '0'; }}
+                                                className="w-full h-full object-cover relative z-10 transition-opacity rounded-2xl"
+                                                alt="" 
+                                              />
                                            )}
                                        </div>
                                        {isTransfer && displayLogo && (
@@ -793,11 +813,11 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                                   
                                                   {topMerchantsLogos[merchant.name] && (
                                                       <img 
-                                                          src={topMerchantsLogos[merchant.name]}
-                                                          onError={(e) => { e.target.style.opacity = '0'; }}
-                                                          className="w-full h-full object-contain p-1.5 relative z-10 transition-opacity bg-white"
-                                                          alt=""
-                                                      />
+                                                      src={topMerchantsLogos[merchant.name]}
+                                                      onError={(e) => { e.target.style.opacity = '0'; }}
+                                                      className="w-full h-full object-cover relative z-10 transition-opacity bg-white rounded-xl"
+                                                      alt=""
+                                                  />
                                                   )}
                                                </div>
                                                <h4 className="font-bold text-slate-800 truncate" title={merchant.name}>{merchant.name}</h4>

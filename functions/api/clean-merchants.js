@@ -18,7 +18,15 @@ export async function onRequestPost({ request, env }) {
 
         // 3. Construct the exact prompt for Gemini
         const fullPrompt = `
-        You are a precise UK banking data extraction API. You MUST return ONLY a valid JSON object mapping the messy strings to the clean strings. No markdown formatting, no conversational text.
+        You are an expert UK banking data extraction AI. Your exact job is to clean messy, truncated bank transaction strings into official, highly recognisable consumer brand names used in the United Kingdom.
+
+        CRITICAL RULES:
+        1. Remove all store locations, city names, and branch details (e.g., "Boots nottingham" -> "Boots", "TESCO STORES 3241 LONDON" -> "Tesco").
+        2. Remove all legal entities if it is a common consumer brand (e.g., "Sainsburys Supermarkets Ltd" -> "Sainsbury's").
+        3. Remove transaction IDs, random numbers, and payment gateway prefixes like "CRV", "Izettle", "SumUp", or "PayPal *".
+        4. Fix common acronyms to their UK brand names (e.g., "AMZN" -> "Amazon").
+        5. If it is a person's name, a local independent shop, or completely unidentifiable, simply return the original string formatted nicely (Title Case).
+        6. You MUST return ONLY a valid JSON object mapping the messy strings to the clean strings. No markdown, no conversational text.
         
         ${prompt}
         
