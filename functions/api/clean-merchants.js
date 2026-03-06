@@ -59,8 +59,14 @@ export async function onRequestPost({ request, env }) {
         });
 
     } catch (error) {
-        console.error("AI API Error:", error);
-        return new Response(JSON.stringify({ error: 'Failed to process AI request' }), {
+        // Log it to your terminal
+        console.error("AI API Error Details:", error.message || error);
+        
+        // Send the EXACT error to the frontend so we can see it!
+        return new Response(JSON.stringify({ 
+            error: 'Failed to process AI request',
+            details: error.message || String(error)
+        }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });
