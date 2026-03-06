@@ -3397,6 +3397,115 @@ const UK_MORTGAGE_LENDERS = [
   { id: 'skipton', name: 'Skipton BS', domain: 'skipton.co.uk' },
 ];
 
+// --- DEMO SCENARIOS FOR TEST LAB ---
+const DEMO_SCENARIOS = {
+  broke: {
+    label: 'Broke Student',
+    description: 'Low income, tight budget, overspending on wants.',
+    overrides: {
+      salary: 950,
+      expenses: [
+        { id: 'd1', name: 'Rent', amount: 500, type: 'fixed', logo: null },
+        { id: 'd2', name: 'Phone Bill', amount: 25, type: 'fixed', logo: null },
+        { id: 'd3', name: 'Groceries', amount: 200, type: 'variable', logo: null },
+        { id: 'd4', name: 'Takeaways', amount: 180, type: 'variable', logo: null },
+        { id: 'd5', name: 'Spotify', amount: 11, type: 'fixed', logo: null },
+      ],
+      actualSavings: { t1: 0, t2: 0 },
+      userSettings: {
+        displayName: 'Test Student',
+        currency: 'GBP',
+        payDay: '1',
+        allocationRules: [
+          { id: 't1', name: 'Needs', percentage: 60, color: 'bg-indigo-100 text-indigo-600' },
+          { id: 't2', name: 'Wants', percentage: 30, color: 'bg-emerald-100 text-emerald-600' },
+          { id: 't3', name: 'Savings', percentage: 10, color: 'bg-amber-100 text-amber-600' },
+        ],
+      },
+    },
+  },
+  comfortable: {
+    label: 'Comfortable Saver',
+    description: 'Decent salary, balanced budget, healthy savings rate.',
+    overrides: {
+      salary: 2800,
+      expenses: [
+        { id: 'd1', name: 'Rent', amount: 750, type: 'fixed', logo: null },
+        { id: 'd2', name: 'Council Tax', amount: 130, type: 'fixed', logo: null },
+        { id: 'd3', name: 'Groceries', amount: 300, type: 'variable', logo: null },
+        { id: 'd4', name: 'Car Insurance', amount: 85, type: 'fixed', logo: null },
+        { id: 'd5', name: 'Netflix', amount: 16, type: 'fixed', logo: null },
+        { id: 'd6', name: 'Gym', amount: 35, type: 'fixed', logo: null },
+      ],
+      actualSavings: { t1: 600, t2: 350 },
+      userSettings: {
+        displayName: 'Test Saver',
+        currency: 'GBP',
+        payDay: '25',
+        allocationRules: [
+          { id: 't1', name: 'Needs', percentage: 50, color: 'bg-indigo-100 text-indigo-600' },
+          { id: 't2', name: 'Wants', percentage: 30, color: 'bg-emerald-100 text-emerald-600' },
+          { id: 't3', name: 'Savings', percentage: 20, color: 'bg-amber-100 text-amber-600' },
+        ],
+      },
+    },
+  },
+  highEarner: {
+    label: 'High Earner',
+    description: 'High salary with complex expenses and multiple savings goals.',
+    overrides: {
+      salary: 5500,
+      expenses: [
+        { id: 'd1', name: 'Mortgage', amount: 1200, type: 'fixed', logo: null },
+        { id: 'd2', name: 'Council Tax', amount: 185, type: 'fixed', logo: null },
+        { id: 'd3', name: 'Groceries', amount: 500, type: 'variable', logo: null },
+        { id: 'd4', name: 'Car Finance', amount: 350, type: 'fixed', logo: null },
+        { id: 'd5', name: 'Childcare', amount: 800, type: 'fixed', logo: null },
+        { id: 'd6', name: 'Dining Out', amount: 250, type: 'variable', logo: null },
+        { id: 'd7', name: 'Utilities', amount: 200, type: 'fixed', logo: null },
+      ],
+      actualSavings: { t1: 1500, t2: 800 },
+      userSettings: {
+        displayName: 'Test Pro',
+        currency: 'GBP',
+        payDay: '28',
+        allocationRules: [
+          { id: 't1', name: 'Needs', percentage: 45, color: 'bg-indigo-100 text-indigo-600' },
+          { id: 't2', name: 'Wants', percentage: 25, color: 'bg-emerald-100 text-emerald-600' },
+          { id: 't3', name: 'Savings', percentage: 20, color: 'bg-amber-100 text-amber-600' },
+          { id: 't4', name: 'Investments', percentage: 10, color: 'bg-violet-100 text-violet-600' },
+        ],
+      },
+    },
+  },
+  overspender: {
+    label: 'Overspender',
+    description: 'Average salary but expenses exceed income. Debt spiral test.',
+    overrides: {
+      salary: 2000,
+      expenses: [
+        { id: 'd1', name: 'Rent', amount: 850, type: 'fixed', logo: null },
+        { id: 'd2', name: 'Car Finance', amount: 280, type: 'fixed', logo: null },
+        { id: 'd3', name: 'Groceries', amount: 350, type: 'variable', logo: null },
+        { id: 'd4', name: 'Takeaways', amount: 300, type: 'variable', logo: null },
+        { id: 'd5', name: 'Shopping', amount: 400, type: 'variable', logo: null },
+        { id: 'd6', name: 'Subscriptions', amount: 80, type: 'fixed', logo: null },
+      ],
+      actualSavings: { t1: 0, t2: 0 },
+      userSettings: {
+        displayName: 'Test Spender',
+        currency: 'GBP',
+        payDay: '15',
+        allocationRules: [
+          { id: 't1', name: 'Needs', percentage: 50, color: 'bg-indigo-100 text-indigo-600' },
+          { id: 't2', name: 'Wants', percentage: 40, color: 'bg-emerald-100 text-emerald-600' },
+          { id: 't3', name: 'Savings', percentage: 10, color: 'bg-amber-100 text-amber-600' },
+        ],
+      },
+    },
+  },
+};
+
 // --- UPDATED ADMIN DASHBOARD ---
 const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
   const [view, setView] = useState('logs'); // 'logs' or 'simulator'
