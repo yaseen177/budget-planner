@@ -295,8 +295,10 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   
   const sortedCategories = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
 
-  // --- NEW: ADVANCED ANALYTICS ENGINE ---
+  // --- NEW: ADVANCED ANALYTICS ENGINE WITH SMART LOGOS ---
   const LOGO_PUBLIC_KEY = import.meta.env.VITE_LOGO_DEV_PUBLIC_KEY;
+  const LOGO_SECRET_KEY = import.meta.env.VITE_LOGO_DEV_SECRET_KEY;
+  const [topMerchantsLogos, setTopMerchantsLogos] = useState({});
 
   const analyticsInsights = useMemo(() => {
       if (!outgoings || outgoings.length === 0) return { topMerchants: [], daysOfWeek: [], dangerDay: null, dangerPercentage: 0 };
@@ -305,7 +307,6 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
       const merchantMap = {};
       outgoings.forEach(tx => {
           let name = (tx.merchant && tx.merchant !== 'Unknown') ? tx.merchant : tx.description;
-          // Clean the name: Remove numbers and messy bank references
           name = name.replace(/[0-9]/g, '').split('  ')[0].trim();
           if (name.length < 2) name = "Unknown";
           name = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
@@ -339,22 +340,47 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
       const dangerPercentage = totalSpentLocal > 0 ? ((maxSpend / totalSpentLocal) * 100).toFixed(0) : 0;
 
       const daysOfWeek = days.map((day, i) => ({
-          day: day.substring(0, 3), // e.g. Sun, Mon
+          day: day.substring(0, 3),
           fullName: day,
           total: dayTotals[i],
           isDanger: i === dangerDayIndex && dayTotals[i] > 0,
           heightPercent: maxSpend > 0 ? (dayTotals[i] / maxSpend) * 100 : 0
       }));
 
-      return { 
-          topMerchants, 
-          daysOfWeek, 
-          dangerDay: days[dangerDayIndex], 
-          dangerPercentage 
+      return { topMerchants, daysOfWeek, dangerDay: days[dangerDayIndex], dangerPercentage };
+  }, [outgoings]);
+
+  // Async Fetcher for real logos using the API
+  useEffect(() => {
+      const fetchLogos = async () => {
+          if (!LOGO_SECRET_KEY || !analyticsInsights.topMerchants.length) return;
+
+          const newLogos = { ...topMerchantsLogos };
+          let hasChanges = false;
+
+          for (const merchant of analyticsInsights.topMerchants) {
+              if (newLogos[merchant.name]) continue; // Skip if already fetched
+              
+              try {
+                  const res = await fetch(`https://api.logo.dev/search?q=${encodeURIComponent(merchant.name)}`, {
+                      headers: { 'Authorization': `Bearer ${LOGO_SECRET_KEY}` }
+                  });
+                  const data = await res.json();
+                  
+                  if (data && data.length > 0) {
+                      newLogos[merchant.name] = `https://img.logo.dev/${data[0].domain}?token=${LOGO_PUBLIC_KEY}`;
+                      hasChanges = true;
+                  }
+              } catch (e) {
+                  console.warn("Logo fetch failed for", merchant.name);
+              }
+          }
+
+          if (hasChanges) setTopMerchantsLogos(newLogos);
       };
 
-  }, [outgoings]);
-  // ------------------------------------------
+      fetchLogos();
+  }, [analyticsInsights.topMerchants, LOGO_SECRET_KEY, LOGO_PUBLIC_KEY]);
 
   return (
     <div className="fixed inset-0 z-[200] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full duration-500">
@@ -693,9 +719,11 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                                                   <span className="absolute inset-0 flex items-center justify-center bg-slate-100 text-slate-500 text-lg z-0">
                                                       {merchant.name.charAt(0)}
                                                   </span>
-                                                  {LOGO_PUBLIC_KEY && (
+                                                  
+                                                  {/* CHANGED THIS BLOCK: Using smart state mapping! */}
+                                                  {topMerchantsLogos[merchant.name] && (
                                                       <img 
-                                                          src={`https://img.logo.dev/${merchant.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.com?token=${LOGO_PUBLIC_KEY}`}
+                                                          src={topMerchantsLogos[merchant.name]}
                                                           onError={(e) => { e.target.style.opacity = '0'; }}
                                                           className="w-full h-full object-contain p-1.5 relative z-10 transition-opacity bg-white"
                                                           alt=""

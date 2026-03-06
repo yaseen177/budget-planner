@@ -3624,125 +3624,145 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
       setBills(bills.map(b => b.id === id ? { ...b, included: b.included === false ? true : false } : b));
   };
 
-  // --- THE MAGIC AUTO-SCAN LOGIC ---
+  // --- THE MAGIC AUTO-SCAN LOGIC (UPGRADED API LOGO MATCHER) ---
   const handleScanBills = async () => {
-      setIsScanningBills(true);
-      triggerHaptic();
-      const internalToast = showToast || alert;
-      
-      try {
-          const connections = Object.values(bankingData?.connections || {});
-          if (connections.length === 0) {
-              internalToast("Please connect a bank account in the earlier steps first to auto-detect bills!");
-              setIsScanningBills(false);
-              return;
-          }
+    setIsScanningBills(true);
+    triggerHaptic();
+    const internalToast = showToast || alert;
+    
+    try {
+        const connections = Object.values(bankingData?.connections || {});
+        if (connections.length === 0) {
+            internalToast("Please connect a bank account in the earlier steps first to auto-detect bills!");
+            setIsScanningBills(false);
+            return;
+        }
 
-          let allTransactions = [];
-          const toDate = new Date();
-          const fromDate = new Date();
-          fromDate.setDate(toDate.getDate() - 90); // Look back 3 months for recurring patterns
+        let allTransactions = [];
+        const toDate = new Date();
+        const fromDate = new Date();
+        fromDate.setDate(toDate.getDate() - 90); // Look back 3 months
 
-          // Fetch from all connected accounts
-          for (const conn of connections) {
-              const response = await fetch('/api/transactions', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                      refreshToken: conn.refreshToken,
-                      clientId: import.meta.env.VITE_TL_CLIENT_ID,
-                      accounts: conn.accounts,
-                      from: fromDate.toISOString(),
-                      to: toDate.toISOString()
-                  })
-              });
-              const data = await response.json();
-              if (data.success && data.transactions) {
-                  allTransactions = [...allTransactions, ...data.transactions];
-              }
-          }
+        // Fetch from all connected accounts
+        for (const conn of connections) {
+            const response = await fetch('/api/transactions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    refreshToken: conn.refreshToken,
+                    clientId: import.meta.env.VITE_TL_CLIENT_ID,
+                    accounts: conn.accounts,
+                    from: fromDate.toISOString(),
+                    to: toDate.toISOString()
+                })
+            });
+            const data = await response.json();
+            if (data.success && data.transactions) {
+                allTransactions = [...allTransactions, ...data.transactions];
+            }
+        }
 
-          const grouped = {};
-          const LOGO_PUBLIC_KEY = import.meta.env.VITE_LOGO_DEV_PUBLIC_KEY;
+        const grouped = {};
+        const LOGO_PUBLIC_KEY = import.meta.env.VITE_LOGO_DEV_PUBLIC_KEY;
+        const LOGO_SECRET_KEY = import.meta.env.VITE_LOGO_DEV_SECRET_KEY;
 
-          allTransactions.forEach(tx => {
-              if (tx.amount >= 0 || tx.category === 'Transfer') return;
-              
-              const rawName = (tx.merchant && tx.merchant !== 'Unknown') ? tx.merchant : tx.description;
-              const isDD = /direct debit|dd|standing order/i.test(rawName);
+        allTransactions.forEach(tx => {
+            if (tx.amount >= 0 || tx.category === 'Transfer') return;
+            
+            const rawName = (tx.merchant && tx.merchant !== 'Unknown') ? tx.merchant : tx.description;
+            const isDD = /direct debit|dd|standing order/i.test(rawName);
 
-              // If it's a known bill category OR explicitly labeled as a Direct Debit
-              if (['Bills', 'Entertainment', 'Health'].includes(tx.category) || isDD) {
-                  let domainForLogo = null;
-                  let cleanName = rawName;
-                  
-                  // Extract domain for logos (e.g. "Netflix.com" -> "netflix.com")
-                  const domainMatch = rawName.match(/\b([a-z0-9\-]+\.[a-z]{2,})\b/i);
-                  if (domainMatch) {
-                      domainForLogo = domainMatch[0].toLowerCase();
-                      const parts = domainForLogo.split('.');
-                      cleanName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1); 
-                  } else {
-                      // Clean up messy bank references
-                      cleanName = cleanName.replace(/direct debit|dd|standing order|visa|mastercard|payment/ig, '')
-                                           .replace(/[0-9]/g, '').trim();
-                      cleanName = cleanName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ').trim();
-                  }
+            if (['Bills', 'Entertainment', 'Health'].includes(tx.category) || isDD) {
+                let knownDomain = null;
+                let cleanName = rawName;
+                
+                // Extract domain if explicit (e.g. "Netflix.com")
+                const domainMatch = rawName.match(/\b([a-z0-9\-]+\.[a-z]{2,})\b/i);
+                if (domainMatch) {
+                    knownDomain = domainMatch[0].toLowerCase();
+                    const parts = knownDomain.split('.');
+                    cleanName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1); 
+                } else {
+                    // Clean up messy bank strings
+                    cleanName = cleanName.replace(/direct debit|dd|standing order|visa|mastercard|payment/ig, '')
+                                         .replace(/[0-9]/g, '').trim();
+                    cleanName = cleanName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ').trim();
+                }
 
-                  if (!cleanName || cleanName.length < 2) cleanName = rawName.substring(0, 15).trim();
+                if (!cleanName || cleanName.length < 2) cleanName = rawName.substring(0, 15).trim();
 
-                  if (!grouped[cleanName]) {
-                      let logoUrl = null;
-                      if (domainForLogo) {
-                          logoUrl = `https://img.logo.dev/${domainForLogo}?token=${LOGO_PUBLIC_KEY}`;
-                      } else {
-                          const guessDomain = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
-                          logoUrl = `https://img.logo.dev/${guessDomain}?token=${LOGO_PUBLIC_KEY}`;
-                      }
-                      
-                      grouped[cleanName] = { amounts: [], logo: logoUrl };
-                  }
-                  grouped[cleanName].amounts.push(Math.abs(tx.amount));
-              }
-          });
+                if (!grouped[cleanName]) {
+                    // Store for async processing
+                    grouped[cleanName] = { amounts: [], knownDomain: knownDomain };
+                }
+                grouped[cleanName].amounts.push(Math.abs(tx.amount));
+            }
+        });
 
-          const detected = [];
-          for (const [name, data] of Object.entries(grouped)) {
-              // Validates it is recurring if it appears at least twice in 90 days
-              if (data.amounts.length >= 2) {
-                  detected.push({
-                      id: 'auto_' + Date.now() + Math.random(),
-                      name: name,
-                      amount: data.amounts[0], // Most recent amount
-                      type: 'fixed',
-                      logo: data.logo,
-                      included: true // Checkbox defaults to ticked
-                  });
-              }
-          }
+        const detected = [];
+        
+        // REAL API LOGO SEARCH LOOP
+        for (const [name, data] of Object.entries(grouped)) {
+            if (data.amounts.length >= 2) {
+                let finalLogoUrl = null;
 
-          if (detected.length === 0) {
-              internalToast("No recurring bills found in the last 90 days.");
-          } else {
-              setBills(prev => {
-                  const newBills = [...prev];
-                  detected.forEach(d => {
-                      if (!newBills.some(b => b.name.toLowerCase() === d.name.toLowerCase())) {
-                          newBills.push(d);
-                      }
-                  });
-                  return newBills;
-              });
-              internalToast(`Auto-detected ${detected.length} recurring bills!`);
-          }
+                if (data.knownDomain) {
+                    // We already extracted the domain
+                    finalLogoUrl = `https://img.logo.dev/${data.knownDomain}?token=${LOGO_PUBLIC_KEY}`;
+                } else if (LOGO_SECRET_KEY) {
+                    // Query the API to find the real domain!
+                    try {
+                        const res = await fetch(`https://api.logo.dev/search?q=${encodeURIComponent(name)}`, {
+                            headers: { 'Authorization': `Bearer ${LOGO_SECRET_KEY}` }
+                        });
+                        const searchData = await res.json();
+                        if (searchData && searchData.length > 0) {
+                            finalLogoUrl = `https://img.logo.dev/${searchData[0].domain}?token=${LOGO_PUBLIC_KEY}`;
+                        }
+                    } catch (error) {
+                        console.warn("Logo search failed for", name);
+                    }
+                }
 
-      } catch (error) {
-          console.error(error);
-          internalToast("Error scanning for bills.");
-      } finally {
-          setIsScanningBills(false);
-      }
-  };
+                // Fallback if API fails
+                if (!finalLogoUrl) {
+                    const guessDomain = name.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
+                    finalLogoUrl = `https://img.logo.dev/${guessDomain}?token=${LOGO_PUBLIC_KEY}`;
+                }
+
+                detected.push({
+                    id: 'auto_' + Date.now() + Math.random(),
+                    name: name,
+                    amount: data.amounts[0], 
+                    type: 'fixed',
+                    logo: finalLogoUrl,
+                    included: true 
+                });
+            }
+        }
+
+        if (detected.length === 0) {
+            internalToast("No recurring bills found in the last 90 days.");
+        } else {
+            setBills(prev => {
+                const newBills = [...prev];
+                detected.forEach(d => {
+                    if (!newBills.some(b => b.name.toLowerCase() === d.name.toLowerCase())) {
+                        newBills.push(d);
+                    }
+                });
+                return newBills;
+            });
+            internalToast(`Auto-detected ${detected.length} recurring bills!`);
+        }
+
+    } catch (error) {
+        console.error(error);
+        internalToast("Error scanning for bills.");
+    } finally {
+        setIsScanningBills(false);
+    }
+};
 
   const toggleCard = (card) => setCreditCards(prev => prev.some(c => c.name === card.name) ? prev.filter(c => c.name !== card.name) : [...prev, card]);
   const toggleMortgage = (lender) => setMortgages(prev => prev.some(m => m.name === lender.name) ? prev.filter(m => m.name !== lender.name) : [...prev, { ...lender, amount: '' }]);
