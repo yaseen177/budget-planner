@@ -6653,8 +6653,9 @@ export default function App() {
                   </div>
                   
                   {/* NEW FLEX WRAPPER FOR INPUT + BUTTON */}
-                  <div className="relative flex items-center gap-3">
-                      <div className="relative flex-1">
+                  <div className="relative flex items-center gap-3 w-full">
+                      {/* ADDED min-w-0 HERE */}
+                      <div className="relative flex-1 min-w-0">
                         <span className="absolute left-0 top-1/2 -translate-y-1/2 text-3xl font-medium text-slate-300">
                             {effectiveSettings.currency === 'GBP' ? '£' : effectiveSettings.currency === 'USD' ? '$' : '€'}
                         </span>
@@ -6671,7 +6672,8 @@ export default function App() {
                                 if (!isSandbox && finalVal) logSystemEvent(`Salary Updated: ${finalVal}`, 'action');
                             }}
                             placeholder="0.00"
-                            className="w-full bg-transparent border-none text-4xl sm:text-5xl font-bold text-slate-800 placeholder-slate-200 outline-none pl-8 tracking-tight"
+                            // ADDED min-w-0, pr-4, truncate, and changed sm:text-5xl to lg:text-5xl
+                            className="w-full min-w-0 bg-transparent border-none text-4xl lg:text-5xl font-bold text-slate-800 placeholder-slate-200 outline-none pl-8 pr-4 tracking-tight truncate"
                         />
                       </div>
                       
