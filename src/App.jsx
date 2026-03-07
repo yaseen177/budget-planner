@@ -5615,7 +5615,18 @@ export default function App() {
   const handleLogin = async () => {
     try {
         // Must be Popup, NOT Redirect
-        await signInWithPopup(auth, provider);
+        const userCredential = await signInWithPopup(auth, provider);
+        const loggedInUser = userCredential.user;
+
+        // --- FIX: CREATE THE REAL PARENT DOCUMENT ---
+        // This ensures the user appears in the Admin Dashboard!
+        await setDoc(doc(db, 'artifacts', appId, 'users', loggedInUser.uid), {
+            email: loggedInUser.email,
+            displayName: loggedInUser.displayName || 'Unknown User',
+            lastLogin: new Date().toISOString()
+        }, { merge: true }); // merge: true prevents overwriting existing data
+        // --------------------------------------------
+
         triggerHaptic();
     } catch (error) {
         console.error("Login failed", error);
