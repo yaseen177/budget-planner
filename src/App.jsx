@@ -3398,7 +3398,6 @@ const UK_MORTGAGE_LENDERS = [
 ];
 
 // --- ADMIN TEST LAB SCENARIOS ---
-// --- ADMIN TEST LAB SCENARIOS ---
 const DEMO_SCENARIOS = {
   'ONBOARDING_NEW': {
     label: 'Fresh User (Onboarding)',
@@ -3409,7 +3408,6 @@ const DEMO_SCENARIOS = {
       salary: '', expenses: [], actualSavings: {}
     }
   },
-  // --- MERGED SCENARIO HERE ---
   'LEGACY_UPDATE': {
     label: 'Legacy User (Update Required)',
     description: 'Simulates an existing user who needs to add Bank & Payday to continue.',
@@ -3420,7 +3418,6 @@ const DEMO_SCENARIOS = {
         currency: 'GBP', 
         allocationRules: DEFAULT_ALLOCATIONS, 
         defaultFixedExpenses: DEFAULT_FIXED_EXPENSES,
-        // BOTH MISSING: This triggers the "Complete Setup" modal
         bankDetails: null,
         payDay: null 
       },
@@ -4604,9 +4601,32 @@ const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Filters
   const [filterUser, setFilterUser] = useState('');
   const [filterType, setFilterType] = useState('ALL');
+
+  // --- AI CACHE WIPE LOGIC ---
+  const handleClearAICache = async (targetUserId) => {
+    if (!window.confirm("Wipe AI brand cache for this user?")) return;
+    try {
+        const dictRef = doc(db, 'artifacts', appId, 'users', targetUserId, 'settings', 'merchantDictionary');
+        await deleteDoc(dictRef);
+        alert("User cache wiped! Logos will refresh on next visit.");
+    } catch (e) { console.error(e); }
+  };
+
+  const handleGlobalCacheWipe = async () => {
+    const msg = "⚠️ NUCLEAR OPTION: Wipe AI cache for EVERY user?\n\nThis will trigger new AI calls for everyone next time they log in.";
+    if (!window.confirm(msg)) return;
+    
+    try {
+      const usersSnap = await getDocs(collection(db, 'artifacts', appId, 'users'));
+      const wipePromises = usersSnap.docs.map(uDoc => 
+        deleteDoc(doc(db, 'artifacts', appId, 'users', uDoc.id, 'settings', 'merchantDictionary'))
+      );
+      await Promise.all(wipePromises);
+      alert(`Successfully wiped AI cache for ${wipePromises.length} users.`);
+    } catch (e) { console.error(e); alert("Wipe failed."); }
+  };
 
   useEffect(() => {
     if (view !== 'logs') return;
@@ -4628,7 +4648,6 @@ const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
     fetchLogs();
   }, [view]);
 
-  // Filter Logic
   const filteredLogs = logs.filter(log => {
     const matchUser = log.userEmail?.toLowerCase().includes(filterUser.toLowerCase());
     const matchType = filterType === 'ALL' || log.type === filterType;
@@ -4661,7 +4680,6 @@ const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
         {/* VIEW: LOGS */}
         {view === 'logs' && (
            <div className="space-y-4 animate-in fade-in">
-              {/* Filters */}
               <div className="grid grid-cols-2 gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
                 <div>
                    <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Search User</label>
@@ -4677,7 +4695,6 @@ const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
                    </select>
                 </div>
               </div>
-              {/* Log Table */}
               <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
                 <table className="w-full text-xs text-left">
                   <thead className="bg-slate-950 text-slate-400 uppercase font-bold">
@@ -4698,27 +4715,48 @@ const AdminDashboard = ({ user, onExitAdmin, onSelectDemo }) => {
            </div>
         )}
 
-        {/* VIEW: SIMULATOR */}
+        {/* VIEW: TEST LAB (Simulator) */}
         {view === 'simulator' && (
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-right-4">
-              {Object.entries(DEMO_SCENARIOS).map(([key, scenario]) => (
-                 <button 
-                   key={key}
-                   onClick={() => onSelectDemo(key)}
-                   className="bg-slate-900 border border-slate-800 hover:border-indigo-500 hover:bg-slate-800 p-6 rounded-2xl text-left transition group relative overflow-hidden"
-                 >
-                    <div className="relative z-10">
-                       <h3 className="font-bold text-white text-lg mb-1 group-hover:text-indigo-400 transition">{scenario.label}</h3>
-                       <p className="text-sm text-slate-400">{scenario.description}</p>
-                    </div>
-                    <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition transform translate-x-4 group-hover:translate-x-0">
-                       <ArrowRight className="w-6 h-6 text-indigo-500" />
-                    </div>
-                 </button>
-              ))}
+           <div className="space-y-6 animate-in slide-in-from-right-4">
+              
+              {/* --- NEW SYSTEM TOOLS --- */}
+              <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800">
+                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">System Tools</h3>
+                 <div className="flex flex-wrap gap-4">
+                    <button 
+                      onClick={handleGlobalCacheWipe}
+                      className="flex items-center gap-2 px-6 py-3 bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 border border-rose-500/30 rounded-xl font-bold transition active:scale-95"
+                    >
+                       <AlertTriangle className="w-4 h-4" /> Global AI Cache Wipe
+                    </button>
+                    <button 
+                      onClick={() => handleClearAICache(user.uid)}
+                      className="flex items-center gap-2 px-6 py-3 bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 border border-indigo-500/30 rounded-xl font-bold transition active:scale-95"
+                    >
+                       <RefreshCw className="w-4 h-4" /> Wipe My Test Cache
+                    </button>
+                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 {Object.entries(DEMO_SCENARIOS).map(([key, scenario]) => (
+                    <button 
+                      key={key}
+                      onClick={() => onSelectDemo(key)}
+                      className="bg-slate-900 border border-slate-800 hover:border-indigo-500 hover:bg-slate-800 p-6 rounded-2xl text-left transition group relative overflow-hidden"
+                    >
+                       <div className="relative z-10">
+                          <h3 className="font-bold text-white text-lg mb-1 group-hover:text-indigo-400 transition">{scenario.label}</h3>
+                          <p className="text-sm text-slate-400">{scenario.description}</p>
+                       </div>
+                       <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition transform translate-x-4 group-hover:translate-x-0">
+                          <ArrowRight className="w-6 h-6 text-indigo-500" />
+                       </div>
+                    </button>
+                 ))}
+              </div>
            </div>
         )}
-
       </div>
     </div>
   );
