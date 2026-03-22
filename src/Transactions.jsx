@@ -258,23 +258,31 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   }, [bankDetails, additionalBanks, expenses, bankingData]);
 
   const activeWalletAccounts = useMemo(() => {
-    if (!bankingData?.connections) return [];
-    const accountsList = [];
-    Object.entries(bankingData.connections).forEach(([providerId, bankData]) => {
-        const relatedBank = userBanks.find(b => b.providerId === providerId);
-        if (bankData.accounts) {
-            bankData.accounts.forEach(acc => {
-                accountsList.push({
-                    ...acc,
-                    providerId,
-                    displayLogo: relatedBank?.fallbackLogo || acc.provider_logo || relatedBank?.logoUrl,
-                    parentBankName: relatedBank?.name || 'Bank'
-                });
-            });
-        }
-    });
-    return accountsList;
-  }, [bankingData, userBanks]);
+   if (!bankingData?.connections) return [];
+   const accountsList = [];
+   Object.entries(bankingData.connections).forEach(([providerId, bankData]) => {
+       const relatedBank = userBanks.find(b => b.providerId === providerId);
+       if (bankData.accounts) {
+           bankData.accounts.forEach(acc => {
+               // --- NEW: Identify if it's a Credit Card ---
+               const isCreditCard = ['CREDIT', 'CREDIT_CARD', 'CARD'].includes((acc.account_type || acc.type || '').toUpperCase()) || 
+                                    providerId.includes('amex') || 
+                                    providerId.includes('capital-one') || 
+                                    providerId.includes('mbna') || 
+                                    relatedBank?.type === 'Credit Card';
+
+               accountsList.push({
+                   ...acc,
+                   providerId,
+                   displayLogo: relatedBank?.fallbackLogo || acc.provider_logo || relatedBank?.logoUrl,
+                   parentBankName: relatedBank?.name || 'Bank',
+                   isCreditCard // Pass the flag to the UI
+               });
+           });
+       }
+   });
+   return accountsList;
+ }, [bankingData, userBanks]);
 
   const getCategoryIcon = (category) => {
     switch(category) {
@@ -547,28 +555,35 @@ useEffect(() => {
                   </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     {activeWalletAccounts.map(acc => (
+                     {activeWalletAccounts.map(acc => {
+                         // --- FIX: Invert Credit Card Balances ---
+                         let displayBalance = balances[acc.account_id];
+                         if (displayBalance !== undefined && acc.isCreditCard && displayBalance > 0) {
+                             displayBalance = -Math.abs(displayBalance);
+                         }
+
+                         return (
                          <SpotlightCard key={acc.account_id} className="flex flex-col justify-between p-5 min-h-[140px]">
                             <div className="flex justify-between items-start">
                             <div className="bg-slate-50 rounded-xl border border-slate-100 shadow-sm flex items-center justify-center w-10 h-10 overflow-hidden">
-   {acc.displayLogo ? (
-       <img src={acc.displayLogo} alt={acc.name} className="w-full h-full object-cover" />
-   ) : (
-       <CreditCard className="w-5 h-5 text-slate-400" />
-   )}
-</div>
+                               {acc.displayLogo ? (
+                                   <img src={acc.displayLogo} alt={acc.name} className="w-full h-full object-cover" />
+                               ) : (
+                                   <CreditCard className="w-5 h-5 text-slate-400" />
+                               )}
+                            </div>
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
                                    {acc.parentBankName}
                                </span>
                             </div>
                             <div className="mt-4">
                                <p className="text-xs font-bold text-slate-500 truncate mb-1">{acc.name}</p>
-                               <p className={`text-2xl font-black tracking-tight ${balances[acc.account_id] !== undefined && balances[acc.account_id] < 0 ? 'text-rose-600' : 'text-slate-800'}`}>
-                                  {balances[acc.account_id] !== undefined ? (
+                               <p className={`text-2xl font-black tracking-tight ${displayBalance !== undefined && displayBalance < 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+                                  {displayBalance !== undefined ? (
                                       <>
-                                         {balances[acc.account_id] < 0 ? '-' : ''}
+                                         {displayBalance < 0 ? '-' : ''}
                                          {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}
-                                         {Math.abs(balances[acc.account_id]).toFixed(2)}
+                                         {Math.abs(displayBalance).toFixed(2)}
                                       </>
                                   ) : (
                                       <span className="w-16 h-6 bg-slate-200 rounded animate-pulse inline-block"></span>
@@ -576,7 +591,7 @@ useEffect(() => {
                                </p>
                             </div>
                          </SpotlightCard>
-                     ))}
+                     )})}
                   </div>
                 </div>
               )}
