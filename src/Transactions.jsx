@@ -262,19 +262,23 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
    const accountsList = [];
    Object.entries(bankingData.connections).forEach(([providerId, bankData]) => {
        const relatedBank = userBanks.find(b => b.providerId === providerId);
+       
        if (bankData.accounts) {
            bankData.accounts.forEach(acc => {
                
-               // --- THE ULTIMATE CREDIT CARD CHECK ---
+               // --- THE SURGICAL CREDIT CARD CHECK ---
                const accType = (acc.account_type || acc.type || '').toUpperCase();
+               const accName = (acc.name || '').toUpperCase();
                
-               // 1. Trust TrueLayer's CREDIT flag, but STRICTLY BLOCK Monzo from triggering it.
-               // 2. Also catch the known manual credit card providers and UI settings.
-               const isCreditCard = (!providerId.includes('monzo') && accType.includes('CREDIT')) || 
+               // We evaluate strictly on the individual account level.
+               // This prevents "provider bleed" where a Halifax Current account 
+               // gets flagged just because you also have a Halifax Credit Card.
+               const isCreditCard = accType === 'CREDIT_CARD' || 
+                                    accName.includes('CREDIT CARD') || 
+                                    accName.includes('FLEX') || 
                                     providerId.includes('amex') || 
                                     providerId.includes('capital-one') || 
-                                    providerId.includes('mbna') || 
-                                    (relatedBank?.type === 'Credit Card' && !providerId.includes('monzo'));
+                                    providerId.includes('mbna');
 
                accountsList.push({
                    ...acc,
