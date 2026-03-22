@@ -3,44 +3,42 @@ import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Co
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 
 const cleanMerchantsWithAI = async (messyNamesArray, userLocation = "") => {
-  const systemPrompt = `
-    You are an elite UK financial data sanitisation AI. Your exact job is to clean messy, truncated BACS/Faster Payments bank transaction strings into official, highly recognisable consumer brand names.
-
-    THE USER CONTEXT:
-    The user is based in Nuneaton, Warwickshire, United Kingdom. Use this geographical context to decode local acronyms (e.g., "Nbbc Ctax" = "Nuneaton and Bedworth Borough Council", "Uhcw" = "University Hospitals Coventry and Warwickshire").
-
-    CRITICAL RULES:
-    1. STRIP PAYMENT PROCESSORS: Remove all prefixes/suffixes like "CRV*" (Curve), "PP*" or "PayPal *", "SumUp *", "ZTL", "iZettle *", "IZ *", "Stripe", "Gpay", or "Apple Pay".
-    2. STRIP LOCATIONS BUT KEEP SUB-BRANDS: Remove city names, street names, and store numbers (e.g., "TESCO STORES 3241 LONDON" -> "Tesco", "Boots nottingham" -> "Boots"). HOWEVER, you MUST preserve distinct operational sub-brands (e.g., keep "Boots Opticians", "Tesco Express", "Sainsbury's Local", "Tesco Petrol").
-    3. DECODE UK GOVERNMENT & UTILITIES: Expand heavily abbreviated council and government payments. Convert "Ctax" or "C.Tax" to "Council Tax" appended to the local council name.
-    4. STRIP LEGAL & BANKING JUNK: Remove "Ltd", "Limited", "Plc", "LLP", "Direct Debit", "DD", "BACS", "VIS", "POS", "STDO", and random 16-digit reference numbers.
-    5. CLEAN UK TRANSPORT: "TFL GOV UK" or "TFL ROAD CHARGE" -> "Transport for London". "LUL" -> "London Underground". 
-    6. UNIDENTIFIABLE: If it is clearly a private individual's name (e.g., "Mr J Smith") or completely unidentifiable, return the original string neatly formatted in Title Case without guessing.
-    7. STRICT OUTPUT: You MUST return ONLY a valid JSON object mapping the messy strings to the clean strings. No markdown formatting, no conversational text.
-    
-    Example Input: ["CRV*Boots", "Nbbc Ctax", "TESCO STORES 3241", "Boots Opticians", "Sainsburys Supermarkets Ltd"]
-    Example Output: {
-       "CRV*Boots": "Boots",
-       "Nbbc Ctax": "Nuneaton and Bedworth Borough Council",
-       "TESCO STORES 3241": "Tesco",
-       "Boots Opticians": "Boots Opticians",
-       "Sainsburys Supermarkets Ltd": "Sainsbury's"
-    }
-  `;
-
-  try {
-    const response = await fetch('/api/clean-merchants', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        // Pass the userLocation into the stringified body!
-        body: JSON.stringify({ prompt: systemPrompt, data: messyNamesArray, userLocation })
-    });
-    return await response.json(); 
-} catch (error) {
-    console.error("AI Cleaning failed", error);
-    return null;
-}
-};
+   const systemPrompt = `
+     You are an elite UK financial data sanitisation AI. Your exact job is to clean messy bank transaction strings into official, recognisable brand names, AND categorise them.
+ 
+     THE USER CONTEXT:
+     The user is based in Nuneaton, Warwickshire, United Kingdom. Use this geographical context to decode local acronyms (e.g., "Nbbc Ctax" = "Nuneaton and Bedworth Borough Council").
+ 
+     CRITICAL RULES:
+     1. STRIP PAYMENT PROCESSORS: Remove all prefixes/suffixes like "CRV*", "PP*", "SumUp *", "ZTL", "iZettle *", "Stripe", "Apple Pay".
+     2. STRIP LOCATIONS BUT KEEP SUB-BRANDS: Remove city names, street names, and store numbers. HOWEVER, preserve sub-brands (e.g., "Tesco Express", "Boots Opticians").
+     3. DECODE UK GOVERNMENT & UTILITIES: Convert "Ctax" to "Council Tax" appended to the local council name.
+     4. STRIP LEGAL & BANKING JUNK: Remove "Ltd", "Plc", "Direct Debit", "DD", "BACS", and random reference numbers.
+     5. CLEAN UK TRANSPORT: "TFL" -> "Transport for London". "LUL" -> "London Underground". 
+     6. CATEGORISATION: Assign each merchant to one of these EXACT categories: "Groceries", "Eating Out", "Transport", "Bills", "Entertainment", "Shopping", "Health", "Income", "Transfer", or "Miscellaneous".
+     7. UNIDENTIFIABLE: If unidentifiable, return the string in Title Case and assign to "Miscellaneous".
+     8. STRICT OUTPUT: You MUST return ONLY a valid JSON object. The keys must be the messy strings, and the values must be an object containing "name" and "category". No markdown.
+     
+     Example Input: ["CRV*Boots", "Nbbc Ctax", "TESCO STORES 3241"]
+     Example Output: {
+        "CRV*Boots": { "name": "Boots", "category": "Health" },
+        "Nbbc Ctax": { "name": "Nuneaton and Bedworth Borough Council", "category": "Bills" },
+        "TESCO STORES 3241": { "name": "Tesco", "category": "Groceries" }
+     }
+   `;
+ 
+   try {
+     const response = await fetch('/api/clean-merchants', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ prompt: systemPrompt, data: messyNamesArray, userLocation })
+     });
+     return await response.json(); 
+ } catch (error) {
+     console.error("AI Cleaning failed", error);
+     return null;
+ }
+ };
 
 const TRUELAYER_PROVIDERS = {
   'monzo': 'ob-monzo', 'barclays': 'ob-barclays', 'natwest': 'ob-natwest', 'lloyds': 'ob-lloyds',
@@ -128,37 +126,51 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   const LOGO_SECRET_KEY = import.meta.env.VITE_LOGO_DEV_SECRET_KEY;
   const [topMerchantsLogos, setTopMerchantsLogos] = useState({});
 
+  
   // --- GLOBAL DATA CLEANING ENGINE ---
   const { cleanedTransactions, unknownNames } = useMemo(() => {
-    const cleaned = [];
-    const unknowns = new Set();
-    
-    transactions.forEach(tx => {
-        let rawName = (tx.merchant && tx.merchant !== 'Unknown') ? tx.merchant : tx.description;
-        rawName = rawName.replace(/[0-9]/g, '').split('  ')[0].trim();
-        if (rawName.length < 2) rawName = "Unknown";
-        
-        let cleanName = merchantDictionary[rawName];
-        
-        if (!cleanName) {
-            cleanName = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
-            if (cleanName.length > 3 && cleanName !== 'Unknown') {
-                unknowns.add(rawName);
-            }
-        }
-        
-        cleaned.push({
-            ...tx,
-            displayMerchant: cleanName,
-            rawMerchant: rawName
-        });
-    });
-    
-    return { 
-        cleanedTransactions: cleaned, 
-        unknownNames: Array.from(unknowns) 
-    };
-  }, [transactions, merchantDictionary]);
+   const cleaned = [];
+   const unknowns = new Set();
+   
+   transactions.forEach(tx => {
+       let rawName = (tx.merchant && tx.merchant !== 'Unknown') ? tx.merchant : tx.description;
+       rawName = rawName.replace(/[0-9]/g, '').split('  ')[0].trim();
+       if (rawName.length < 2) rawName = "Unknown";
+       
+       const dictEntry = merchantDictionary[rawName];
+       
+       // Handle both legacy strings (old cache) and new AI objects
+       let cleanName = null;
+       let aiCategory = null;
+
+       if (typeof dictEntry === 'string') {
+           cleanName = dictEntry;
+       } else if (dictEntry && typeof dictEntry === 'object') {
+           cleanName = dictEntry.name;
+           aiCategory = dictEntry.category;
+       }
+       
+       if (!cleanName) {
+           cleanName = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
+           if (cleanName.length > 3 && cleanName !== 'Unknown') {
+               unknowns.add(rawName);
+           }
+       }
+       
+       cleaned.push({
+           ...tx,
+           displayMerchant: cleanName,
+           rawMerchant: rawName,
+           // Override the bank's category with the AI's category if it exists!
+           category: aiCategory || tx.category || 'Miscellaneous'
+       });
+   });
+   
+   return { 
+       cleanedTransactions: cleaned, 
+       unknownNames: Array.from(unknowns) 
+   };
+ }, [transactions, merchantDictionary]);
 
   const outgoings = cleanedTransactions.filter(tx => tx.category !== 'Income' && tx.category !== 'Transfer' && tx.amount !== 0);
   const totalSpent = outgoings.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
