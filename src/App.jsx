@@ -2030,25 +2030,16 @@ const AllocationCard = ({ title, targetAmount, actualAmount, percentage, hexColo
             />
           </div>
           
-          {showRemainderButton ? (
+          {/* ALWAYS RENDER THE TICK BUTTON */}
+          {onUpdateActual && (
             <button 
-              onClick={onFillRemainder}
-              className="px-4 py-3 rounded-xl text-xs font-bold text-white shadow-md hover:opacity-90 active:scale-95 transition h-full"
-              style={{ backgroundColor: activeColor }}
+              onClick={() => onUpdateActual(targetAmount)}
+              className="px-3 py-3 rounded-xl text-xs font-bold transition border-2 hover:opacity-100 opacity-70 h-full flex justify-center items-center"
+              style={{ color: activeColor, borderColor: `${activeColor}30`, backgroundColor: `${activeColor}10` }}
+              title="Match Target"
             >
-              Max
+              <Check className="w-4 h-4" />
             </button>
-          ) : (
-               onUpdateActual && (
-                  <button 
-                    onClick={() => onUpdateActual(targetAmount)}
-                    className="px-3 py-3 rounded-xl text-xs font-bold transition border-2 hover:opacity-100 opacity-70 h-full"
-                    style={{ color: activeColor, borderColor: `${activeColor}30`, backgroundColor: `${activeColor}10` }}
-                    title="Match Target"
-                  >
-                    <Check className="w-4 h-4" />
-                  </button>
-                )
           )}
         </div>
       </div>
