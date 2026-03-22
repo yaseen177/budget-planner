@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, RefreshCw, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2, Utensils, Tv, ShoppingCart, TrendingUp, Activity, PieChart, List, ArrowRightLeft, Wallet, Link as LinkIcon } from 'lucide-react';
+import { X, RefreshCw, ChevronDown, Landmark, ArrowRight, Shield, CreditCard, ShoppingBag, Coffee, Car, Zap, CheckCircle2, AlertCircle, AlertTriangle, MoreVertical, Trash2, Utensils, Tv, ShoppingCart, TrendingUp, Activity, PieChart, List, ArrowRightLeft, Wallet, Link as LinkIcon } from 'lucide-react';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 
 const cleanMerchantsWithAI = async (messyNamesArray, userLocation = "") => {
@@ -115,6 +115,12 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
   const [error, setError] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null); 
+
+  const [collapsedBanks, setCollapsedBanks] = useState({});
+
+  const toggleBankCollapse = (providerId) => {
+      setCollapsedBanks(prev => ({ ...prev, [providerId]: !prev[providerId] }));
+  };
   
   const [activeTab, setActiveTab] = useState('feed'); 
   const [dateFilter, setDateFilter] = useState('30'); 
@@ -292,6 +298,39 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
    });
    return accountsList;
  }, [bankingData, userBanks]);
+
+ // --- NEW: GROUPED ACCOUNTS WITH TOTALS ---
+ const groupedWalletAccounts = useMemo(() => {
+   const groups = {};
+   
+   activeWalletAccounts.forEach(acc => {
+       if (!groups[acc.providerId]) {
+           groups[acc.providerId] = {
+               providerId: acc.providerId,
+               bankName: acc.parentBankName,
+               logo: acc.displayLogo,
+               accounts: [],
+               totalBalance: 0,
+               isFullyLoaded: true
+           };
+       }
+       
+       groups[acc.providerId].accounts.push(acc);
+       
+       // Apply the exact same smart math we use for the individual cards
+       let displayBalance = balances[acc.account_id];
+       if (displayBalance !== undefined) {
+           if (acc.isCreditCard && displayBalance > 0) {
+               displayBalance = -Math.abs(displayBalance);
+           }
+           groups[acc.providerId].totalBalance += displayBalance;
+       } else {
+           groups[acc.providerId].isFullyLoaded = false;
+       }
+   });
+   
+   return Object.values(groups);
+}, [activeWalletAccounts, balances]);
 
   const getCategoryIcon = (category) => {
     switch(category) {
@@ -563,48 +602,90 @@ useEffect(() => {
                       </ShinyButton>
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     {activeWalletAccounts.map(acc => {
-                         // --- SMART BALANCE INVERSION ---
-                         let displayBalance = balances[acc.account_id];
-                         
-                         // If it's a credit card and TrueLayer reports the debt as a positive number (like AMEX/Halifax CC), 
-                         // we flip it to negative so it shows as red debt.
-                         // If it already reports as negative, we leave it alone so it stays correctly red!
-                         if (displayBalance !== undefined && acc.isCreditCard && displayBalance > 0) {
-                             displayBalance = -Math.abs(displayBalance); 
-                         }
+                  <div className="space-y-4">
+                     {groupedWalletAccounts.map(group => (
+                         <div key={group.providerId} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden transition-all">
+                             
+                             {/* Group Header (Clickable) */}
+                             <button 
+                                 onClick={() => toggleBankCollapse(group.providerId)}
+                                 className="w-full flex items-center justify-between p-4 sm:p-5 bg-slate-50/50 hover:bg-slate-50 transition"
+                             >
+                                 <div className="flex items-center gap-4">
+                                     <div className="w-10 h-10 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden shrink-0">
+                                         {group.logo ? (
+                                             <img src={group.logo} alt={group.bankName} className="w-full h-full object-cover" />
+                                         ) : (
+                                             <Landmark className="w-5 h-5 text-slate-400" />
+                                         )}
+                                     </div>
+                                     <div className="text-left">
+                                         <h4 className="font-bold text-slate-800">{group.bankName}</h4>
+                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{group.accounts.length} Account{group.accounts.length !== 1 ? 's' : ''}</p>
+                                     </div>
+                                 </div>
+                                 
+                                 <div className="flex items-center gap-4">
+                                     <div className="text-right">
+                                         {group.isFullyLoaded ? (
+                                             <p className={`font-black text-lg tracking-tight ${group.totalBalance < 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+                                                 {group.totalBalance < 0 ? '-' : ''}{currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}{Math.abs(group.totalBalance).toFixed(2)}
+                                             </p>
+                                         ) : (
+                                             <span className="w-16 h-5 bg-slate-200 rounded animate-pulse inline-block"></span>
+                                         )}
+                                     </div>
+                                     <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${collapsedBanks[group.providerId] ? '-rotate-90' : ''}`} />
+                                 </div>
+                             </button>
 
-                         return (
-                         <SpotlightCard key={acc.account_id} className="flex flex-col justify-between p-5 min-h-[140px]">
-                            <div className="flex justify-between items-start">
-                            <div className="bg-slate-50 rounded-xl border border-slate-100 shadow-sm flex items-center justify-center w-10 h-10 overflow-hidden">
-                               {acc.displayLogo ? (
-                                   <img src={acc.displayLogo} alt={acc.name} className="w-full h-full object-cover" />
-                               ) : (
-                                   <CreditCard className="w-5 h-5 text-slate-400" />
-                               )}
-                            </div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
-                                   {acc.parentBankName}
-                               </span>
-                            </div>
-                            <div className="mt-4">
-                               <p className="text-xs font-bold text-slate-500 truncate mb-1">{acc.name}</p>
-                               <p className={`text-2xl font-black tracking-tight ${displayBalance !== undefined && displayBalance < 0 ? 'text-rose-600' : 'text-slate-800'}`}>
-                                  {displayBalance !== undefined ? (
-                                      <>
-                                         {displayBalance < 0 ? '-' : ''}
-                                         {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}
-                                         {Math.abs(displayBalance).toFixed(2)}
-                                      </>
-                                  ) : (
-                                      <span className="w-16 h-6 bg-slate-200 rounded animate-pulse inline-block"></span>
-                                  )}
-                               </p>
-                            </div>
-                         </SpotlightCard>
-                     )})}
+                             {/* Group Accounts (The Grid) */}
+                             <div 
+                                className={`grid grid-cols-1 sm:grid-cols-2 gap-4 transition-all duration-300 ease-in-out origin-top ${collapsedBanks[group.providerId] ? 'grid-rows-[0fr] opacity-0 p-0 m-0 border-0' : 'grid-rows-[1fr] opacity-100 p-4 sm:p-5 border-t border-slate-100'}`}
+                             >
+                                 <div className={`col-span-1 sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 overflow-hidden ${collapsedBanks[group.providerId] ? 'invisible' : 'visible'}`}>
+                                     {group.accounts.map(acc => {
+                                         // --- SMART BALANCE INVERSION ---
+                                         let displayBalance = balances[acc.account_id];
+                                         
+                                         if (displayBalance !== undefined && acc.isCreditCard && displayBalance > 0) {
+                                             displayBalance = -Math.abs(displayBalance); 
+                                         }
+
+                                         return (
+                                         <SpotlightCard key={acc.account_id} className="flex flex-col justify-between p-5 min-h-[140px] border-slate-100 shadow-none hover:shadow-sm">
+                                            <div className="flex justify-between items-start">
+                                                <div className="bg-slate-50 rounded-xl border border-slate-100 shadow-sm flex items-center justify-center w-10 h-10 overflow-hidden">
+                                                   {acc.displayLogo ? (
+                                                       <img src={acc.displayLogo} alt={acc.name} className="w-full h-full object-cover" />
+                                                   ) : (
+                                                       <CreditCard className="w-5 h-5 text-slate-400" />
+                                                   )}
+                                                </div>
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                                                   {acc.isCreditCard ? 'Credit' : 'Debit'}
+                                               </span>
+                                            </div>
+                                            <div className="mt-4">
+                                               <p className="text-xs font-bold text-slate-500 truncate mb-1">{acc.name}</p>
+                                               <p className={`text-2xl font-black tracking-tight ${displayBalance !== undefined && displayBalance < 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+                                                  {displayBalance !== undefined ? (
+                                                      <>
+                                                         {displayBalance < 0 ? '-' : ''}
+                                                         {currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€'}
+                                                         {Math.abs(displayBalance).toFixed(2)}
+                                                      </>
+                                                  ) : (
+                                                      <span className="w-16 h-6 bg-slate-200 rounded animate-pulse inline-block"></span>
+                                                  )}
+                                               </p>
+                                            </div>
+                                         </SpotlightCard>
+                                     )})}
+                                 </div>
+                             </div>
+                         </div>
+                     ))}
                   </div>
                 </div>
               )}
