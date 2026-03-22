@@ -265,7 +265,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
        if (bankData.accounts) {
            bankData.accounts.forEach(acc => {
                // --- NEW: Identify if it's a Credit Card ---
-               const isCreditCard = ['CREDIT', 'CREDIT_CARD', 'CARD'].includes((acc.account_type || acc.type || '').toUpperCase()) || 
+               const isCreditCard = ['CREDIT', 'CREDIT_CARD'].includes((acc.account_type || acc.type || '').toUpperCase()) || 
                                     providerId.includes('amex') || 
                                     providerId.includes('capital-one') || 
                                     providerId.includes('mbna') || 
