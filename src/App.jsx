@@ -5009,6 +5009,122 @@ const LandingPage = ({ onGetStarted, onDemo }) => {
   );
 };
 
+// --- NEW: CONFIGURE MONTH MODAL ---
+const ConfigureMonthModal = ({ 
+  isOpen, onClose, 
+  settings, 
+  expenses, actualSavings, 
+  excludedItems, onToggleExclude 
+}) => {
+  if (!isOpen) return null;
+
+  // Combine fixed expenses, CCs, Mortgages into one list for the UI
+  const globalBills = [
+    ...(settings.defaultFixedExpenses || []).map(e => ({ ...e, group: 'fixed' })),
+    ...(settings.creditCards || []).map(c => ({ ...c, group: 'credit_card' })),
+    ...(settings.mortgages || []).map(m => ({ ...m, group: 'mortgage' }))
+  ];
+
+  const globalPots = settings.allocationRules || [];
+
+  const handleToggle = (name, isPot, potId) => {
+     // Safeguard: Prevent hiding if money is already assigned
+     if (isPot) {
+        if (actualSavings[potId] && parseFloat(actualSavings[potId]) > 0) {
+           alert("Cannot hide this pot: You have already deposited money into it this month.");
+           return;
+        }
+     } else {
+        const monthExp = expenses.find(e => e.name === name);
+        if (monthExp) {
+           if (monthExp.paid) {
+              alert("Cannot hide this bill: It is marked as paid this month.");
+              return;
+           }
+           if (monthExp.type === 'credit_card' && parseFloat(monthExp.amount) > 0) {
+              alert("Cannot hide this credit card: An amount has already been assigned.");
+              return;
+           }
+        }
+     }
+     onToggleExclude(name);
+  };
+
+  const isExcluded = (name) => excludedItems.includes(name);
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[110] flex items-center justify-center p-4 animate-in fade-in">
+       <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+             <div>
+                <h3 className="font-bold text-lg text-slate-800">Configure Month</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Toggle items ON/OFF for this month only</p>
+             </div>
+             <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition"><X className="w-5 h-5 text-slate-500" /></button>
+          </div>
+          
+          <div className="p-4 overflow-y-auto custom-scrollbar space-y-6">
+             
+             {/* BILLS & DEBTS */}
+             <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-2 flex items-center gap-2"><TrendingDown className="w-4 h-4"/> Bills & Debts</h4>
+                <div className="space-y-2">
+                   {globalBills.map(bill => {
+                      const hidden = isExcluded(bill.name);
+                      return (
+                         <div key={bill.name} className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${hidden ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-emerald-100 shadow-sm'}`}>
+                            <div className="flex items-center gap-3">
+                               {bill.logo ? <img src={bill.logo} className="w-6 h-6 object-contain rounded-md mix-blend-multiply" /> : <div className="w-6 h-6 bg-slate-100 rounded-md flex items-center justify-center"><Zap className="w-3 h-3 text-slate-400" /></div>}
+                               <div>
+                                  <div className={`text-sm font-bold ${hidden ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{bill.name}</div>
+                                  <div className="text-[10px] font-medium text-slate-400 uppercase">{bill.group.replace('_', ' ')}</div>
+                               </div>
+                            </div>
+                            <button 
+                               onClick={() => handleToggle(bill.name, false)}
+                               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${!hidden ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                            >
+                               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!hidden ? 'translate-x-6' : 'translate-x-1'}`} />
+                            </button>
+                         </div>
+                      );
+                   })}
+                   {globalBills.length === 0 && <div className="text-xs text-slate-400 italic px-2">No fixed bills in settings.</div>}
+                </div>
+             </div>
+
+             {/* SPENDING POTS */}
+             <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-2 flex items-center gap-2"><Target className="w-4 h-4"/> Savings Pots</h4>
+                <div className="space-y-2">
+                   {globalPots.map(pot => {
+                      const hidden = isExcluded(pot.name);
+                      return (
+                         <div key={pot.id} className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${hidden ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-indigo-100 shadow-sm'}`}>
+                            <div className="flex items-center gap-3">
+                               <div className="w-6 h-6 rounded-full shadow-sm" style={{ backgroundColor: pot.hex || '#10b981' }}></div>
+                               <div>
+                                  <div className={`text-sm font-bold ${hidden ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{pot.name}</div>
+                                  <div className="text-[10px] font-medium text-slate-400">{pot.percentage}% Allocation</div>
+                               </div>
+                            </div>
+                            <button 
+                               onClick={() => handleToggle(pot.name, true, pot.id)}
+                               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${!hidden ? 'bg-indigo-500' : 'bg-slate-300'}`}
+                            >
+                               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!hidden ? 'translate-x-6' : 'translate-x-1'}`} />
+                            </button>
+                         </div>
+                      );
+                   })}
+                </div>
+             </div>
+
+          </div>
+       </div>
+    </div>
+  );
+};
 
 export default function App() {
 
@@ -5032,6 +5148,10 @@ export default function App() {
   const [isLegacyUser, setIsLegacyUser] = useState(false);
 
   const [showTransactions, setShowTransactions] = useState(false);
+
+  const [showConfigureModal, setShowConfigureModal] = useState(false);
+  const [excludedItems, setExcludedItems] = useState([]);
+  const [sandboxExcludedItems, setSandboxExcludedItems] = useState([]);
 
   // --- ADMIN DEMO STATE ---
   const [activeDemoId, setActiveDemoId] = useState(null);
@@ -5321,12 +5441,16 @@ export default function App() {
   // 7. Allocations (Pots)
   const activeRules = monthAllocations || effectiveSettings.allocationRules;
   const effectiveAllocations = isTutorialMode ? tutorialAllocations : activeRules;
+  
+  // --- EXCLUSION FILTER LOGIC ---
+  const effectiveExcludedItems = demoData?.excludedItems !== undefined ? demoData.excludedItems : (isSandbox ? sandboxExcludedItems : excludedItems);
 
-  // 8. Display Variables (Legacy support for UI components that might still use these names)
-  const displayAllocations = effectiveAllocations;
+  // 8. Display Variables (Filtered to hide items toggled off in the Configure modal)
+  const displayAllocations = effectiveAllocations.filter(plan => !effectiveExcludedItems.includes(plan.name));
   const displayDefaultExpenses = effectiveSettings.defaultFixedExpenses;
   const displayActualSavings = effectiveActuals;
-  const displayExpenses = effectiveExpenses; // Add this to be safe
+  const displayExpensesAll = effectiveExpenses.filter(e => !effectiveExcludedItems.includes(e.name));
+  const displayExpenses = displayExpensesAll; // Keeps legacy components safe
 
   // Toast Helper
   const showToast = (msg) => {
@@ -5490,6 +5614,7 @@ export default function App() {
         setExpenses(currentExpenses);
         setSalary(data.salary || '');
         setActualSavings(data.actualSavings || {});
+        setExcludedItems(data.excludedItems || []);
 
         if (data.salary && !data.allocationRules) {
            setDoc(docRef, { ...data, allocationRules: userSettings.allocationRules }, { merge: true });
@@ -5560,6 +5685,7 @@ export default function App() {
            
            setExpenses(initialExpenses);
            setMonthAllocations(null);
+           setExcludedItems([]);
         }
 
         setActualSavings({});
@@ -5795,21 +5921,19 @@ export default function App() {
     }
   };
 
-  const saveData = async (newSalary, newExpenses, newActuals) => {
-    if (!user || isSandbox || activeDemoId) return; // <--- ADD activeDemoId HERE
+  const saveData = async (newSalary, newExpenses, newActuals, excluded = excludedItems) => { // <-- UPDATE PARAMS
+    if (!user || isSandbox || activeDemoId) return; 
     const monthId = getMonthId(currentDate);
     const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgetData', monthId);
     
-    // Determine which rules to lock in:
-    // 1. If we already have locked rules for this month, keep them.
-    // 2. If not (new month), lock in the current global settings.
     const rulesToSave = monthAllocations || userSettings.allocationRules;
 
     await setDoc(docRef, { 
       salary: newSalary, 
       expenses: newExpenses, 
       actualSavings: newActuals || actualSavings,
-      allocationRules: rulesToSave, // <--- SAVE THE RULES
+      allocationRules: rulesToSave, 
+      excludedItems: excluded, // <--- ADD THIS LINE
       lastUpdated: new Date() 
     });
   };
@@ -5861,6 +5985,19 @@ export default function App() {
       showToast("Month reset.");
     }
   };
+
+  const toggleExcludeItem = async (name) => {
+    triggerHaptic();
+    if (isSandbox) {
+        const newExcluded = sandboxExcludedItems.includes(name) ? sandboxExcludedItems.filter(i => i !== name) : [...sandboxExcludedItems, name];
+        setSandboxExcludedItems(newExcluded);
+        return;
+    }
+
+    const newExcluded = excludedItems.includes(name) ? excludedItems.filter(i => i !== name) : [...excludedItems, name];
+    setExcludedItems(newExcluded);
+    saveData(salary, expenses, actualSavings, newExcluded);
+ };
 
   const updateSalary = (val) => {
     if (isSandbox) {
@@ -6381,6 +6518,16 @@ export default function App() {
         isOpen={isAddingExpense} 
         onClose={() => setIsAddingExpense(false)}
         onSave={handleAddExpenseSave}
+      />
+
+<ConfigureMonthModal 
+         isOpen={showConfigureModal}
+         onClose={() => setShowConfigureModal(false)}
+         settings={effectiveSettings}
+         expenses={effectiveExpenses}
+         actualSavings={effectiveActuals}
+         excludedItems={effectiveExcludedItems}
+         onToggleExclude={toggleExcludeItem}
       />
 
   {showSettings && (
@@ -6944,6 +7091,8 @@ export default function App() {
                    <div className="p-2 bg-amber-100 text-amber-600 rounded-xl"><Target className="w-4 h-4" /></div>
                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Your Money Map</h3>
                 </div>
+
+
                 
                 {/* Help Icon Wrapper */}
                 <div className="relative">
@@ -7099,6 +7248,9 @@ export default function App() {
                     className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-2xl border border-transparent focus:bg-white focus:border-emerald-100 focus:ring-4 focus:ring-emerald-500/10 text-sm font-medium transition outline-none"
                   />
                 </div>
+                <button onClick={() => setShowConfigureModal(true)} className="bg-slate-50 hover:bg-slate-100 text-slate-600 p-3 rounded-2xl transition border border-transparent hover:border-slate-200" title="Configure Bills">
+                   <Settings className="w-5 h-5" />
+                </button>
                 <button onClick={toggleSort} className="bg-slate-50 hover:bg-slate-100 text-slate-600 p-3 rounded-2xl transition border border-transparent hover:border-slate-200"><ArrowUpDown className="w-5 h-5" /></button>
                 <button onClick={copyFromPreviousMonth} className="bg-slate-50 hover:bg-slate-100 text-slate-600 p-3 rounded-2xl transition border border-transparent hover:border-slate-200" title="Copy Previous"><Copy className="w-5 h-5" /></button>
              </div>
