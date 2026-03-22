@@ -5027,26 +5027,7 @@ const ConfigureMonthModal = ({
 
   const globalPots = settings.allocationRules || [];
 
-  const handleToggle = (name, isPot, potId) => {
-     // Safeguard: Prevent hiding if money is already assigned
-     if (isPot) {
-        if (actualSavings[potId] && parseFloat(actualSavings[potId]) > 0) {
-           alert("Cannot hide this pot: You have already deposited money into it this month.");
-           return;
-        }
-     } else {
-        const monthExp = expenses.find(e => e.name === name);
-        if (monthExp) {
-           if (monthExp.paid) {
-              alert("Cannot hide this bill: It is marked as paid this month.");
-              return;
-           }
-           if (monthExp.type === 'credit_card' && parseFloat(monthExp.amount) > 0) {
-              alert("Cannot hide this credit card: An amount has already been assigned.");
-              return;
-           }
-        }
-     }
+  const handleToggle = (name) => {
      onToggleExclude(name);
   };
 
@@ -5071,6 +5052,13 @@ const ConfigureMonthModal = ({
                 <div className="space-y-2">
                    {globalBills.map(bill => {
                       const hidden = isExcluded(bill.name);
+                      
+                      // Check if it can be hidden
+                      const monthExp = expenses.find(e => e.name === bill.name);
+                      const isPaid = monthExp?.paid;
+                      const hasAssignedAmount = monthExp?.type === 'credit_card' && parseFloat(monthExp.amount) > 0;
+                      const isDisabled = isPaid || hasAssignedAmount;
+
                       return (
                          <div key={bill.name} className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${hidden ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-emerald-100 shadow-sm'}`}>
                             <div className="flex items-center gap-3">
@@ -5081,8 +5069,10 @@ const ConfigureMonthModal = ({
                                </div>
                             </div>
                             <button 
-                               onClick={() => handleToggle(bill.name, false)}
-                               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${!hidden ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                               disabled={isDisabled}
+                               onClick={() => handleToggle(bill.name)}
+                               title={isDisabled ? "Cannot hide: Bill is paid or assigned" : ""}
+                               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''} ${!hidden ? 'bg-emerald-500' : 'bg-slate-300'}`}
                             >
                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!hidden ? 'translate-x-6' : 'translate-x-1'}`} />
                             </button>
@@ -5099,6 +5089,10 @@ const ConfigureMonthModal = ({
                 <div className="space-y-2">
                    {globalPots.map(pot => {
                       const hidden = isExcluded(pot.name);
+                      
+                      // Check if it can be hidden
+                      const hasMoney = actualSavings[pot.id] && parseFloat(actualSavings[pot.id]) > 0;
+
                       return (
                          <div key={pot.id} className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${hidden ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-indigo-100 shadow-sm'}`}>
                             <div className="flex items-center gap-3">
@@ -5109,8 +5103,10 @@ const ConfigureMonthModal = ({
                                </div>
                             </div>
                             <button 
-                               onClick={() => handleToggle(pot.name, true, pot.id)}
-                               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${!hidden ? 'bg-indigo-500' : 'bg-slate-300'}`}
+                               disabled={hasMoney}
+                               onClick={() => handleToggle(pot.name)}
+                               title={hasMoney ? "Cannot hide: Money is deposited this month" : ""}
+                               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${hasMoney ? 'opacity-40 cursor-not-allowed' : ''} ${!hidden ? 'bg-indigo-500' : 'bg-slate-300'}`}
                             >
                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!hidden ? 'translate-x-6' : 'translate-x-1'}`} />
                             </button>
@@ -6350,8 +6346,8 @@ export default function App() {
       return val !== undefined && val !== '';
   }).length;
 
-  // Filter Expenses using effectiveExpenses
-  let filteredExpenses = effectiveExpenses.filter(e => 
+  // Filter Expenses using displayExpensesAll (This correctly hides excluded items)
+  let filteredExpenses = displayExpensesAll.filter(e => 
     e.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
