@@ -264,20 +264,21 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
        const relatedBank = userBanks.find(b => b.providerId === providerId);
        if (bankData.accounts) {
            bankData.accounts.forEach(acc => {
-               // --- BULLETPROOF CREDIT CARD CHECK ---
-               const accType = (acc.account_type || acc.type || '').toUpperCase();
-               const isCreditCard = accType === 'CREDIT_CARD' || 
-                                    providerId.includes('amex') || 
+               
+               // --- STRICT CREDIT CARD CHECK ---
+               // We are completely ignoring TrueLayer's internal 'account_type' because 
+               // it mislabels things like Monzo Flex or Overdrafts as credit cards.
+               const isCreditCard = providerId.includes('amex') || 
                                     providerId.includes('capital-one') || 
                                     providerId.includes('mbna') || 
-                                    relatedBank?.type === 'Credit Card';
+                                    (relatedBank?.type === 'Credit Card' && !providerId.includes('monzo'));
 
                accountsList.push({
                    ...acc,
                    providerId,
                    displayLogo: relatedBank?.fallbackLogo || acc.provider_logo || relatedBank?.logoUrl,
                    parentBankName: relatedBank?.name || 'Bank',
-                   isCreditCard
+                   isCreditCard // Pass the strict flag to the UI
                });
            });
        }
