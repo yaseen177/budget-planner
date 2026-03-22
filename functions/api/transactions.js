@@ -185,16 +185,21 @@ export async function onRequestPost(context) {
             ...settledTx.map(tx => ({ ...tx, is_pending: false }))
         ];
 
-        const cleanedTx = allRawTx.map(tx => ({
-            id: tx.transaction_id,
-            date: (tx.timestamp || '').split('T')[0] || new Date().toISOString().split('T')[0],
-            description: tx.description,
-            amount: tx.amount,
-            category: categoriseTransaction(tx.merchant_name || '', tx.description || '', tx.transaction_category, tx.amount, acc.type, accountHolderNames),
-            merchant: tx.merchant_name || 'Unknown',
-            account_id: acc.account_id,
-            is_pending: tx.is_pending 
-        }));
+        const cleanedTx = allRawTx.map(tx => {
+            // Aggressively hunt for the true execution date before falling back to the settlement timestamp
+            const trueDateString = tx.executed_timestamp || tx.authorization_timestamp || tx.timestamp || new Date().toISOString();
+            
+            return {
+                id: tx.transaction_id,
+                date: trueDateString.split('T')[0],
+                description: tx.description,
+                amount: tx.amount,
+                category: categoriseTransaction(tx.merchant_name || '', tx.description || '', tx.transaction_category, tx.amount, acc.type, accountHolderNames),
+                merchant: tx.merchant_name || 'Unknown',
+                account_id: acc.account_id,
+                is_pending: tx.is_pending 
+            };
+        });
 
         return {
             account_id: acc.account_id,
