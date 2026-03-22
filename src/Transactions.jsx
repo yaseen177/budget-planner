@@ -264,8 +264,9 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
        const relatedBank = userBanks.find(b => b.providerId === providerId);
        if (bankData.accounts) {
            bankData.accounts.forEach(acc => {
-               // --- NEW: Identify if it's a Credit Card ---
-               const isCreditCard = ['CREDIT', 'CREDIT_CARD'].includes((acc.account_type || acc.type || '').toUpperCase()) || 
+               // --- BULLETPROOF CREDIT CARD CHECK ---
+               const accType = (acc.account_type || acc.type || '').toUpperCase();
+               const isCreditCard = accType === 'CREDIT_CARD' || 
                                     providerId.includes('amex') || 
                                     providerId.includes('capital-one') || 
                                     providerId.includes('mbna') || 
@@ -276,7 +277,7 @@ const Transactions = ({ user, appId, db, onClose, onConnectBank, currency = 'GBP
                    providerId,
                    displayLogo: relatedBank?.fallbackLogo || acc.provider_logo || relatedBank?.logoUrl,
                    parentBankName: relatedBank?.name || 'Bank',
-                   isCreditCard // Pass the flag to the UI
+                   isCreditCard
                });
            });
        }
@@ -556,10 +557,12 @@ useEffect(() => {
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      {activeWalletAccounts.map(acc => {
-                         // --- FIX: Invert Credit Card Balances ---
+                         // --- BULLETPROOF BALANCE INVERSION ---
                          let displayBalance = balances[acc.account_id];
-                         if (displayBalance !== undefined && acc.isCreditCard && displayBalance > 0) {
-                             displayBalance = -Math.abs(displayBalance);
+                         
+                         // If it's a credit card, invert the TrueLayer mathematical logic
+                         if (displayBalance !== undefined && acc.isCreditCard) {
+                             displayBalance = -displayBalance; 
                          }
 
                          return (
