@@ -565,12 +565,14 @@ useEffect(() => {
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      {activeWalletAccounts.map(acc => {
-                         // --- BULLETPROOF BALANCE INVERSION ---
+                         // --- SMART BALANCE INVERSION ---
                          let displayBalance = balances[acc.account_id];
                          
-                         // If it's a credit card, invert the TrueLayer mathematical logic
-                         if (displayBalance !== undefined && acc.isCreditCard) {
-                             displayBalance = -displayBalance; 
+                         // If it's a credit card and TrueLayer reports the debt as a positive number (like AMEX/Halifax CC), 
+                         // we flip it to negative so it shows as red debt.
+                         // If it already reports as negative, we leave it alone so it stays correctly red!
+                         if (displayBalance !== undefined && acc.isCreditCard && displayBalance > 0) {
+                             displayBalance = -Math.abs(displayBalance); 
                          }
 
                          return (
