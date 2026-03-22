@@ -5009,29 +5009,30 @@ const LandingPage = ({ onGetStarted, onDemo }) => {
   );
 };
 
-// --- NEW: CONFIGURE MONTH MODAL ---
+// --- UPGRADED CONFIGURE MONTH MODAL ---
 const ConfigureMonthModal = ({ 
   isOpen, onClose, 
   settings, 
-  expenses, actualSavings, 
-  excludedItems, onToggleExclude 
+  expenses, monthAllocations, actualSavings, 
+  excludedItems, onToggleItem 
 }) => {
   if (!isOpen) return null;
 
-  // Combine fixed expenses, CCs, Mortgages into one list for the UI
   const globalBills = [
     ...(settings.defaultFixedExpenses || []).map(e => ({ ...e, group: 'fixed' })),
     ...(settings.creditCards || []).map(c => ({ ...c, group: 'credit_card' })),
     ...(settings.mortgages || []).map(m => ({ ...m, group: 'mortgage' }))
   ];
-
   const globalPots = settings.allocationRules || [];
 
-  const handleToggle = (name) => {
-     onToggleExclude(name);
+  // This checks the historical month to see if it's currently active
+  const checkIsActive = (name, isPot) => {
+     const currentMonthPots = monthAllocations || settings.allocationRules;
+     const isInMonth = isPot 
+         ? currentMonthPots.some(p => p.name === name)
+         : expenses.some(e => e.name === name);
+     return isInMonth && !excludedItems.includes(name);
   };
-
-  const isExcluded = (name) => excludedItems.includes(name);
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[110] flex items-center justify-center p-4 animate-in fade-in">
@@ -5051,30 +5052,29 @@ const ConfigureMonthModal = ({
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-2 flex items-center gap-2"><TrendingDown className="w-4 h-4"/> Bills & Debts</h4>
                 <div className="space-y-2">
                    {globalBills.map(bill => {
-                      const hidden = isExcluded(bill.name);
+                      const isActive = checkIsActive(bill.name, false);
                       
-                      // Check if it can be hidden
                       const monthExp = expenses.find(e => e.name === bill.name);
                       const isPaid = monthExp?.paid;
                       const hasAssignedAmount = monthExp?.type === 'credit_card' && parseFloat(monthExp.amount) > 0;
-                      const isDisabled = isPaid || hasAssignedAmount;
+                      const isDisabled = isActive && (isPaid || hasAssignedAmount);
 
                       return (
-                         <div key={bill.name} className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${hidden ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-emerald-100 shadow-sm'}`}>
+                         <div key={bill.name} className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${!isActive ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-emerald-100 shadow-sm'}`}>
                             <div className="flex items-center gap-3">
                                {bill.logo ? <img src={bill.logo} className="w-6 h-6 object-contain rounded-md mix-blend-multiply" /> : <div className="w-6 h-6 bg-slate-100 rounded-md flex items-center justify-center"><Zap className="w-3 h-3 text-slate-400" /></div>}
                                <div>
-                                  <div className={`text-sm font-bold ${hidden ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{bill.name}</div>
+                                  <div className={`text-sm font-bold ${!isActive ? 'text-slate-500' : 'text-slate-800'}`}>{bill.name}</div>
                                   <div className="text-[10px] font-medium text-slate-400 uppercase">{bill.group.replace('_', ' ')}</div>
                                </div>
                             </div>
                             <button 
                                disabled={isDisabled}
-                               onClick={() => handleToggle(bill.name)}
+                               onClick={() => onToggleItem(bill, false)}
                                title={isDisabled ? "Cannot hide: Bill is paid or assigned" : ""}
-                               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''} ${!hidden ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''} ${isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}
                             >
-                               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!hidden ? 'translate-x-6' : 'translate-x-1'}`} />
+                               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isActive ? 'translate-x-6' : 'translate-x-1'}`} />
                             </button>
                          </div>
                       );
@@ -5088,27 +5088,25 @@ const ConfigureMonthModal = ({
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-2 flex items-center gap-2"><Target className="w-4 h-4"/> Savings Pots</h4>
                 <div className="space-y-2">
                    {globalPots.map(pot => {
-                      const hidden = isExcluded(pot.name);
-                      
-                      // Check if it can be hidden
-                      const hasMoney = actualSavings[pot.id] && parseFloat(actualSavings[pot.id]) > 0;
+                      const isActive = checkIsActive(pot.name, true);
+                      const hasMoney = isActive && actualSavings[pot.id] && parseFloat(actualSavings[pot.id]) > 0;
 
                       return (
-                         <div key={pot.id} className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${hidden ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-indigo-100 shadow-sm'}`}>
+                         <div key={pot.id} className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${!isActive ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-indigo-100 shadow-sm'}`}>
                             <div className="flex items-center gap-3">
                                <div className="w-6 h-6 rounded-full shadow-sm" style={{ backgroundColor: pot.hex || '#10b981' }}></div>
                                <div>
-                                  <div className={`text-sm font-bold ${hidden ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{pot.name}</div>
+                                  <div className={`text-sm font-bold ${!isActive ? 'text-slate-500' : 'text-slate-800'}`}>{pot.name}</div>
                                   <div className="text-[10px] font-medium text-slate-400">{pot.percentage}% Allocation</div>
                                </div>
                             </div>
                             <button 
                                disabled={hasMoney}
-                               onClick={() => handleToggle(pot.name)}
+                               onClick={() => onToggleItem(pot, true)}
                                title={hasMoney ? "Cannot hide: Money is deposited this month" : ""}
-                               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${hasMoney ? 'opacity-40 cursor-not-allowed' : ''} ${!hidden ? 'bg-indigo-500' : 'bg-slate-300'}`}
+                               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${hasMoney ? 'opacity-40 cursor-not-allowed' : ''} ${isActive ? 'bg-indigo-500' : 'bg-slate-300'}`}
                             >
-                               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!hidden ? 'translate-x-6' : 'translate-x-1'}`} />
+                               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isActive ? 'translate-x-6' : 'translate-x-1'}`} />
                             </button>
                          </div>
                       );
@@ -5917,19 +5915,21 @@ export default function App() {
     }
   };
 
-  const saveData = async (newSalary, newExpenses, newActuals, excluded = excludedItems) => { // <-- UPDATE PARAMS
+  // --- UPDATED SAVE DATA ---
+  const saveData = async (newSalary, newExpenses, newActuals, excluded = excludedItems, rules = monthAllocations) => {
     if (!user || isSandbox || activeDemoId) return; 
     const monthId = getMonthId(currentDate);
     const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgetData', monthId);
     
-    const rulesToSave = monthAllocations || userSettings.allocationRules;
+    // Uses the passed rules, or falls back to global settings for brand new months
+    const rulesToSave = rules || userSettings.allocationRules;
 
     await setDoc(docRef, { 
       salary: newSalary, 
       expenses: newExpenses, 
       actualSavings: newActuals || actualSavings,
       allocationRules: rulesToSave, 
-      excludedItems: excluded, // <--- ADD THIS LINE
+      excludedItems: excluded,
       lastUpdated: new Date() 
     });
   };
@@ -5982,17 +5982,62 @@ export default function App() {
     }
   };
 
-  const toggleExcludeItem = async (name) => {
+  const toggleMonthItem = async (globalItem, isPot) => {
     triggerHaptic();
-    if (isSandbox) {
-        const newExcluded = sandboxExcludedItems.includes(name) ? sandboxExcludedItems.filter(i => i !== name) : [...sandboxExcludedItems, name];
-        setSandboxExcludedItems(newExcluded);
-        return;
+    
+    const name = globalItem.name;
+    const currentExcluded = isSandbox ? sandboxExcludedItems : excludedItems;
+    
+    // 1. Get the current arrays for this specific month
+    const currentExpenses = [...expenses];
+    const currentAllocations = monthAllocations ? [...monthAllocations] : [...effectiveSettings.allocationRules];
+
+    // 2. Check if the item actually exists in this month's snapshot
+    const isInMonth = isPot 
+        ? currentAllocations.some(p => p.name === name)
+        : currentExpenses.some(e => e.name === name);
+        
+    const isExcluded = currentExcluded.includes(name);
+    
+    // 3. It is "Active" ONLY if it exists in the month AND hasn't been hidden
+    const isActive = isInMonth && !isExcluded;
+
+    let newExcluded = [...currentExcluded];
+    let newExpenses = currentExpenses;
+    let newAllocations = currentAllocations;
+
+    if (isActive) {
+        // TURN OFF -> Hide it by adding to the exclusion list
+        if (!newExcluded.includes(name)) newExcluded.push(name);
+    } else {
+        // TURN ON -> Remove from exclusion list
+        newExcluded = newExcluded.filter(n => n !== name);
+        
+        // INJECTION: If it wasn't in the month's snapshot at all, we add it now!
+        if (!isInMonth) {
+            if (isPot) {
+                newAllocations.push(globalItem);
+            } else {
+                newExpenses.push({
+                    id: globalItem.id || `item_${Date.now()}`,
+                    name: globalItem.name,
+                    amount: globalItem.amount || 0,
+                    type: globalItem.group || 'fixed',
+                    paid: false
+                });
+            }
+        }
     }
 
-    const newExcluded = excludedItems.includes(name) ? excludedItems.filter(i => i !== name) : [...excludedItems, name];
-    setExcludedItems(newExcluded);
-    saveData(salary, expenses, actualSavings, newExcluded);
+    // 4. Update States instantly for snappy UI
+    if (isSandbox) setSandboxExcludedItems(newExcluded);
+    else setExcludedItems(newExcluded);
+    
+    setExpenses(newExpenses);
+    setMonthAllocations(newAllocations);
+    
+    // 5. Save the updated arrays to Firebase
+    saveData(salary, newExpenses, actualSavings, newExcluded, newAllocations);
  };
 
   const updateSalary = (val) => {
@@ -6516,14 +6561,15 @@ export default function App() {
         onSave={handleAddExpenseSave}
       />
 
-<ConfigureMonthModal 
+      <ConfigureMonthModal 
          isOpen={showConfigureModal}
          onClose={() => setShowConfigureModal(false)}
          settings={effectiveSettings}
          expenses={effectiveExpenses}
+         monthAllocations={monthAllocations} 
          actualSavings={effectiveActuals}
          excludedItems={effectiveExcludedItems}
-         onToggleExclude={toggleExcludeItem}
+         onToggleItem={toggleMonthItem}
       />
 
   {showSettings && (
