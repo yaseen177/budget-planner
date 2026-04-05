@@ -5385,6 +5385,18 @@ export default function App() {
   const [bankTransactions, setBankTransactions] = useState([]);
   const [expenseToLink, setExpenseToLink] = useState(null);
 
+  const handleLinkExpenseLocal = (expenseId, merchantNamesArray) => {
+    // Safe haptic feedback (since triggerHaptic might not be passed down to settings)
+    if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+        window.navigator.vibrate(50);
+    }
+    
+    setDefaultExpenses(prev => prev.map(e => 
+        e.id === expenseId ? { ...e, linkedMerchants: merchantNamesArray, linkedMerchant: null } : e
+    ));
+    setExpenseToLink(null);
+};
+
   // --- ADMIN DEMO STATE ---
   const [activeDemoId, setActiveDemoId] = useState(null);
 
