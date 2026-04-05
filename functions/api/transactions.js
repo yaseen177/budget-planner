@@ -140,7 +140,7 @@ export async function onRequestPost(context) {
     if (!fromStr || !toStr) {
         const toDate = new Date();
         const fromDate = new Date();
-        fromDate.setDate(toDate.getDate() - 30); 
+        fromDate.setDate(toDate.getDate() - 90); 
         fromStr = fromDate.toISOString();
         toStr = toDate.toISOString();
     }
