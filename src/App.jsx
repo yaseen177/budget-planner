@@ -4211,7 +4211,7 @@ const handleAddDetectedBills = async (selectedItems) => {
              onClose={() => setShowAutoDetectModal(false)}
              bankTransactions={scannedTransactions}
              onAddBills={handleAddDetectedBills}
-             currency={currency}
+             currency={currentSettings?.currency || 'GBP'} 
           />
 
                   
