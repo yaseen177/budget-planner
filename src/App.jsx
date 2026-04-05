@@ -2601,7 +2601,6 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
       ));
       setExpenseToLink(null);
   };
-  const [currency, setCurrency] = useState(currentSettings.currency || 'GBP');
   const [bank, setBank] = useState(currentSettings.bankDetails || null);
   // NEW STATE: Manage the list of extra current accounts
   const [additionalBanks, setAdditionalBanks] = useState(currentSettings.additionalBanks || []);
