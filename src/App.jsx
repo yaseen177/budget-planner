@@ -2592,15 +2592,7 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   // --- STATE MANAGEMENT ---
   const [displayName, setDisplayName] = useState(currentSettings.displayName || user.displayName || '');
   const [currency, setCurrency] = useState(currentSettings.currency || 'GBP');
-  const [expenseToLink, setExpenseToLink] = useState(null);
-
-  const handleLinkExpenseLocal = (expenseId, merchantNamesArray) => {
-      triggerHaptic();
-      setDefaultExpenses(defaultExpenses.map(e => 
-          e.id === expenseId ? { ...e, linkedMerchants: merchantNamesArray, linkedMerchant: null } : e
-      ));
-      setExpenseToLink(null);
-  };
+  
   const [bank, setBank] = useState(currentSettings.bankDetails || null);
   // NEW STATE: Manage the list of extra current accounts
   const [additionalBanks, setAdditionalBanks] = useState(currentSettings.additionalBanks || []);
@@ -6895,14 +6887,6 @@ export default function App() {
          onToggleItem={toggleMonthItem}
       />
 
-      <LinkExpenseModal 
-          isOpen={!!expenseToLink}
-          expense={expenseToLink}
-          bankTransactions={bankTransactions}
-          onClose={() => setExpenseToLink(null)}
-          onLink={handleLinkExpenseLocal}
-          currency={currency} 
-      />
 
   {showSettings && (
         <SettingsScreen 
