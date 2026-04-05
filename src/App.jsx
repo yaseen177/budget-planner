@@ -5484,14 +5484,18 @@ export default function App() {
   const displayExpensesAllRaw = effectiveExpenses.filter(e => !effectiveExcludedItems.includes(e.name));
   
   const displayExpensesAll = displayExpensesAllRaw.map(expense => {
-      if (expense.linkedMerchant && bankTransactions.length > 0) {
-          // 1. Establish the current dashboard month bounds
+      // 1. Find the global setting for this expense to see if it's linked globally
+      const globalCounterpart = effectiveSettings.defaultFixedExpenses?.find(ge => ge.name === expense.name);
+      const activeLink = globalCounterpart?.linkedMerchant;
+
+      if (activeLink && bankTransactions.length > 0) {
+          // 2. Establish the current dashboard month bounds
           const monthStart = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`;
           const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString().split('T')[0];
           
-          // 2. Scan bank feed for this exact merchant WITHIN this specific month
+          // 3. Scan bank feed for this exact merchant WITHIN this specific month
           const matchedTx = bankTransactions.find(tx => 
-              tx.merchant === expense.linkedMerchant && 
+              tx.merchant === activeLink && 
               tx.date >= monthStart && 
               tx.date <= monthEnd
           );
@@ -5499,11 +5503,15 @@ export default function App() {
           if (matchedTx) {
               return {
                   ...expense,
+                  linkedMerchant: activeLink, // Inject for the UI to read
                   paid: true,
-                  amount: matchedTx.amount, // Automatically overrides expected cost with Actual Cost!
+                  amount: matchedTx.amount, // Overrides expected cost with Actual Cost!
                   paidDate: matchedTx.date,
                   paidBank: matchedTx.bankName
               };
+          } else {
+              // Inject the link so the UI knows it's awaiting sync
+              return { ...expense, linkedMerchant: activeLink };
           }
       }
       return expense;
@@ -6318,13 +6326,27 @@ export default function App() {
     showToast("Bill added!");
   };
 
-  const handleLinkExpense = (expenseId, merchantName) => {
+  const handleLinkExpense = async (expenseId, merchantName) => {
     triggerHaptic();
-    const updatedExpenses = expenses.map(e => 
-        e.id === expenseId ? { ...e, linkedMerchant: merchantName } : e
+    if (!user || isSandbox) {
+       setExpenseToLink(null);
+       return;
+    }
+
+    // We match by name so it correctly finds the Master Settings template
+    const targetExpenseName = expenseToLink?.name;
+    if (!targetExpenseName) return;
+
+    const updatedDefaults = (userSettings.defaultFixedExpenses || []).map(e => 
+        e.name === targetExpenseName ? { ...e, linkedMerchant: merchantName } : e
     );
-    setExpenses(updatedExpenses);
-    saveData(salary, updatedExpenses, actualSavings);
+
+    // Save globally to Firebase (Master Settings)
+    const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'userSettings');
+    await setDoc(settingsRef, { defaultFixedExpenses: updatedDefaults }, { merge: true });
+
+    // Update local state instantly so the UI reflects the change
+    setUserSettings(prev => ({ ...prev, defaultFixedExpenses: updatedDefaults }));
     setExpenseToLink(null);
 };
 
