@@ -5112,43 +5112,82 @@ const ConfigureMonthModal = ({
   );
 };
 
-// --- NEW: MANUAL BANK LINKING MODAL ---
-const LinkExpenseModal = ({ isOpen, onClose, expense, bankTransactions, onLink }) => {
+const LinkExpenseModal = ({ isOpen, onClose, expense, bankTransactions, onLink, currency }) => {
+  const [selected, setSelected] = useState([]);
+
+  // Load existing links when opened
+  useEffect(() => {
+      if (expense) {
+          const existing = expense.linkedMerchants || (expense.linkedMerchant ? [expense.linkedMerchant] : []);
+          setSelected(existing);
+      }
+  }, [expense]);
+
   if (!isOpen || !expense) return null;
   
-  // Get unique merchants from recent transactions and sort alphabetically
-  const uniqueMerchants = [...new Set(bankTransactions.map(tx => tx.merchant))].sort();
+  // Group merchants and grab their most recent amount to display
+  const merchantSummary = bankTransactions.reduce((acc, tx) => {
+      if (!acc[tx.merchant]) acc[tx.merchant] = { amount: 0, date: tx.date };
+      if (tx.date >= acc[tx.merchant].date) {
+          acc[tx.merchant].amount = tx.amount;
+          acc[tx.merchant].date = tx.date;
+      }
+      return acc;
+  }, {});
+  
+  const uniqueMerchants = Object.keys(merchantSummary).sort();
+
+  const toggleMerchant = (merchant) => {
+      setSelected(prev => prev.includes(merchant) ? prev.filter(m => m !== merchant) : [...prev, merchant]);
+  };
+
+  const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
 
   return (
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-xl flex flex-col max-h-[80vh]">
               <div className="shrink-0 mb-4">
-                  <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><LinkIcon className="w-5 h-5 text-indigo-500" /> Link to Bank</h3>
-                  <p className="text-xs font-medium text-slate-500 mt-1">Select the actual bank merchant for <strong>{expense.name}</strong> to auto-track it.</p>
+                  <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><LinkIcon className="w-5 h-5 text-indigo-500" /> Link Bank Transactions</h3>
+                  <p className="text-xs font-medium text-slate-500 mt-1">Select one or more merchants for <strong>{expense.name}</strong>. We will add them all up automatically.</p>
               </div>
               
               <div className="overflow-y-auto custom-scrollbar space-y-2 mb-4 pr-2 flex-1">
                   <button 
-                      onClick={() => onLink(expense.id, null)}
+                      onClick={() => setSelected([])}
                       className="w-full text-left px-4 py-3 rounded-xl border border-rose-100 text-rose-600 hover:bg-rose-50 text-sm font-bold transition flex items-center gap-2"
                   >
-                      <X className="w-4 h-4" /> Unlink / Use Manual Tracking
+                      <X className="w-4 h-4" /> Clear All Selections
                   </button>
                   
-                  {uniqueMerchants.map(merchant => (
-                      <button 
-                          key={merchant}
-                          onClick={() => onLink(expense.id, merchant)}
-                          className={`w-full text-left px-4 py-3 rounded-xl border transition text-sm font-bold flex justify-between items-center ${expense.linkedMerchant === merchant ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-200'}`}
-                      >
-                          {merchant}
-                          {expense.linkedMerchant === merchant && <CheckCircle2 className="w-4 h-4" />}
-                      </button>
-                  ))}
-                  {uniqueMerchants.length === 0 && <p className="text-sm text-slate-400 text-center py-4">No recent bank transactions found. Connect a bank first!</p>}
+                  {uniqueMerchants.map(merchant => {
+                      const isSelected = selected.includes(merchant);
+                      return (
+                          <button 
+                              key={merchant}
+                              onClick={() => toggleMerchant(merchant)}
+                              className={`w-full text-left px-4 py-3 rounded-xl border transition flex justify-between items-center ${isSelected ? 'bg-indigo-50 border-indigo-200 shadow-inner' : 'bg-white border-slate-200 hover:border-indigo-200'}`}
+                          >
+                              <div className="flex items-center gap-3">
+                                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300'}`}>
+                                      {isSelected && <Check className="w-3.5 h-3.5" />}
+                                  </div>
+                                  <div>
+                                      <div className={`text-sm font-bold ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{merchant}</div>
+                                  </div>
+                              </div>
+                              <div className="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                                  Last: {currencySymbol}{merchantSummary[merchant].amount.toFixed(2)}
+                              </div>
+                          </button>
+                      );
+                  })}
+                  {uniqueMerchants.length === 0 && <p className="text-sm text-slate-400 text-center py-4">No recent bank transactions found.</p>}
               </div>
               
-              <button onClick={onClose} className="w-full py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition shrink-0">Cancel</button>
+              <div className="flex gap-3 shrink-0">
+                  <button onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition">Cancel</button>
+                  <button onClick={() => onLink(expense.id, selected)} className="flex-1 py-3 bg-indigo-500 text-white rounded-xl font-bold hover:bg-indigo-600 transition shadow-lg shadow-indigo-200">Save Links</button>
+              </div>
           </div>
       </div>
   );
@@ -5484,38 +5523,43 @@ export default function App() {
   const displayExpensesAllRaw = effectiveExpenses.filter(e => !effectiveExcludedItems.includes(e.name));
   
   const displayExpensesAll = displayExpensesAllRaw.map(expense => {
-      // 1. Find the global setting for this expense to see if it's linked globally
-      const globalCounterpart = effectiveSettings.defaultFixedExpenses?.find(ge => ge.name === expense.name);
-      const activeLink = globalCounterpart?.linkedMerchant;
+    const globalCounterpart = effectiveSettings.defaultFixedExpenses?.find(ge => ge.name === expense.name);
+    
+    // Upgrade path: Support legacy strings or new arrays
+    let activeLinks = globalCounterpart?.linkedMerchants || [];
+    if (activeLinks.length === 0 && globalCounterpart?.linkedMerchant) {
+        activeLinks = [globalCounterpart.linkedMerchant];
+    }
 
-      if (activeLink && bankTransactions.length > 0) {
-          // 2. Establish the current dashboard month bounds
-          const monthStart = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`;
-          const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString().split('T')[0];
-          
-          // 3. Scan bank feed for this exact merchant WITHIN this specific month
-          const matchedTx = bankTransactions.find(tx => 
-              tx.merchant === activeLink && 
-              tx.date >= monthStart && 
-              tx.date <= monthEnd
-          );
+    if (activeLinks.length > 0 && bankTransactions.length > 0) {
+        const monthStart = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`;
+        const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString().split('T')[0];
+        
+        // Find ALL transactions that match ANY of the linked merchants
+        const matchedTxs = bankTransactions.filter(tx => 
+            activeLinks.includes(tx.merchant) && 
+            tx.date >= monthStart && 
+            tx.date <= monthEnd
+        );
 
-          if (matchedTx) {
-              return {
-                  ...expense,
-                  linkedMerchant: activeLink, // Inject for the UI to read
-                  paid: true,
-                  amount: matchedTx.amount, // Overrides expected cost with Actual Cost!
-                  paidDate: matchedTx.date,
-                  paidBank: matchedTx.bankName
-              };
-          } else {
-              // Inject the link so the UI knows it's awaiting sync
-              return { ...expense, linkedMerchant: activeLink };
-          }
-      }
-      return expense;
-  });
+        if (matchedTxs.length > 0) {
+            const totalAmount = matchedTxs.reduce((sum, tx) => sum + tx.amount, 0);
+            const latestTx = matchedTxs.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+
+            return {
+                ...expense,
+                linkedMerchants: activeLinks, 
+                paid: true,
+                amount: totalAmount, // Adds up every single matched bill!
+                paidDate: matchedTxs.length > 1 ? 'Multiple' : latestTx.date,
+                paidBank: matchedTxs.length > 1 ? 'Multiple' : latestTx.bankName
+            };
+        } else {
+            return { ...expense, linkedMerchants: activeLinks };
+        }
+    }
+    return expense;
+});
   const displayExpenses = displayExpensesAll; // Keeps legacy components safe
 
   // Toast Helper
@@ -6326,26 +6370,24 @@ export default function App() {
     showToast("Bill added!");
   };
 
-  const handleLinkExpense = async (expenseId, merchantName) => {
+  const handleLinkExpense = async (expenseId, merchantNamesArray) => {
     triggerHaptic();
     if (!user || isSandbox) {
        setExpenseToLink(null);
        return;
     }
 
-    // We match by name so it correctly finds the Master Settings template
     const targetExpenseName = expenseToLink?.name;
     if (!targetExpenseName) return;
 
     const updatedDefaults = (userSettings.defaultFixedExpenses || []).map(e => 
-        e.name === targetExpenseName ? { ...e, linkedMerchant: merchantName } : e
+        // We clear out the old string version and use the array version
+        e.name === targetExpenseName ? { ...e, linkedMerchants: merchantNamesArray, linkedMerchant: null } : e
     );
 
-    // Save globally to Firebase (Master Settings)
     const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'userSettings');
     await setDoc(settingsRef, { defaultFixedExpenses: updatedDefaults }, { merge: true });
 
-    // Update local state instantly so the UI reflects the change
     setUserSettings(prev => ({ ...prev, defaultFixedExpenses: updatedDefaults }));
     setExpenseToLink(null);
 };
@@ -6685,6 +6727,7 @@ export default function App() {
           bankTransactions={bankTransactions}
           onClose={() => setExpenseToLink(null)}
           onLink={handleLinkExpense}
+          currency={effectiveSettings.currency} // <--- Add this line
       />
 
   {showSettings && (
@@ -7492,8 +7535,8 @@ export default function App() {
                                               <p className={`font-bold text-slate-700 truncate text-sm sm:text-base transition-all ${expense.paid ? 'line-through decoration-slate-500 decoration-2' : ''}`}>{expense.name}</p>
                                               <button 
                                                   onClick={() => setExpenseToLink(expense)}
-                                                  className={`shrink-0 p-1 sm:p-1.5 rounded-lg transition-colors ${expense.linkedMerchant ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
-                                                  title="Link to Bank Transaction"
+                                                  className={`shrink-0 p-1 sm:p-1.5 rounded-lg transition-colors ${expense.linkedMerchants?.length > 0 ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                                                  title="Link Bank Transactions"
                                               >
                                                   <LinkIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                                               </button>
@@ -7502,9 +7545,17 @@ export default function App() {
                                         <p className="text-[10px] sm:text-xs text-slate-400 flex items-center gap-1 truncate mt-0.5">
                                            <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${expense.type === 'fixed' ? 'bg-indigo-400' : expense.type === 'credit_card' ? 'bg-purple-400' : expense.type === 'mortgage' ? 'bg-blue-500' : 'bg-emerald-400'}`}></span>
                                            <span className="truncate capitalize">{expense.type.replace('_', ' ')}</span>
-                                           {expense.linkedMerchant && (
-                                               <span className="text-[9px] font-bold text-indigo-500 uppercase tracking-wider bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 ml-1">Linked</span>
-                                           )}
+                                           
+                                           {/* UPDATED BADGE */}
+                                           {expense.linkedMerchants?.length > 0 && (
+                                          <div className="text-[9px] text-slate-400 pr-2 sm:pr-3 text-right">
+                                              {expense.paid ? (
+                                                  <span className="text-emerald-500 font-bold">Paid: {expense.paidDate}</span>
+                                              ) : (
+                                                  <span className="flex items-center gap-1 opacity-70"><RefreshCw className="w-2.5 h-2.5 animate-spin-slow" /> Awaiting Sync</span>
+                                              )}
+                                          </div>
+                                      )}
                                         </p>
                                       </div>
                                     </div>
