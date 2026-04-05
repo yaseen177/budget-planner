@@ -5173,7 +5173,7 @@ const LinkExpenseModal = ({ isOpen, onClose, expense, bankTransactions, onLink, 
 
   // 4. THE FILTER: Only show expenses that occur > 1 time (Regular) OR are already selected
   const regularMerchants = processedMerchants
-      .filter(m => m.count > 1 || m.isSelected)
+      .filter(m => m.count > 0 || m.isSelected)
       .sort((a, b) => a.merchant.localeCompare(b.merchant));
 
   const toggleMerchant = (merchant) => {
