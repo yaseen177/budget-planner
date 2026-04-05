@@ -2591,6 +2591,7 @@ const SettingsGroup = ({ title, icon: Icon, children, defaultOpen = false, subti
 const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onResetMonth, isTutorial, onExitTutorial, isLegacyMode, currentMonthId, bankTransactions }) => {
   // --- STATE MANAGEMENT ---
   const [displayName, setDisplayName] = useState(currentSettings.displayName || user.displayName || '');
+  const [currency, setCurrency] = useState(currentSettings.currency || 'GBP');
   const [expenseToLink, setExpenseToLink] = useState(null);
 
   const handleLinkExpenseLocal = (expenseId, merchantNamesArray) => {
