@@ -5388,7 +5388,6 @@ export default function App() {
   const [sandboxExcludedItems, setSandboxExcludedItems] = useState([]);
 
   const [bankTransactions, setBankTransactions] = useState([]);
-  const [expenseToLink, setExpenseToLink] = useState(null);
 
   const handleLinkExpenseLocal = (expenseId, merchantNamesArray) => {
     // Safe haptic feedback (since triggerHaptic might not be passed down to settings)
