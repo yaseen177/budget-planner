@@ -2593,8 +2593,21 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
   const [displayName, setDisplayName] = useState(currentSettings.displayName || user.displayName || '');
   const [currency, setCurrency] = useState(currentSettings.currency || 'GBP');
   
+  // ✅ ADD THIS MISSING BLOCK BACK IN:
+  const [expenseToLink, setExpenseToLink] = useState(null);
+
+  const handleLinkExpenseLocal = (expenseId, merchantNamesArray) => {
+      if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+          window.navigator.vibrate(50);
+      }
+      setDefaultExpenses(prev => prev.map(e => 
+          e.id === expenseId ? { ...e, linkedMerchants: merchantNamesArray, linkedMerchant: null } : e
+      ));
+      setExpenseToLink(null);
+  };
+  // ✅ END OF ADDITION
+
   const [bank, setBank] = useState(currentSettings.bankDetails || null);
-  // NEW STATE: Manage the list of extra current accounts
   const [additionalBanks, setAdditionalBanks] = useState(currentSettings.additionalBanks || []);
   const [payDay, setPayDay] = useState(currentSettings.payDay || '1');
   
