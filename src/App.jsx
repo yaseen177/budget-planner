@@ -2588,9 +2588,18 @@ const SettingsGroup = ({ title, icon: Icon, children, defaultOpen = false, subti
 };
 
 // --- SETTINGS SCREEN (UX IMPROVED) ---
-const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onResetMonth, isTutorial, onExitTutorial, isLegacyMode, currentMonthId }) => {
+const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onResetMonth, isTutorial, onExitTutorial, isLegacyMode, currentMonthId, bankTransactions }) => {
   // --- STATE MANAGEMENT ---
   const [displayName, setDisplayName] = useState(currentSettings.displayName || user.displayName || '');
+  const [expenseToLink, setExpenseToLink] = useState(null);
+
+  const handleLinkExpenseLocal = (expenseId, merchantNamesArray) => {
+      triggerHaptic();
+      setDefaultExpenses(defaultExpenses.map(e => 
+          e.id === expenseId ? { ...e, linkedMerchants: merchantNamesArray, linkedMerchant: null } : e
+      ));
+      setExpenseToLink(null);
+  };
   const [currency, setCurrency] = useState(currentSettings.currency || 'GBP');
   const [bank, setBank] = useState(currentSettings.bankDetails || null);
   // NEW STATE: Manage the list of extra current accounts
@@ -3018,16 +3027,28 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
           {/* GROUP 4: RECURRING BILLS */}
           <SettingsGroup title="Recurring Bills" subtitle="Default Fixed Expenses" icon={RefreshCw}>
               <div className="space-y-3">
-                 {defaultExpenses.map(exp => (
+              {defaultExpenses.map(exp => (
                     <div key={exp.id} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
                        <div className="flex items-center gap-2">
                           {exp.logo ? <img src={exp.logo} className="w-6 h-6 object-contain rounded-full bg-slate-50" /> : <div className="w-6 h-6 bg-slate-100 rounded-full" />}
                           <span className="font-bold text-slate-700 text-sm">{exp.name}</span>
+                          {exp.linkedMerchants?.length > 0 && (
+                              <span className="text-[9px] font-bold text-indigo-500 uppercase tracking-wider bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                                  Linked ({exp.linkedMerchants.length})
+                              </span>
+                          )}
                        </div>
                        <div className="flex items-center gap-3">
                           <span className={`font-medium text-sm ${exp.amount === 0 ? 'text-orange-500 bg-orange-50 px-2 py-0.5 rounded text-xs' : 'text-slate-600'}`}>
                             {exp.amount > 0 ? formatCurrency(exp.amount, currency) : 'Variable'}
                           </span>
+                          <button 
+                             onClick={(e) => { e.preventDefault(); setExpenseToLink(exp); }}
+                             className={`p-1.5 rounded-lg transition-colors ${exp.linkedMerchants?.length > 0 ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}
+                             title="Link Bank Transactions"
+                          >
+                             <LinkIcon className="w-4 h-4" />
+                          </button>
                           <button onClick={() => removeDefaultExpense(exp.id)} className="text-slate-300 hover:text-red-500"><X className="w-4 h-4" /></button>
                        </div>
                     </div>
@@ -3504,6 +3525,122 @@ const OnboardingSlide = ({ isActive, children, center = false }) => (
   </div>
 );
 
+const AutoDetectModal = ({ isOpen, onClose, bankTransactions, onAddBills, currency }) => {
+  const [selected, setSelected] = useState([]);
+
+  useEffect(() => {
+      if (isOpen) setSelected([]);
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const getFrequency = (dates) => {
+      if (dates.length < 2) return "One-off";
+      const diffs = [];
+      for (let i = 0; i < dates.length - 1; i++) {
+          const d1 = new Date(dates[i]);
+          const d2 = new Date(dates[i+1]);
+          diffs.push(Math.abs((d1 - d2) / (1000 * 60 * 60 * 24)));
+      }
+      const avgDiff = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+
+      if (avgDiff >= 6 && avgDiff <= 8) return "Weekly";
+      if (avgDiff >= 13 && avgDiff <= 15) return "Fortnightly";
+      if (avgDiff >= 27 && avgDiff <= 33) return "Monthly";
+      if (avgDiff >= 85 && avgDiff <= 95) return "Quarterly";
+      if (avgDiff >= 355 && avgDiff <= 375) return "Annually";
+      return `Every ${Math.round(avgDiff)} days`;
+  };
+
+  const formatUKDate = (dateStr) => {
+      if (!dateStr) return '';
+      return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const merchantData = {};
+  (bankTransactions || []).forEach(tx => {
+      if (tx.amount >= 0 || tx.category === 'Transfer') return;
+      
+      let cleanName = (tx.merchant && tx.merchant !== 'Unknown') ? tx.merchant : tx.description;
+      cleanName = cleanName.replace(/direct debit|dd|standing order|visa|mastercard|payment/ig, '').replace(/[0-9]/g, '').trim();
+      cleanName = cleanName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ').trim();
+      if (!cleanName || cleanName.length < 2) cleanName = (tx.merchant || tx.description).substring(0, 15).trim();
+
+      if (!merchantData[cleanName]) merchantData[cleanName] = [];
+      merchantData[cleanName].push(tx);
+  });
+
+  const processedMerchants = Object.keys(merchantData).map(merchant => {
+      const txs = merchantData[merchant].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const dates = txs.map(t => t.date);
+      return {
+          merchant,
+          count: txs.length,
+          lastAmount: Math.abs(txs[0].amount),
+          lastDate: txs[0].date,
+          frequency: getFrequency(dates)
+      };
+  });
+
+  // Only show recurring (>1)
+  const regularMerchants = processedMerchants
+      .filter(m => m.count > 1)
+      .sort((a, b) => a.merchant.localeCompare(b.merchant));
+
+  const toggleMerchant = (m) => {
+      setSelected(prev => prev.some(x => x.merchant === m.merchant) ? prev.filter(x => x.merchant !== m.merchant) : [...prev, m]);
+  };
+
+  const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
+
+  return (
+      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[250] flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-xl flex flex-col max-h-[85vh]">
+              <div className="shrink-0 mb-4">
+                  <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Search className="w-5 h-5 text-indigo-500" /> Detected Bills</h3>
+                  <p className="text-xs font-medium text-slate-500 mt-1">We found these regular payments. Select the ones you want to add as linked bills.</p>
+              </div>
+              
+              <div className="overflow-y-auto custom-scrollbar space-y-2 mb-4 pr-2 flex-1">
+                  {regularMerchants.map(item => {
+                      const isSelected = selected.some(x => x.merchant === item.merchant);
+                      return (
+                          <button 
+                              key={item.merchant}
+                              onClick={() => toggleMerchant(item)}
+                              className={`w-full text-left px-4 py-3 rounded-xl border transition flex gap-3 items-center ${isSelected ? 'bg-indigo-50 border-indigo-200 shadow-inner' : 'bg-white border-slate-200 hover:border-indigo-200'}`}
+                          >
+                              <div className={`shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300'}`}>
+                                  {isSelected && <Check className="w-3.5 h-3.5" />}
+                              </div>
+                              <div className="flex flex-col gap-0.5 w-full min-w-0">
+                                  <div className="flex justify-between items-center w-full gap-2">
+                                      <span className={`text-sm font-bold truncate ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{item.merchant}</span>
+                                      <span className="text-sm font-bold text-slate-800 shrink-0">{currencySymbol}{item.lastAmount.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center w-full text-[10px] sm:text-xs text-slate-500 font-medium">
+                                      <span>Last Paid {formatUKDate(item.lastDate)}</span>
+                                      <span className="bg-slate-100/80 px-1.5 py-0.5 rounded text-slate-600">{item.frequency}</span>
+                                  </div>
+                              </div>
+                          </button>
+                      );
+                  })}
+                  {regularMerchants.length === 0 && <p className="text-sm text-slate-400 text-center py-4">No regular bank transactions found.</p>}
+              </div>
+              
+              <div className="flex gap-3 shrink-0">
+                  <button onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition">Cancel</button>
+                  <button onClick={() => onAddBills(selected)} className="flex-[2] py-3 bg-indigo-500 text-white rounded-xl font-bold hover:bg-indigo-600 transition shadow-lg shadow-indigo-200">
+                      Add {selected.length} Bills
+                  </button>
+              </div>
+          </div>
+      </div>
+  );
+};
+
+
 const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft, onConnectBank, bankingData, showToast }) => {
   const [step, setStep] = useState(currentSettings?.onboardingStep || 0); 
   
@@ -3534,6 +3671,8 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
   // --- NEW STATES FOR AUTO-SCANNING BILLS ---
   const [isScanningBills, setIsScanningBills] = useState(false);
   const [editingBillId, setEditingBillId] = useState(null);
+  const [scannedTransactions, setScannedTransactions] = useState([]);
+  const [showAutoDetectModal, setShowAutoDetectModal] = useState(false);
 
   const totalPercent = pots.reduce((sum, p) => sum + p.percentage, 0);
 
@@ -3630,9 +3769,8 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
         let allTransactions = [];
         const toDate = new Date();
         const fromDate = new Date();
-        fromDate.setDate(toDate.getDate() - 90); // Look back 3 months
+        fromDate.setDate(toDate.getDate() - 90); 
 
-        // Fetch from all connected accounts
         for (const conn of connections) {
             const response = await fetch('/api/transactions', {
                 method: 'POST',
@@ -3651,98 +3789,11 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
             }
         }
 
-        const grouped = {};
-        const LOGO_PUBLIC_KEY = import.meta.env.VITE_LOGO_DEV_PUBLIC_KEY;
-        const LOGO_SECRET_KEY = import.meta.env.VITE_LOGO_DEV_SECRET_KEY;
-
-        allTransactions.forEach(tx => {
-            if (tx.amount >= 0 || tx.category === 'Transfer') return;
-            
-            const rawName = (tx.merchant && tx.merchant !== 'Unknown') ? tx.merchant : tx.description;
-            const isDD = /direct debit|dd|standing order/i.test(rawName);
-
-            if (['Bills', 'Entertainment', 'Health'].includes(tx.category) || isDD) {
-                let knownDomain = null;
-                let cleanName = rawName;
-                
-                // Extract domain if explicit (e.g. "Netflix.com")
-                const domainMatch = rawName.match(/\b([a-z0-9\-]+\.[a-z]{2,})\b/i);
-                if (domainMatch) {
-                    knownDomain = domainMatch[0].toLowerCase();
-                    const parts = knownDomain.split('.');
-                    cleanName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1); 
-                } else {
-                    // Clean up messy bank strings
-                    cleanName = cleanName.replace(/direct debit|dd|standing order|visa|mastercard|payment/ig, '')
-                                         .replace(/[0-9]/g, '').trim();
-                    cleanName = cleanName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ').trim();
-                }
-
-                if (!cleanName || cleanName.length < 2) cleanName = rawName.substring(0, 15).trim();
-
-                if (!grouped[cleanName]) {
-                    // Store for async processing
-                    grouped[cleanName] = { amounts: [], knownDomain: knownDomain };
-                }
-                grouped[cleanName].amounts.push(Math.abs(tx.amount));
-            }
-        });
-
-        const detected = [];
-        
-        // REAL API LOGO SEARCH LOOP
-        for (const [name, data] of Object.entries(grouped)) {
-            if (data.amounts.length >= 2) {
-                let finalLogoUrl = null;
-
-                if (data.knownDomain) {
-                    // We already extracted the domain
-                    finalLogoUrl = `https://img.logo.dev/${data.knownDomain}?token=${LOGO_PUBLIC_KEY}`;
-                } else if (LOGO_SECRET_KEY) {
-                    // Query the API to find the real domain!
-                    try {
-                        const res = await fetch(`https://api.logo.dev/search?q=${encodeURIComponent(name)}`, {
-                            headers: { 'Authorization': `Bearer ${LOGO_SECRET_KEY}` }
-                        });
-                        const searchData = await res.json();
-                        if (searchData && searchData.length > 0) {
-                            finalLogoUrl = `https://img.logo.dev/${searchData[0].domain}?token=${LOGO_PUBLIC_KEY}`;
-                        }
-                    } catch (error) {
-                        console.warn("Logo search failed for", name);
-                    }
-                }
-
-                // Fallback if API fails
-                if (!finalLogoUrl) {
-                    const guessDomain = name.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
-                    finalLogoUrl = `https://img.logo.dev/${guessDomain}?token=${LOGO_PUBLIC_KEY}`;
-                }
-
-                detected.push({
-                    id: 'auto_' + Date.now() + Math.random(),
-                    name: name,
-                    amount: data.amounts[0], 
-                    type: 'fixed',
-                    logo: finalLogoUrl,
-                    included: true 
-                });
-            }
-        }
-
-        if (detected.length === 0) {
-            internalToast("No recurring bills found in the last 90 days.");
+        if (allTransactions.length === 0) {
+            internalToast("No recent transactions found.");
         } else {
-            setBills(prev => {
-                const newBills = [...prev];
-                detected.forEach(d => {
-                    if (!newBills.some(b => b.name.toLowerCase() === d.name.toLowerCase())) {
-                        newBills.push(d);
-                    }
-                });
-                return newBills;
-            });
-            internalToast(`Auto-detected ${detected.length} recurring bills!`);
+            setScannedTransactions(allTransactions);
+            setShowAutoDetectModal(true);
         }
 
     } catch (error) {
@@ -3751,6 +3802,61 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
     } finally {
         setIsScanningBills(false);
     }
+};
+
+const handleAddDetectedBills = async (selectedItems) => {
+    setShowAutoDetectModal(false);
+    setIsScanningBills(true); 
+
+    const LOGO_PUBLIC_KEY = import.meta.env.VITE_LOGO_DEV_PUBLIC_KEY;
+    const LOGO_SECRET_KEY = import.meta.env.VITE_LOGO_DEV_SECRET_KEY;
+    
+    const newDetected = [];
+
+    for (const item of selectedItems) {
+        let finalLogoUrl = null;
+        if (LOGO_SECRET_KEY) {
+            try {
+                const res = await fetch(`https://api.logo.dev/search?q=${encodeURIComponent(item.merchant)}`, {
+                    headers: { 'Authorization': `Bearer ${LOGO_SECRET_KEY}` }
+                });
+                const searchData = await res.json();
+                if (searchData && searchData.length > 0) {
+                    finalLogoUrl = `https://img.logo.dev/${searchData[0].domain}?token=${LOGO_PUBLIC_KEY}`;
+                }
+            } catch (error) {
+                console.warn("Logo search failed for", item.merchant);
+            }
+        }
+
+        if (!finalLogoUrl) {
+            const guessDomain = item.merchant.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
+            finalLogoUrl = `https://img.logo.dev/${guessDomain}?token=${LOGO_PUBLIC_KEY}`;
+        }
+
+        newDetected.push({
+            id: 'auto_' + Date.now() + Math.random(),
+            name: item.merchant,
+            amount: item.lastAmount, 
+            type: 'fixed',
+            logo: finalLogoUrl,
+            included: true,
+            linkedMerchants: [item.merchant] // <--- SAVES THE LINK!
+        });
+    }
+
+    setBills(prev => {
+        const newBills = [...prev];
+        newDetected.forEach(d => {
+            if (!newBills.some(b => b.name.toLowerCase() === d.name.toLowerCase())) {
+                newBills.push(d);
+            }
+        });
+        return newBills;
+    });
+
+    setIsScanningBills(false);
+    if (showToast) showToast(`Added ${newDetected.length} linked bills!`);
 };
 
   const toggleCard = (card) => setCreditCards(prev => prev.some(c => c.name === card.name) ? prev.filter(c => c.name !== card.name) : [...prev, card]);
@@ -4100,6 +4206,16 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
             <p className="text-slate-500 mt-2">Add bills that stay the same every month (Netflix, Gym). You can scan your connected bank to detect them instantly!</p>
           </div>
 
+          <AutoDetectModal 
+             isOpen={showAutoDetectModal}
+             onClose={() => setShowAutoDetectModal(false)}
+             bankTransactions={scannedTransactions}
+             onAddBills={handleAddDetectedBills}
+             currency={currency}
+          />
+
+                  
+
           <button 
              onClick={handleScanBills}
              disabled={isScanningBills}
@@ -4157,7 +4273,14 @@ const OnboardingWizard = ({ user, currentSettings = {}, onComplete, onSaveDraft,
                             ) : (
                                 <div className="w-8 h-8 bg-slate-100 border border-slate-200 rounded-full flex items-center justify-center shrink-0"><Zap className="w-4 h-4 text-slate-400" /></div>
                             )}
-                            <span className={`font-bold truncate ${!isIncluded ? 'line-through text-slate-500' : 'text-slate-700'}`}>{b.name}</span>
+                            <div className="flex flex-col min-w-0">
+                                <span className={`font-bold truncate ${!isIncluded ? 'line-through text-slate-500' : 'text-slate-700'}`}>{b.name}</span>
+                                {b.linkedMerchants?.length > 0 && (
+                                    <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border w-fit mt-0.5 ${!isIncluded ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-indigo-50 text-indigo-500 border-indigo-100'}`}>
+                                        Linked ({b.linkedMerchants.length})
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0 pl-2">
@@ -6765,8 +6888,8 @@ export default function App() {
           expense={expenseToLink}
           bankTransactions={bankTransactions}
           onClose={() => setExpenseToLink(null)}
-          onLink={handleLinkExpense}
-          currency={effectiveSettings.currency} // <--- Add this line
+          onLink={handleLinkExpenseLocal}
+          currency={currency} 
       />
 
   {showSettings && (
@@ -6777,6 +6900,7 @@ export default function App() {
           onSaveSettings={saveSettings}
           onResetMonth={resetCurrentMonth}
           isTutorial={isTutorialMode}
+          bankTransactions={bankTransactions}
           onExitTutorial={() => {
              setActiveTutorial(null);
              setShowSettings(false);
@@ -7569,18 +7693,11 @@ export default function App() {
                                             onBlur={(e) => updateExpenseName(expense.id, e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
                                           />
-                                        ) : (
-                                          <div className="flex items-center gap-2">
-                                              <p className={`font-bold text-slate-700 truncate text-sm sm:text-base transition-all ${expense.paid ? 'line-through decoration-slate-500 decoration-2' : ''}`}>{expense.name}</p>
-                                              <button 
-                                                  onClick={() => setExpenseToLink(expense)}
-                                                  className={`shrink-0 p-1 sm:p-1.5 rounded-lg transition-colors ${expense.linkedMerchants?.length > 0 ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
-                                                  title="Link Bank Transactions"
-                                              >
-                                                  <LinkIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                                              </button>
-                                          </div>
-                                        )}
+                                          ) : (
+                                            <div className="flex items-center gap-2">
+                                                <p className={`font-bold text-slate-700 truncate text-sm sm:text-base transition-all ${expense.paid ? 'line-through decoration-slate-500 decoration-2' : ''}`}>{expense.name}</p>
+                                            </div>
+                                          )}
                                         <p className="text-[10px] sm:text-xs text-slate-400 flex items-center gap-1 truncate mt-0.5">
                                            <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${expense.type === 'fixed' ? 'bg-indigo-400' : expense.type === 'credit_card' ? 'bg-purple-400' : expense.type === 'mortgage' ? 'bg-blue-500' : 'bg-emerald-400'}`}></span>
                                            <span className="truncate capitalize">{expense.type.replace('_', ' ')}</span>
