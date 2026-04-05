@@ -564,7 +564,7 @@ useEffect(() => {
             // We extract the last 150 outgoings to use as the manual linking dropdown
             const simplifiedTxs = cleanedTransactions
                 .filter(tx => tx.amount < 0 && tx.category !== 'Transfer')
-                .slice(0, 150)
+                .slice(0, 400)
                 .map(tx => ({
                     id: tx.id,
                     date: tx.date,

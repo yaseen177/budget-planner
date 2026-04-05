@@ -5115,7 +5115,6 @@ const ConfigureMonthModal = ({
 const LinkExpenseModal = ({ isOpen, onClose, expense, bankTransactions, onLink, currency }) => {
   const [selected, setSelected] = useState([]);
 
-  // Load existing links when opened
   useEffect(() => {
       if (expense) {
           const existing = expense.linkedMerchants || (expense.linkedMerchant ? [expense.linkedMerchant] : []);
@@ -5125,17 +5124,57 @@ const LinkExpenseModal = ({ isOpen, onClose, expense, bankTransactions, onLink, 
 
   if (!isOpen || !expense) return null;
   
-  // Group merchants and grab their most recent amount to display
-  const merchantSummary = bankTransactions.reduce((acc, tx) => {
-      if (!acc[tx.merchant]) acc[tx.merchant] = { amount: 0, date: tx.date };
-      if (tx.date >= acc[tx.merchant].date) {
-          acc[tx.merchant].amount = tx.amount;
-          acc[tx.merchant].date = tx.date;
+  // 1. Math Engine: Calculate Payment Frequency
+  const getFrequency = (dates) => {
+      if (dates.length < 2) return "One-off";
+      const diffs = [];
+      for (let i = 0; i < dates.length - 1; i++) {
+          const d1 = new Date(dates[i]);
+          const d2 = new Date(dates[i+1]);
+          diffs.push(Math.abs((d1 - d2) / (1000 * 60 * 60 * 24)));
       }
-      return acc;
-  }, {});
-  
-  const uniqueMerchants = Object.keys(merchantSummary).sort();
+      const avgDiff = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+
+      if (avgDiff >= 6 && avgDiff <= 8) return "Weekly";
+      if (avgDiff >= 13 && avgDiff <= 15) return "Fortnightly";
+      if (avgDiff >= 27 && avgDiff <= 33) return "Monthly";
+      if (avgDiff >= 85 && avgDiff <= 95) return "Quarterly";
+      if (avgDiff >= 355 && avgDiff <= 375) return "Annually";
+      return `Every ${Math.round(avgDiff)} days`;
+  };
+
+  // 2. Format Date to UK Standard (DD/MM/YYYY)
+  const formatUKDate = (dateStr) => {
+      if (!dateStr) return '';
+      return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  // 3. Group and Process all Bank Transactions
+  const merchantData = {};
+  bankTransactions.forEach(tx => {
+      if (!merchantData[tx.merchant]) merchantData[tx.merchant] = [];
+      merchantData[tx.merchant].push(tx);
+  });
+
+  const processedMerchants = Object.keys(merchantData).map(merchant => {
+      // Sort transactions newest to oldest
+      const txs = merchantData[merchant].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const dates = txs.map(t => t.date);
+      
+      return {
+          merchant,
+          count: txs.length,
+          lastAmount: txs[0].amount,
+          lastDate: txs[0].date,
+          frequency: getFrequency(dates),
+          isSelected: selected.includes(merchant)
+      };
+  });
+
+  // 4. THE FILTER: Only show expenses that occur > 1 time (Regular) OR are already selected
+  const regularMerchants = processedMerchants
+      .filter(m => m.count > 1 || m.isSelected)
+      .sort((a, b) => a.merchant.localeCompare(b.merchant));
 
   const toggleMerchant = (merchant) => {
       setSelected(prev => prev.includes(merchant) ? prev.filter(m => m !== merchant) : [...prev, merchant]);
@@ -5145,43 +5184,43 @@ const LinkExpenseModal = ({ isOpen, onClose, expense, bankTransactions, onLink, 
 
   return (
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-xl flex flex-col max-h-[80vh]">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-xl flex flex-col max-h-[85vh]">
               <div className="shrink-0 mb-4">
-                  <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><LinkIcon className="w-5 h-5 text-indigo-500" /> Link Bank Transactions</h3>
-                  <p className="text-xs font-medium text-slate-500 mt-1">Select one or more merchants for <strong>{expense.name}</strong>. We will add them all up automatically.</p>
+                  <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><LinkIcon className="w-5 h-5 text-indigo-500" /> Link Regular Expenses</h3>
+                  <p className="text-xs font-medium text-slate-500 mt-1">We have filtered out one-off purchases. Select the regular merchants for <strong>{expense.name}</strong>.</p>
               </div>
               
               <div className="overflow-y-auto custom-scrollbar space-y-2 mb-4 pr-2 flex-1">
                   <button 
                       onClick={() => setSelected([])}
-                      className="w-full text-left px-4 py-3 rounded-xl border border-rose-100 text-rose-600 hover:bg-rose-50 text-sm font-bold transition flex items-center gap-2"
+                      className="w-full text-left px-4 py-3 rounded-xl border border-rose-100 text-rose-600 hover:bg-rose-50 text-sm font-bold transition flex items-center gap-2 mb-2"
                   >
                       <X className="w-4 h-4" /> Clear All Selections
                   </button>
                   
-                  {uniqueMerchants.map(merchant => {
-                      const isSelected = selected.includes(merchant);
-                      return (
-                          <button 
-                              key={merchant}
-                              onClick={() => toggleMerchant(merchant)}
-                              className={`w-full text-left px-4 py-3 rounded-xl border transition flex justify-between items-center ${isSelected ? 'bg-indigo-50 border-indigo-200 shadow-inner' : 'bg-white border-slate-200 hover:border-indigo-200'}`}
-                          >
-                              <div className="flex items-center gap-3">
-                                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300'}`}>
-                                      {isSelected && <Check className="w-3.5 h-3.5" />}
-                                  </div>
-                                  <div>
-                                      <div className={`text-sm font-bold ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{merchant}</div>
-                                  </div>
+                  {regularMerchants.map(item => (
+                      <button 
+                          key={item.merchant}
+                          onClick={() => toggleMerchant(item.merchant)}
+                          className={`w-full text-left px-4 py-3 rounded-xl border transition flex gap-3 items-center ${item.isSelected ? 'bg-indigo-50 border-indigo-200 shadow-inner' : 'bg-white border-slate-200 hover:border-indigo-200'}`}
+                      >
+                          <div className={`shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-colors ${item.isSelected ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300'}`}>
+                              {item.isSelected && <Check className="w-3.5 h-3.5" />}
+                          </div>
+                          
+                          <div className="flex flex-col gap-0.5 w-full min-w-0">
+                              <div className="flex justify-between items-center w-full gap-2">
+                                  <span className={`text-sm font-bold truncate ${item.isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{item.merchant}</span>
+                                  <span className="text-sm font-bold text-slate-800 shrink-0">{currencySymbol}{item.lastAmount.toFixed(2)}</span>
                               </div>
-                              <div className="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
-                                  Last: {currencySymbol}{merchantSummary[merchant].amount.toFixed(2)}
+                              <div className="flex justify-between items-center w-full text-[10px] sm:text-xs text-slate-500 font-medium">
+                                  <span>Last Paid {formatUKDate(item.lastDate)}</span>
+                                  <span className="bg-slate-100/80 px-1.5 py-0.5 rounded text-slate-600">{item.frequency}</span>
                               </div>
-                          </button>
-                      );
-                  })}
-                  {uniqueMerchants.length === 0 && <p className="text-sm text-slate-400 text-center py-4">No recent bank transactions found.</p>}
+                          </div>
+                      </button>
+                  ))}
+                  {regularMerchants.length === 0 && <p className="text-sm text-slate-400 text-center py-4">No regular bank transactions found.</p>}
               </div>
               
               <div className="flex gap-3 shrink-0">
