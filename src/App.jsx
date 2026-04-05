@@ -3162,6 +3162,15 @@ const SettingsScreen = ({ user, onClose, currentSettings, onSaveSettings, onRese
         </div>
       </div>
 
+      <LinkExpenseModal 
+          isOpen={!!expenseToLink}
+          expense={expenseToLink}
+          bankTransactions={bankTransactions || []} 
+          onClose={() => setExpenseToLink(null)}
+          onLink={handleLinkExpenseLocal}
+          currency={currency} 
+      />
+
       {/* STICKY FOOTER ACTION BAR */}
       <div className="bg-white p-4 border-t border-slate-200 shrink-0 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-20">
          <div className="max-w-2xl mx-auto flex gap-3">
