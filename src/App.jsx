@@ -5111,6 +5111,48 @@ const ConfigureMonthModal = ({
   );
 };
 
+// --- NEW: MANUAL BANK LINKING MODAL ---
+const LinkExpenseModal = ({ isOpen, onClose, expense, bankTransactions, onLink }) => {
+  if (!isOpen || !expense) return null;
+  
+  // Get unique merchants from recent transactions and sort alphabetically
+  const uniqueMerchants = [...new Set(bankTransactions.map(tx => tx.merchant))].sort();
+
+  return (
+      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-xl flex flex-col max-h-[80vh]">
+              <div className="shrink-0 mb-4">
+                  <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><LinkIcon className="w-5 h-5 text-indigo-500" /> Link to Bank</h3>
+                  <p className="text-xs font-medium text-slate-500 mt-1">Select the actual bank merchant for <strong>{expense.name}</strong> to auto-track it.</p>
+              </div>
+              
+              <div className="overflow-y-auto custom-scrollbar space-y-2 mb-4 pr-2 flex-1">
+                  <button 
+                      onClick={() => onLink(expense.id, null)}
+                      className="w-full text-left px-4 py-3 rounded-xl border border-rose-100 text-rose-600 hover:bg-rose-50 text-sm font-bold transition flex items-center gap-2"
+                  >
+                      <X className="w-4 h-4" /> Unlink / Use Manual Tracking
+                  </button>
+                  
+                  {uniqueMerchants.map(merchant => (
+                      <button 
+                          key={merchant}
+                          onClick={() => onLink(expense.id, merchant)}
+                          className={`w-full text-left px-4 py-3 rounded-xl border transition text-sm font-bold flex justify-between items-center ${expense.linkedMerchant === merchant ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-200'}`}
+                      >
+                          {merchant}
+                          {expense.linkedMerchant === merchant && <CheckCircle2 className="w-4 h-4" />}
+                      </button>
+                  ))}
+                  {uniqueMerchants.length === 0 && <p className="text-sm text-slate-400 text-center py-4">No recent bank transactions found. Connect a bank first!</p>}
+              </div>
+              
+              <button onClick={onClose} className="w-full py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition shrink-0">Cancel</button>
+          </div>
+      </div>
+  );
+};
+
 export default function App() {
 
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -5137,6 +5179,9 @@ export default function App() {
   const [showConfigureModal, setShowConfigureModal] = useState(false);
   const [excludedItems, setExcludedItems] = useState([]);
   const [sandboxExcludedItems, setSandboxExcludedItems] = useState([]);
+
+  const [bankTransactions, setBankTransactions] = useState([]);
+  const [expenseToLink, setExpenseToLink] = useState(null);
 
   // --- ADMIN DEMO STATE ---
   const [activeDemoId, setActiveDemoId] = useState(null);
@@ -5434,7 +5479,34 @@ export default function App() {
   const displayAllocations = effectiveAllocations.filter(plan => !effectiveExcludedItems.includes(plan.name));
   const displayDefaultExpenses = effectiveSettings.defaultFixedExpenses;
   const displayActualSavings = effectiveActuals;
-  const displayExpensesAll = effectiveExpenses.filter(e => !effectiveExcludedItems.includes(e.name));
+  // --- NEW: THE AUTO-TICK ENGINE ---
+  const displayExpensesAllRaw = effectiveExpenses.filter(e => !effectiveExcludedItems.includes(e.name));
+  
+  const displayExpensesAll = displayExpensesAllRaw.map(expense => {
+      if (expense.linkedMerchant && bankTransactions.length > 0) {
+          // 1. Establish the current dashboard month bounds
+          const monthStart = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`;
+          const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString().split('T')[0];
+          
+          // 2. Scan bank feed for this exact merchant WITHIN this specific month
+          const matchedTx = bankTransactions.find(tx => 
+              tx.merchant === expense.linkedMerchant && 
+              tx.date >= monthStart && 
+              tx.date <= monthEnd
+          );
+
+          if (matchedTx) {
+              return {
+                  ...expense,
+                  paid: true,
+                  amount: matchedTx.amount, // Automatically overrides expected cost with Actual Cost!
+                  paidDate: matchedTx.date,
+                  paidBank: matchedTx.bankName
+              };
+          }
+      }
+      return expense;
+  });
   const displayExpenses = displayExpensesAll; // Keeps legacy components safe
 
   // Toast Helper
@@ -5695,6 +5767,17 @@ export default function App() {
     });
     
     return () => unsub();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const txRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'bankTransactions');
+    const unsubTx = onSnapshot(txRef, (docSnap) => {
+        if (docSnap.exists() && docSnap.data().transactions) {
+            setBankTransactions(docSnap.data().transactions);
+        }
+    });
+    return () => unsubTx();
   }, [user]);
 
   const handleReportSelection = async (type) => {
@@ -6234,6 +6317,16 @@ export default function App() {
     showToast("Bill added!");
   };
 
+  const handleLinkExpense = (expenseId, merchantName) => {
+    triggerHaptic();
+    const updatedExpenses = expenses.map(e => 
+        e.id === expenseId ? { ...e, linkedMerchant: merchantName } : e
+    );
+    setExpenses(updatedExpenses);
+    saveData(salary, updatedExpenses, actualSavings);
+    setExpenseToLink(null);
+};
+
 
   const updateExpenseAmount = (id, newAmount) => {
     const updatedExpenses = displayExpenses.map(e => 
@@ -6561,6 +6654,14 @@ export default function App() {
          actualSavings={effectiveActuals}
          excludedItems={effectiveExcludedItems}
          onToggleItem={toggleMonthItem}
+      />
+
+      <LinkExpenseModal 
+          isOpen={!!expenseToLink}
+          expense={expenseToLink}
+          bankTransactions={bankTransactions}
+          onClose={() => setExpenseToLink(null)}
+          onLink={handleLinkExpense}
       />
 
   {showSettings && (
@@ -7324,21 +7425,27 @@ export default function App() {
                                 >
                                   <div className="p-3 sm:p-4 sm:px-6 flex justify-between items-center group hover:bg-slate-50/80 transition-all duration-200 gap-2 sm:gap-4">
                                     
-                                    {/* ✅ LEFT SIDE: Added min-w-0 to force the title to truncate if it gets too long */}
+                                    {/* ✅ LEFT SIDE */}
                                     <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
                                       
-                                      {/* ✅ CHECKBOX: Made slightly smaller on mobile (w-5 h-5) */}
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          toggleExpensePaid(expense.id);
-                                        }}
-                                        className={`shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-md border-2 flex items-center justify-center transition-all ${expense.paid ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm' : 'border-slate-300 bg-slate-50 hover:border-emerald-400'}`}
-                                      >
-                                        {expense.paid && <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" />}
-                                      </button>
+                                      {/* ✅ CHECKBOX */}
+                                      {expense.linkedMerchant ? (
+                                          <div className={`shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-md flex items-center justify-center ${expense.paid ? 'bg-emerald-100 text-emerald-500' : 'bg-slate-100 text-slate-400'}`}>
+                                              {expense.paid ? <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <RefreshCw className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-spin-slow" />}
+                                          </div>
+                                      ) : (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              toggleExpensePaid(expense.id);
+                                            }}
+                                            className={`shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-md border-2 flex items-center justify-center transition-all ${expense.paid ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm' : 'border-slate-300 bg-slate-50 hover:border-emerald-400'}`}
+                                          >
+                                            {expense.paid && <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" />}
+                                          </button>
+                                      )}
 
-                                      {/* ✅ ICON: Made slightly smaller on mobile */}
+                                      {/* ✅ ICON */}
                                       <div className={`shrink-0 p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-slate-50 text-slate-400 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center border border-slate-100 shadow-sm group-hover:scale-110 transition duration-300 ${expense.paid ? 'opacity-40 grayscale' : ''}`}>
                                          {expense.logo ? (
                                            <img src={expense.logo} alt={expense.name} className="w-full h-full object-contain mix-blend-multiply" />
@@ -7358,56 +7465,81 @@ export default function App() {
                                             onKeyDown={(e) => e.key === 'Enter' && setEditingExpenseId(null)}
                                           />
                                         ) : (
-                                          <p className={`font-bold text-slate-700 truncate text-sm sm:text-base transition-all ${expense.paid ? 'line-through decoration-slate-500 decoration-2' : ''}`}>{expense.name}</p>
+                                          <div className="flex items-center gap-2">
+                                              <p className={`font-bold text-slate-700 truncate text-sm sm:text-base transition-all ${expense.paid ? 'line-through decoration-slate-500 decoration-2' : ''}`}>{expense.name}</p>
+                                              <button 
+                                                  onClick={() => setExpenseToLink(expense)}
+                                                  className={`shrink-0 p-1 sm:p-1.5 rounded-lg transition-colors ${expense.linkedMerchant ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                                                  title="Link to Bank Transaction"
+                                              >
+                                                  <LinkIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                              </button>
+                                          </div>
                                         )}
-                                        <p className="text-[10px] sm:text-xs text-slate-400 capitalize flex items-center gap-1 truncate">
+                                        <p className="text-[10px] sm:text-xs text-slate-400 flex items-center gap-1 truncate mt-0.5">
                                            <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${expense.type === 'fixed' ? 'bg-indigo-400' : expense.type === 'credit_card' ? 'bg-purple-400' : expense.type === 'mortgage' ? 'bg-blue-500' : 'bg-emerald-400'}`}></span>
-                                           <span className="truncate">{expense.type.replace('_', ' ')}</span>
+                                           <span className="truncate capitalize">{expense.type.replace('_', ' ')}</span>
+                                           {expense.linkedMerchant && (
+                                               <span className="text-[9px] font-bold text-indigo-500 uppercase tracking-wider bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 ml-1">Linked</span>
+                                           )}
                                         </p>
                                       </div>
                                     </div>
                                     
-                                    {/* ✅ RIGHT SIDE: Added 'shrink-0' so the amount NEVER gets squashed or cut off */}
-                                    <div className="flex items-center gap-1 sm:gap-3 shrink-0">
-                                      {isEditing ? (
-                                        <div className="flex items-center gap-1">
-                                          <input 
-                                            autoFocus
-                                            type="text"
-                                            defaultValue={expense.amount}
-                                            onBlur={(e) => updateExpenseAmount(expense.id, safeCalculate(e.target.value))}
-                                            onKeyDown={(e) => {
-                                              if (e.key === 'Enter') {
-                                                 updateExpenseAmount(expense.id, safeCalculate(e.currentTarget.value));
-                                                 setEditingExpenseId(null);
-                                              }
-                                            }}
-                                            className="w-20 sm:w-24 p-1.5 sm:p-2 border border-emerald-200 rounded-lg bg-white text-right font-bold text-slate-800 ring-2 ring-emerald-100 outline-none text-sm sm:text-base"
-                                          />
-                                        </div>
-                                      ) : (
-                                        <button 
-                                          onClick={() => { triggerHaptic(); setEditingExpenseId(expense.id); }}
-                                          className={`flex items-center gap-1 sm:gap-2 hover:bg-white px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200 text-orange-600' : 'text-slate-700'} ${expense.paid ? 'line-through decoration-slate-500 decoration-2 opacity-40' : ''} print:hover:bg-transparent print:p-0 print:ring-0`}
-                                        >
-                                          {expense.amount === 0 ? (
-                                            <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
-                                              Set <span className="hidden sm:inline">Amount</span> <Edit2 className="w-3 h-3" />
-                                            </span>
-                                          ) : (
-                                            <span className="font-bold text-base sm:text-lg">{formatCurrency(expense.amount, effectiveSettings.currency)}</span>
-                                          )}
-                                        </button>
-                                      )}
+                                    {/* ✅ RIGHT SIDE */}
+                                    <div className="flex flex-col items-end gap-1 shrink-0">
+                                      <div className="flex items-center gap-1 sm:gap-2">
+                                        {isEditing ? (
+                                          <div className="flex items-center gap-1">
+                                            <input 
+                                              autoFocus
+                                              type="text"
+                                              defaultValue={expense.amount}
+                                              onBlur={(e) => updateExpenseAmount(expense.id, safeCalculate(e.target.value))}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                   updateExpenseAmount(expense.id, safeCalculate(e.currentTarget.value));
+                                                   setEditingExpenseId(null);
+                                                }
+                                              }}
+                                              className="w-20 sm:w-24 p-1.5 sm:p-2 border border-emerald-200 rounded-lg bg-white text-right font-bold text-slate-800 ring-2 ring-emerald-100 outline-none text-sm sm:text-base"
+                                            />
+                                          </div>
+                                        ) : (
+                                          <button 
+                                            onClick={() => { triggerHaptic(); setEditingExpenseId(expense.id); }}
+                                            className={`flex items-center gap-1 sm:gap-2 hover:bg-white px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl transition ${expense.amount === 0 ? 'bg-orange-50 ring-1 ring-orange-200 text-orange-600' : 'text-slate-700'} ${expense.paid && !expense.linkedMerchant ? 'line-through decoration-slate-500 decoration-2 opacity-40' : ''} print:hover:bg-transparent print:p-0 print:ring-0`}
+                                          >
+                                            {expense.amount === 0 ? (
+                                              <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
+                                                Set <span className="hidden sm:inline">Amount</span> <Edit2 className="w-3 h-3" />
+                                              </span>
+                                            ) : (
+                                              <span className={`font-bold text-base sm:text-lg ${expense.linkedMerchant && expense.paid ? 'text-emerald-600' : ''}`}>{formatCurrency(expense.amount, effectiveSettings.currency)}</span>
+                                            )}
+                                          </button>
+                                        )}
+                                        
+                                        {isEditing ? (
+                                           <button onClick={() => setEditingExpenseId(null)} className="bg-emerald-500 text-white p-1.5 sm:p-2 rounded-full hover:bg-emerald-600 transition shadow-lg shadow-emerald-200">
+                                             <Check className="w-3 h-3 sm:w-4 sm:h-4" />
+                                           </button>
+                                        ) : (
+                                          <button onClick={handleVacuum} className="text-slate-300 hover:text-red-500 transition p-1.5 sm:p-2 rounded-xl hover:bg-red-50 opacity-0 group-hover:opacity-100 print:hidden hidden md:block">
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        )}
+                                      </div>
                                       
-                                      {isEditing ? (
-                                         <button onClick={() => setEditingExpenseId(null)} className="bg-emerald-500 text-white p-1.5 sm:p-2 rounded-full hover:bg-emerald-600 transition shadow-lg shadow-emerald-200">
-                                           <Check className="w-3 h-3 sm:w-4 sm:h-4" />
-                                         </button>
-                                      ) : (
-                                        <button onClick={handleVacuum} className="text-slate-300 hover:text-red-500 transition p-1.5 sm:p-2 rounded-xl hover:bg-red-50 opacity-0 group-hover:opacity-100 print:hidden hidden md:block">
-                                          <Trash2 className="w-4 h-4" />
-                                        </button>
+                                      {/* LINKED STATUS TEXT */}
+                                      {expense.linkedMerchant && (
+                                          <div className="text-[9px] text-slate-400 pr-2 sm:pr-3 text-right">
+                                              {expense.paid ? (
+                                                  <span className="text-emerald-500 font-bold">Paid: {expense.paidDate}</span>
+                                              ) : (
+                                                  <span className="flex items-center gap-1 opacity-70"><RefreshCw className="w-2.5 h-2.5 animate-spin-slow" /> Awaiting Sync</span>
+                                              )}
+                                          </div>
                                       )}
                                     </div>
                                   </div>

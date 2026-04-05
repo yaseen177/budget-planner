@@ -59,6 +59,8 @@ const SpotlightCard = ({ children, className = "" }) => {
     setPosition({ x: e.clientX - rect.left, y: e.clientY - rect.top });
   };
 
+  
+
   return (
     <div
       ref={divRef}
@@ -553,6 +555,29 @@ useEffect(() => {
   const timeoutId = setTimeout(() => runAiCleaner(), 2000);
   return () => clearTimeout(timeoutId);
 }, [unknownNames, isDictionaryLoaded, user, appId, db]);
+
+  useEffect(() => {
+    if (cleanedTransactions.length > 0 && user) {
+        const saveTxs = async () => {
+            const txRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'bankTransactions');
+            
+            // We extract the last 150 outgoings to use as the manual linking dropdown
+            const simplifiedTxs = cleanedTransactions
+                .filter(tx => tx.amount < 0 && tx.category !== 'Transfer')
+                .slice(0, 150)
+                .map(tx => ({
+                    id: tx.id,
+                    date: tx.date,
+                    merchant: tx.displayMerchant || tx.rawMerchant || 'Unknown',
+                    amount: Math.abs(tx.amount),
+                    bankName: tx.bankName
+                }));
+                
+            await setDoc(txRef, { transactions: simplifiedTxs }, { merge: true }).catch(e => console.error(e));
+        };
+        saveTxs();
+    }
+  }, [cleanedTransactions, user, appId, db]);
 
   return (
     <div className="fixed inset-0 z-[200] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full duration-500">
